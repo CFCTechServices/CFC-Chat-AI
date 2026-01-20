@@ -76,3 +76,4 @@ data/videos/meta/*.whisper.json
 
 # Docs that shouldn't be tracked
 CFC Nutrient Ratio Templates Guide.docx
+__pycache__/main.cpython-312.pyc
