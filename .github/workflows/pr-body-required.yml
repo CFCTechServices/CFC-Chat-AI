@@ -1,0 +1,26 @@
+name: Require PR description and checklist
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  validate_pr_body:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate PR body + at least one checked box
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = (context.payload.pull_request.body || "").trim();
+
+            if (!body) {
+              core.setFailed("PR description is required. Please fill out the PR template.");
+              return;
+            }
+
+            // At least one checked markdown checkbox in the PR body
+            const checkedBoxRegex = /^[\s>*-]*[-*]\s*\[[xX]\]/m;
+            if (!checkedBoxRegex.test(body)) {
+              core.setFailed("Please check at least one item (e.g., in 'Type of change').");
+            }
