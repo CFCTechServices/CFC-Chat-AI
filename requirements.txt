@@ -9,10 +9,10 @@ numpy
 pathlib
 typing-extensions
 python-dotenv
-pywin32
 python-multipart>=0.0.20
 pytest
 supabase
-python-multipart
 openai>=1.13.3
 google-generativeai>=0.8.3
+
+# Note: pywin32 has been removed - it's Windows-only and not needed for Linux deployment
