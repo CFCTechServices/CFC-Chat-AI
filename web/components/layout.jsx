@@ -59,7 +59,7 @@
   }
 
   function Layout({ children }) {
-    const { user } = useUser();
+    const { user, role, supabase } = useUser();
     const { route, navigate, visualState } = useRouter();
 
     const showBackToLogin = route !== 'login' && route !== 'transition';
@@ -67,12 +67,12 @@
     const [hasAnimatedGreeting, setHasAnimatedGreeting] = React.useState(false);
 
     React.useEffect(() => {
-      if (!user?.name) {
+      if (!user?.email) {
         setGreetingName('');
         setHasAnimatedGreeting(false);
         return;
       }
-      const target = (user.name.split(' ')[0] || '').toString();
+      const target = (user.email.split('@')[0] || '').toString();
 
       if (route === 'transition' && !hasAnimatedGreeting) {
         let idx = 0;
@@ -89,7 +89,7 @@
       }
 
       setGreetingName(target);
-    }, [user?.name, route, hasAnimatedGreeting]);
+    }, [user?.email, route, hasAnimatedGreeting]);
 
     return (
       <div className="app-root">
@@ -100,12 +100,41 @@
               <div className="app-title">Support Assistant</div>
               <div className="app-subtitle">Conversational help for CFC Technologies</div>
             </div>
+
+            {/* Admin Navigation */}
+            {user && role === 'admin' && (
+              <div style={{ marginLeft: '40px', display: 'flex', gap: '10px' }}>
+                <button
+                  className={route === 'chat' ? 'btn-primary' : 'btn-secondary'}
+                  onClick={() => navigate('chat')}
+                  style={{ padding: '4px 12px', fontSize: '0.9rem' }}
+                >
+                  Chat
+                </button>
+                <button
+                  className={route === 'admin' ? 'btn-primary' : 'btn-secondary'}
+                  onClick={() => navigate('admin')}
+                  style={{ padding: '4px 12px', fontSize: '0.9rem' }}
+                >
+                  Admin
+                </button>
+              </div>
+            )}
           </div>
           <div className="app-header-right">
-            {user?.name ? (
-              <span className="app-greeting">
-                {greetingName ? `Hi, ${greetingName}!` : 'Hi,'}
-              </span>
+            {user?.email ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <span className="app-greeting">
+                  {greetingName ? `Hi, ${greetingName}!` : 'Hi,'}
+                </span>
+                <button
+                  className="link-button"
+                  onClick={() => supabase.auth.signOut()}
+                  style={{ fontSize: '0.9rem' }}
+                >
+                  Sign Out
+                </button>
+              </div>
             ) : (
               <span className="app-greeting muted">Hi there!</span>
             )}
@@ -118,15 +147,7 @@
         </main>
 
         <footer className="app-footer">
-          {showBackToLogin && (
-            <button
-              type="button"
-              className="link-button"
-              onClick={() => navigate('login')}
-            >
-              Return to login
-            </button>
-          )}
+          &copy; 2026 CFC Tech Services
         </footer>
       </div>
     );

@@ -2,6 +2,7 @@
 (() => {
   const { Layout } = window.CFC.Layout;
   const { Card, PrimaryButton } = window.CFC.Primitives;
+  const { useUser } = window.CFC.UserContext;
 
   const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.m4v', '.mkv', '.webm'];
 
@@ -18,8 +19,10 @@
     return name.replace(/\.[^.]+$/, '').replace(/\s+/g, '-');
   }
 
-  async function uploadSingleFile(file, onProgress) {
+  async function uploadSingleFile(file, token, onProgress) {
     if (!file) return { error: 'No file selected' };
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
 
     if (isVideoFile(file)) {
       const form = new FormData();
@@ -27,7 +30,11 @@
       form.append('file', file);
       form.append('model', 'small');
 
-      const res = await fetch('/api/videos/upload', { method: 'POST', body: form });
+      const res = await fetch('/api/videos/upload', {
+        method: 'POST',
+        headers: headers,
+        body: form
+      });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.detail || 'Video upload failed');
@@ -41,6 +48,11 @@
       form.append('file', file);
       const xhr = new XMLHttpRequest();
       xhr.open('POST', '/files/upload');
+
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      }
+
       xhr.upload.addEventListener('progress', (e) => {
         if (onProgress && e.lengthComputable) {
           const pct = Math.round((e.loaded / e.total) * 100);
@@ -67,6 +79,7 @@
   }
 
   function AdminPage() {
+    const { session } = useUser();
     const [singleFile, setSingleFile] = React.useState(null);
     const [singleStatus, setSingleStatus] = React.useState(null);
     const [singleProgress, setSingleProgress] = React.useState(0);
@@ -86,7 +99,7 @@
       if (!singleFile) return;
       setSingleStatus({ state: 'uploading', message: 'Uploading…' });
       try {
-        const data = await uploadSingleFile(singleFile, setSingleProgress);
+        const data = await uploadSingleFile(singleFile, session?.access_token, setSingleProgress);
         const isVideo = isVideoFile(singleFile);
         setSingleStatus({
           state: 'done',
@@ -126,7 +139,7 @@
         const file = bulkFiles[i];
         updateItem(i, { status: 'uploading', detail: '' });
         try {
-          const data = await uploadSingleFile(file, (pct) => updateItem(i, { progress: pct }));
+          const data = await uploadSingleFile(file, session?.access_token, (pct) => updateItem(i, { progress: pct }));
           const isVideo = isVideoFile(file);
           updateItem(i, {
             status: 'done',

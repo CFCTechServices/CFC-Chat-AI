@@ -2,6 +2,8 @@
 (() => {
   const { Layout } = window.CFC.Layout;
   const { Card } = window.CFC.Primitives;
+  const { useUser } = window.CFC.UserContext;
+  const { useState, useEffect, useRef, useCallback } = React;
 
   function formatTimecode(seconds) {
     if (seconds == null || Number.isNaN(seconds)) return null;
@@ -16,7 +18,7 @@
   }
 
   function useModal() {
-    const [content, setContent] = React.useState(null);
+    const [content, setContent] = useState(null);
     const open = (c) => setContent(c);
     const close = () => setContent(null);
 
@@ -34,9 +36,11 @@
     return { open, close, modal };
   }
 
-  function ChatMessage({ message, onImageClick, onVideoClick }) {
+  function ChatMessage({ message, onImageClick, onVideoClick, onFeedback }) {
     const isUser = message.role === 'user';
+    const isAssistant = message.role === 'assistant';
 
+    // Original Markdown Logic
     const escapeHtml = (text) =>
       text
         .replace(/&/g, '&amp;')
@@ -45,7 +49,7 @@
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
 
-    const renderMarkdown = React.useCallback((text) => {
+    const renderMarkdown = useCallback((text) => {
       if (!text) return '';
       const escaped = escapeHtml(text);
       const lines = escaped.split(/\r?\n/);
@@ -87,357 +91,174 @@
       return <div className="chat-text markdown" dangerouslySetInnerHTML={{ __html: html }} />;
     };
 
-    if (message.typing) {
-      return (
-        <div className="chat-message bot">
-          <div className="chat-bubble typing-bubble">
-            <div className="typing-dots-container">
-              <span className="typing-dot" />
-              <span className="typing-dot" />
-              <span className="typing-dot" />
-            </div>
-            {message.showThinking && <span className="typing-message">Assistant is thinking</span>}
-          </div>
-        </div>
-      );
-    }
-
     return (
       <div className={`chat-message ${isUser ? 'user' : 'bot'}`}>
-        <div className="chat-bubble">
-          {message.segments && message.segments.length ? (
-            message.segments.map((seg, idx) => {
-              if (seg.type === 'text') {
-                return <MarkdownText key={idx} text={seg.text} />;
-              }
-              if (seg.type === 'image') {
-                return (
-                  <img
-                    key={idx}
-                    src={seg.url}
-                    alt={seg.alt || 'Image'}
-                    className="chat-image"
-                    onClick={() => onImageClick && onImageClick(seg.url)}
-                  />
-                );
-              }
-              if (seg.type === 'video') {
-                return <VideoBubble key={idx} segment={seg} onVideoClick={onVideoClick} />;
-              }
-              return null;
-            })
-          ) : (
-            <MarkdownText text={message.text} />
-          )}
+        <div className={`chat-bubble ${isUser ? 'user-bubble' : 'bot-bubble'}`}>
+          {/* For now, we render content as text since backend returns text. 
+                    If we re-implement segments, they would go here. */}
+          <MarkdownText text={message.content || ''} />
         </div>
-      </div>
-    );
-  }
-
-  function VideoBubble({ segment, onVideoClick }) {
-    const videoRef = React.useRef(null);
-
-    const handleSeek = (sec) => {
-      if (videoRef.current) {
-        videoRef.current.currentTime = sec;
-        videoRef.current.play();
-      }
-    };
-
-    const timestamps = segment.timestamps || [];
-
-    return (
-      <div className="video-bubble">
-        <video
-          ref={videoRef}
-          className="chat-video"
-          controls
-          onClick={() => onVideoClick && onVideoClick({ url: segment.url, timestamps })}
-        >
-          <source src={segment.url} type="video/mp4" />
-        </video>
-        {timestamps.length > 0 && (
-          <div className="video-timestamps">
-            {timestamps.map((ts, idx) => (
-              <button
-                key={idx}
-                type="button"
-                className="timestamp-chip"
-                onClick={() => handleSeek(ts.seconds)}
-              >
-                {ts.label}
-              </button>
-            ))}
+        {isAssistant && message.id && !message.id.startsWith('temp') && (
+          <div style={{ marginTop: '4px', display: 'flex', gap: '8px', fontSize: '0.8rem', marginLeft: '4px' }}>
+            <button className="btn-secondary" style={{ padding: '2px 8px', height: '24px' }} onClick={() => onFeedback(message.id, 1)}>👍</button>
+            <button className="btn-secondary" style={{ padding: '2px 8px', height: '24px' }} onClick={() => onFeedback(message.id, -1)}>👎</button>
+            {message.citations && message.citations.length > 0 && (
+              <span style={{ color: 'var(--color-text-muted)', marginLeft: '8px', alignSelf: 'center' }}>
+                Sources: {message.citations.map(c => c.source || c.title || 'Doc').slice(0, 2).join(', ')}
+              </span>
+            )}
           </div>
         )}
       </div>
     );
   }
 
-  function buildVideoSegmentsFromAnswer(data) {
-    const url = data.answer_video_url || (Array.isArray(data.video_context) && data.video_context[0]?.video_url);
-    if (!url) return [];
-
-    const timestamps = [];
-    const start = data.answer_start_seconds ?? data.video_context?.[0]?.start_seconds;
-    const end = data.answer_end_seconds ?? data.video_context?.[0]?.end_seconds;
-
-    if (start != null && end != null && end > start) {
-      const span = end - start;
-      const step = span / 3;
-      const points = [start, start + step, start + 2 * step, end];
-      points.slice(0, 4).forEach((sec) => {
-        const label = formatTimecode(sec);
-        if (label) timestamps.push({ seconds: sec, label });
-      });
-    } else if (Array.isArray(data.video_context)) {
-      data.video_context.slice(0, 4).forEach((clip) => {
-        const sec = clip.start_seconds ?? 0;
-        const label = clip.timestamp || formatTimecode(sec) || 'Clip';
-        timestamps.push({ seconds: sec, label });
-      });
-    }
-
-    return [{ type: 'video', url, timestamps }];
-  }
-
-  function buildImageSegmentsFromAnswer(data) {
-    if (data.relevant_images && Array.isArray(data.relevant_images) && data.relevant_images.length > 0) {
-      return data.relevant_images.map((img) => {
-        const path = img.path || '';
-        const url = path.startsWith('http://') || path.startsWith('https://') ? path : `/content/images/${path}`;
-        return { type: 'image', url, alt: img.alt_text || 'Document image', position: img.position, path };
-      });
-    }
-    return [];
-  }
-
   function ChatPage() {
-    const [messages, setMessages] = React.useState([]);
-    const [input, setInput] = React.useState('');
-    const [sending, setSending] = React.useState(false);
-    const [attachedImages, setAttachedImages] = React.useState([]);
-    const chatThreadRef = React.useRef(null);
-    const thinkingTimeoutsRef = React.useRef({});
-
+    const { session } = useUser();
+    const [sessions, setSessions] = useState([]);
+    const [currentSessionId, setCurrentSessionId] = useState(null);
+    const [messages, setMessages] = useState([]);
+    const [input, setInput] = useState('');
+    const [sending, setSending] = useState(false);
+    const chatThreadRef = useRef(null);
     const { open: openModal, modal } = useModal();
 
-    const prepareConversationHistory = (msgs, maxMessages = 8) => {
-      const filtered = msgs.filter((m) => m.role === 'user' || m.role === 'assistant');
-      if (filtered.length <= maxMessages) return filtered;
-      const firstCount = Math.min(3, Math.floor(filtered.length / 3));
-      const firstMessages = filtered.slice(0, firstCount);
-      const recentCount = maxMessages - firstCount;
-      const recentMessages = filtered.slice(-recentCount);
-      const combined = [...firstMessages];
-      const firstIds = new Set(firstMessages.map((m) => m.id));
-      for (const msg of recentMessages) {
-        if (!firstIds.has(msg.id)) combined.push(msg);
-      }
-      return combined;
-    };
+    // ... (Hooks for sessions and messages remain the same) ...
+    useEffect(() => {
+      if (session) fetchSessions();
+    }, [session]);
 
-    React.useEffect(() => {
+    useEffect(() => {
+      if (session && currentSessionId) {
+        fetchMessages(currentSessionId);
+      } else {
+        setMessages([]);
+      }
+    }, [session, currentSessionId]);
+
+    useEffect(() => {
       if (chatThreadRef.current) {
         chatThreadRef.current.scrollTop = chatThreadRef.current.scrollHeight;
       }
     }, [messages]);
 
-    React.useEffect(() => {
-      messages.forEach((msg) => {
-        if (msg.typing && !msg.showThinking) {
-          if (!thinkingTimeoutsRef.current[msg.id]) {
-            thinkingTimeoutsRef.current[msg.id] = setTimeout(() => {
-              setMessages((prev) => {
-                const currentMsg = prev.find((m) => m.id === msg.id);
-                if (currentMsg && currentMsg.typing) {
-                  return prev.map((m) => (m.id === msg.id ? { ...m, showThinking: true } : m));
-                }
-                return prev;
-              });
-            }, 7000);
-          }
-        } else if (!msg.typing) {
-          if (thinkingTimeoutsRef.current[msg.id]) {
-            clearTimeout(thinkingTimeoutsRef.current[msg.id]);
-            delete thinkingTimeoutsRef.current[msg.id];
-          }
-          if (msg.showThinking) {
-            setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, showThinking: false } : m)));
+    const fetchSessions = async () => {
+      try {
+        const res = await fetch("/api/chat/sessions", {
+          headers: { "Authorization": `Bearer ${session.access_token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSessions(data);
+          if (data.length > 0 && !currentSessionId) {
+            setCurrentSessionId(data[0].id);
           }
         }
-      });
-
-      return () => {
-        Object.values(thinkingTimeoutsRef.current).forEach((timeout) => { if (timeout) clearTimeout(timeout); });
-        thinkingTimeoutsRef.current = {};
-      };
-    }, [messages]);
-
-    const handleImageChange = (e) => {
-      const files = Array.from(e.target.files || []);
-      const previews = files.map((file) => ({ file, url: URL.createObjectURL(file), id: `${file.name}-${Math.random().toString(36).slice(2)}` }));
-      setAttachedImages((prev) => [...prev, ...previews]);
+      } catch (e) { console.error("Fetch sessions error", e); }
     };
 
-    const appendMessage = (msg) => {
-      setMessages((prev) => [...prev, msg]);
+    const fetchMessages = async (sessionId) => {
+      try {
+        const res = await fetch(`/api/chat/sessions/${sessionId}`, {
+          headers: { "Authorization": `Bearer ${session.access_token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setMessages(data);
+        }
+      } catch (e) { console.error("Fetch messages error", e); }
     };
 
-    const simulateStreaming = (fullText, baseMessageId, extraSegments = []) => {
-      const chars = Array.from(fullText);
-      let idx = 0;
-      const speed = 18;
-
-      const imageSegments = extraSegments.filter((seg) => seg.type === 'image');
-      const otherSegments = extraSegments.filter((seg) => seg.type !== 'image');
-      const sortedImages = [...imageSegments].sort((a, b) => {
-        const posA = a.position ?? -1;
-        const posB = b.position ?? -1;
-        if (posA === -1) return 1;
-        if (posB === -1) return -1;
-        return posA - posB;
-      });
-
-      const buildSegments = (textLength) => {
-        const segments = [];
-        let textStart = 0;
-        const insertedImages = new Set();
-
-        for (const img of sortedImages) {
-          const imgPos = img.position ?? -1;
-          if (imgPos === -1 || imgPos >= textLength) continue;
-          if (imgPos > textStart) {
-            const textBefore = fullText.slice(textStart, imgPos);
-            if (textBefore.trim()) segments.push({ type: 'text', text: textBefore });
-          }
-          segments.push(img);
-          insertedImages.add(img.path || img.url);
-          textStart = imgPos;
+    const createNewSession = async () => {
+      try {
+        const res = await fetch("/api/chat/sessions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${session.access_token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ title: "New Chat" })
+        });
+        if (res.ok) {
+          const newSession = await res.json();
+          setSessions([newSession, ...sessions]);
+          setCurrentSessionId(newSession.id);
         }
-
-        if (textStart < textLength) {
-          const remainingText = fullText.slice(textStart, textLength);
-          if (remainingText.trim()) segments.push({ type: 'text', text: remainingText });
-        }
-
-        for (const img of sortedImages) {
-          if (!insertedImages.has(img.path || img.url)) segments.push(img);
-        }
-
-        segments.push(...otherSegments);
-        return segments;
-      };
-
-      const interval = setInterval(() => {
-        idx += 3;
-        const currentLength = Math.min(idx, chars.length);
-        const segments = buildSegments(currentLength);
-
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === baseMessageId
-              ? { ...m, typing: false, text: fullText.slice(0, currentLength), segments }
-              : m,
-          ),
-        );
-        if (chatThreadRef.current) {
-          chatThreadRef.current.scrollTop = chatThreadRef.current.scrollHeight;
-        }
-        if (idx >= chars.length) {
-          clearInterval(interval);
-        }
-      }, speed);
+      } catch (e) { console.error("Create session error", e); }
     };
 
-    const handleSubmit = async (e) => {
+    const handleSend = async (e) => {
       e.preventDefault();
       const q = input.trim();
       if (!q || sending) return;
 
-      const imageSegments = attachedImages.map((img) => ({ type: 'image', url: img.url, alt: 'Attached image' }));
+      let activeSessionId = currentSessionId;
+      if (!activeSessionId) {
+        const res = await fetch("/api/chat/sessions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${session.access_token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ title: q.substring(0, 30) })
+        });
+        const newSession = await res.json();
+        setSessions([newSession, ...sessions]);
+        setCurrentSessionId(newSession.id);
+        activeSessionId = newSession.id;
+      }
 
-      const userMessage = {
-        id: `u-${Date.now()}`,
+      const userMsg = {
+        id: `temp-${Date.now()}`,
         role: 'user',
-        text: q,
-        segments: [{ type: 'text', text: q }, ...imageSegments],
+        content: q
       };
-      appendMessage(userMessage);
-
-      const imagesForBackend = attachedImages.map((img) => img.url);
-
+      setMessages(prev => [...prev, userMsg]);
       setInput('');
-      setAttachedImages([]);
       setSending(true);
 
-      const botId = `b-${Date.now()}`;
-      appendMessage({ id: botId, role: 'assistant', text: '', segments: [], typing: true });
-
       try {
-        const conversationHistory = prepareConversationHistory(
-          messages.filter((m) => m.role === 'user' || m.role === 'assistant'),
-        ).map((m) => ({ role: m.role, content: m.text }));
-
-        const res = await fetch('/ask', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            question: q + (imagesForBackend.length ? ` (images: ${imagesForBackend.join(', ')})` : ''),
-            top_k: 4,
-            conversation_history: conversationHistory.length > 0 ? conversationHistory : undefined,
-          }),
+        const res = await fetch("/api/chat/message", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${session.access_token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ session_id: activeSessionId, content: q })
         });
-        const data = await res.json();
-        if (!data.success) {
-          throw new Error(data.detail || 'Error from assistant');
-        }
 
-        const answer = data.answer || 'No answer available.';
-        const videoSegments = buildVideoSegmentsFromAnswer(data);
-        const answerImages = buildImageSegmentsFromAnswer(data);
-        const allSegments = [...answerImages, ...videoSegments];
-        simulateStreaming(answer, botId, allSegments);
+        if (res.ok) {
+          const botMsg = await res.json();
+          setMessages(prev => [...prev, botMsg]);
+        } else {
+          setMessages(prev => [...prev, { role: 'assistant', content: "Error: Could not retrieve answer." }]);
+        }
       } catch (err) {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === botId
-              ? {
-                  ...m,
-                  typing: false,
-                  text: err.message || String(err),
-                  segments: [{ type: 'text', text: err.message || String(err) }],
-                }
-              : m,
-          ),
-        );
+        console.error(err);
+        setMessages(prev => [...prev, { role: 'assistant', content: "Error: " + err.message }]);
       } finally {
         setSending(false);
       }
     };
 
-    const handleImageClick = (url) => {
-      openModal(<img src={url} alt="Preview" className="modal-image" />);
-    };
-
-    const handleVideoClick = ({ url, timestamps }) => {
-      openModal(
-        <div className="modal-video-wrapper">
-          <video src={url} className="modal-video" controls autoPlay />
-          {timestamps && timestamps.length > 0 && (
-            <div className="video-timestamps">
-              {timestamps.map((ts, idx) => (
-                <span key={idx} className="timestamp-chip static">{ts.label}</span>
-              ))}
-            </div>
-          )}
-        </div>,
-      );
+    const handleFeedback = async (msgId, rating) => {
+      try {
+        await fetch("/api/chat/feedback", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${session.access_token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ message_id: msgId, session_id: currentSessionId, rating })
+        });
+        // Optional: show toast
+      } catch (e) { console.error("Feedback error", e); }
     };
 
     return (
       <Layout>
         <div className="page chat-page">
+          {/* Header Restored */}
           <div className="page-header-row">
             <div>
               <h1>Chat with CFC AI</h1>
@@ -445,67 +266,82 @@
             </div>
           </div>
 
-          <Card className="chat-card">
-            <div className="chat-thread" id="chatThread" ref={chatThreadRef}>
-              {messages.map((m) => (
-                <ChatMessage key={m.id} message={m} onImageClick={handleImageClick} onVideoClick={handleVideoClick} />
-              ))}
-            </div>
-            <form className="chat-composer" onSubmit={handleSubmit}>
-              <div className="composer-row">
-                <button
-                  type="button"
-                  className={`composer-info-icon ${messages.length > 12 ? 'visible' : ''}`}
-                  onClick={() => openModal(
-                    <div className="conversation-info-modal">
-                      <h3>Long Conversation Notice</h3>
-                      <p>
-                        This conversation is getting long. CFC AI may begin to lose sight of the original goal in very long conversations.
-                      </p>
-                      <p>
-                        For separate questions or new topics, consider refreshing the page to start a new conversation. This ensures the most reliable and focused responses.
-                      </p>
-                    </div>,
-                  )}
-                  title="Conversation length info"
-                  aria-label="Conversation length information"
-                >
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="10" cy="10" r="9" stroke="currentColor" strokeWidth="1.5" fill="none" />
-                    <path d="M10 7V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                    <circle cx="10" cy="13" r="1" fill="currentColor" />
-                  </svg>
-                </button>
-                <input
-                  type="text"
-                  className="composer-input"
-                  placeholder="Ask anything about CFC software…"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                />
-                <label className="btn-primary composer-button" title="Attach images">
-                  <span>Attach</span>
-                  <input type="file" accept="image/*" multiple onChange={handleImageChange} />
-                </label>
-                <button type="submit" className="btn-primary composer-button" disabled={sending}>
-                  {sending ? 'Sending…' : 'Send'}
-                </button>
-              </div>
-              {attachedImages.length > 0 && (
-                <div className="attached-images">
-                  {attachedImages.map((img) => (
-                    <img
-                      key={img.id}
-                      src={img.url}
-                      alt="Attachment"
-                      className="attached-thumb"
-                      onClick={() => handleImageClick(img.url)}
-                    />
+          <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start', height: 'calc(100vh - 220px)' }}>
+            {/* Sidebar */}
+            <div style={{ width: '260px', flexShrink: 0, height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <Card style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '12px' }}>
+                <button className="btn-secondary" style={{ width: '100%', marginBottom: '10px' }} onClick={createNewSession}>+ New Chat</button>
+                <div style={{ flex: 1, overflowY: 'auto', paddingRight: '4px' }}>
+                  {sessions.map(s => (
+                    <div
+                      key={s.id}
+                      onClick={() => setCurrentSessionId(s.id)}
+                      style={{
+                        padding: '8px 10px',
+                        cursor: 'pointer',
+                        backgroundColor: currentSessionId === s.id ? 'var(--color-surface-secondary)' : 'transparent',
+                        borderRadius: '8px',
+                        marginBottom: '4px',
+                        fontSize: '0.9rem',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        border: currentSessionId === s.id ? '1px solid var(--color-border)' : '1px solid transparent'
+                      }}
+                    >
+                      {s.title || "New Chat"}
+                    </div>
                   ))}
                 </div>
-              )}
-            </form>
-          </Card>
+              </Card>
+            </div>
+
+            {/* Main Chat Area */}
+            <div style={{ flex: 1, height: '100%', minWidth: 0 }}>
+              <Card className="chat-card" style={{ height: '100%' }}>
+                <div className="chat-thread" ref={chatThreadRef}>
+                  {messages.length === 0 && (
+                    <div style={{ textAlign: 'center', marginTop: '40px', color: 'var(--color-text-muted)' }}>
+                      Start a conversation...
+                    </div>
+                  )}
+                  {messages.map((m) => (
+                    <ChatMessage
+                      key={m.id || Math.random()}
+                      message={m}
+                      onFeedback={handleFeedback}
+                    />
+                  ))}
+                  {sending && (
+                    <div className="chat-message bot">
+                      <div className="chat-bubble typing-bubble">
+                        <div className="typing-dots-container">
+                          <span className="typing-dot" />
+                          <span className="typing-dot" />
+                          <span className="typing-dot" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <form className="chat-composer" onSubmit={handleSend} style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid var(--color-border)' }}>
+                  <div className="composer-row" style={{ display: 'flex', gap: '8px' }}>
+                    <input
+                      type="text"
+                      className="composer-input" // This class likely has flex-grow in css
+                      style={{ flex: 1, borderRadius: '999px', padding: '10px 16px', border: '1px solid var(--color-border)', outline: 'none' }}
+                      placeholder="Ask anything..."
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                    />
+                    <button type="submit" className="btn-primary composer-button" disabled={sending}>
+                      {sending ? 'Sending…' : 'Send'}
+                    </button>
+                  </div>
+                </form>
+              </Card>
+            </div>
+          </div>
         </div>
         {modal}
       </Layout>
