@@ -14,14 +14,23 @@
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [isSignUp, setIsSignUp] = useState(false);
+    const [inviteEmail, setInviteEmail] = useState(""); // Email from invite code
 
-    // Auto-detect invite code from URL
+    // Auto-detect invite code and email from URL
     useEffect(() => {
       const params = new URLSearchParams(window.location.search);
       const code = params.get("code") || params.get("invite");
+      const emailParam = params.get("email");
+
       if (code) {
         setInviteCode(code);
         setStep(1);
+
+        // If email is in URL, pre-fill it
+        if (emailParam) {
+          setEmail(emailParam);
+          setInviteEmail(emailParam);
+        }
       }
     }, []);
 
@@ -37,6 +46,11 @@
         });
         const data = await res.json();
         if (data.valid) {
+          // Store the email from the invite
+          if (data.email) {
+            setEmail(data.email);
+            setInviteEmail(data.email);
+          }
           setStep(2);
           setIsSignUp(true);
         } else {
@@ -54,18 +68,27 @@
       setLoading(true);
       setError("");
 
-      // Use Supabase client from global or context
-      // Context might not be fully ready if we are racing, but window.supabaseClient is set in setup.jsx
-      // Better to use window.supabaseClient as initialized in setup.jsx
-      // or cleaner: const { supabase } = useUser();
-
       try {
         const supabase = window.supabaseClient;
         if (!supabase) throw new Error("Supabase client not initialized");
 
         let result;
         if (isSignUp) {
-          result = await supabase.auth.signUp({ email, password });
+          // Validate email matches invite email
+          if (inviteEmail && email !== inviteEmail) {
+            throw new Error(`Email must match the invited email: ${inviteEmail}`);
+          }
+
+          // Pass invite_code in user metadata for the database trigger
+          result = await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: {
+                invite_code: inviteCode
+              }
+            }
+          });
         } else {
           result = await supabase.auth.signInWithPassword({ email, password });
         }
@@ -76,7 +99,7 @@
           setError("Sign up successful! Please check your email to confirm.");
           setIsSignUp(false); // Switch to login view
         }
-        // If session exists, UserProvider will reject automatically via onAuthStateChange
+        // If session exists, UserProvider will update automatically via onAuthStateChange
       } catch (err) {
         console.error(err);
         setError(err.message);
@@ -123,6 +146,11 @@
             ) : (
               <form onSubmit={handleAuth} className="login-form">
                 <h2>{isSignUp ? "Create Account" : "Sign In"}</h2>
+                {inviteEmail && isSignUp && (
+                  <div className="invite-info-box">
+                    ℹ️ This invitation is for: <strong>{inviteEmail}</strong>
+                  </div>
+                )}
                 <TextInput
                   label="Email"
                   type="email"
@@ -130,6 +158,7 @@
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@cfctech.com"
                   autoComplete="email"
+                  disabled={!!inviteEmail}
                 />
                 <TextInput
                   label="Password"

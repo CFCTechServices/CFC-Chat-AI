@@ -510,6 +510,22 @@ html.dark-mode .badge-blue {
   color: var(--color-text-muted);
 }
 
+.invite-info-box {
+  margin-bottom: 15px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--color-blue);
+  background: rgba(64, 101, 174, 0.1);
+  color: var(--color-text);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+html.dark-mode .invite-info-box {
+  background: rgba(64, 101, 174, 0.15);
+  border-color: var(--color-blue);
+}
+
 /* Docs page */
 .docs-grid {
   display: grid;

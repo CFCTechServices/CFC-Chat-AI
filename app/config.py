@@ -52,6 +52,14 @@ class Settings:
     GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY")
     GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
     
+    # Resend API Configuration (for email invitations)
+    RESEND_API_KEY: Optional[str] = os.getenv("RESEND_API_KEY")
+    FRONTEND_BASE_URL: str = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000")
+    
+    # Email Configuration
+    # Set to False to create invitations without sending emails (useful when Resend domain is not verified)
+    ENABLE_EMAIL_INVITES: bool = os.getenv("ENABLE_EMAIL_INVITES", "true").lower() in ("true", "1", "yes")
+    
     # Search Settings
     DEFAULT_TOP_K = 5
     MAX_CONTEXT_LENGTH = 4000

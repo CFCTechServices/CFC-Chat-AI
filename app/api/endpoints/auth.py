@@ -10,6 +10,7 @@ class ValidateInviteRequest(BaseModel):
 class ValidateInviteResponse(BaseModel):
     valid: bool
     message: str
+    email: str = None  # Email associated with the invite code
 
 @router.get("/config")
 def get_auth_config():
@@ -25,15 +26,24 @@ def get_auth_config():
 @router.post("/validate-invite", response_model=ValidateInviteResponse)
 async def validate_invite(request: ValidateInviteRequest):
     """
-    Validates an invite code using Supabase RPC.
+    Validates an invite code and returns the associated email.
     """
-    is_valid = check_invite_code(request.invite_code)
+    from app.core.supabase_service import supabase
     
-    if is_valid:
-        return ValidateInviteResponse(valid=True, message="Invite code is valid.")
-    else:
-        # Return 200 with valid=False or 400? 
-        # Frontend logic usually likes 200 OK -> valid=false/true, 
-        # but 400 is semantically correct for 'invalid input'. 
-        # Given the requirements, we'll return False but keep 200 OK so frontend can handle it gracefully.
+    try:
+        # Query the invitations table to get the code and email
+        response = supabase.table("invitations").select("email, is_used").eq("code", request.invite_code).single().execute()
+        
+        if response.data and not response.data.get("is_used"):
+            return ValidateInviteResponse(
+                valid=True, 
+                message="Invite code is valid.",
+                email=response.data.get("email")
+            )
+        elif response.data and response.data.get("is_used"):
+            return ValidateInviteResponse(valid=False, message="Invite code has already been used.")
+        else:
+            return ValidateInviteResponse(valid=False, message="Invalid invite code.")
+    except Exception as e:
+        print(f"Error validating invite: {e}")
         return ValidateInviteResponse(valid=False, message="Invalid invite code.")
