@@ -126,7 +126,7 @@
             {step === "credentials" && (
             <form onSubmit={handleRequestOtp} className="login-form">
               <h2>Sign in</h2>
-              <p> Access is restricted to authorized users only.
+              <p> Access is restricted to authorized users only. 
               </p>
               <TextInput
                 label="Email Address"
@@ -148,8 +148,8 @@
               <PrimaryButton type="submit" disabled = {isVerifying}>
                 {isVerifying ? 'Verifying...' : 'Continue'}
               </PrimaryButton>
-              <p>
-                  Don't have access? Contact your administrator.
+              <p className="footer-text">
+                  Don't have access? Contact your administrator to request access.
                 </p>
             </form>
             )}
