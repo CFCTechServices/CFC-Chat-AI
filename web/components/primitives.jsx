@@ -4,17 +4,17 @@
     return <div className={`card ${className}`}>{children}</div>;
   }
 
-  function PrimaryButton({ children, ...props }) {
+  function PrimaryButton({ children, className = '', ...props }) {
     return (
-      <button className="btn-primary" {...props}>
+      <button className={`btn-primary ${className}`} {...props}>
         {children}
       </button>
     );
   }
 
-  function SecondaryButton({ children, ...props }) {
+  function SecondaryButton({ children, className = '', ...props }) {
     return (
-      <button className="btn-secondary" {...props}>
+      <button className={`btn-secondary ${className}`} {...props}>
         {children}
       </button>
     );
