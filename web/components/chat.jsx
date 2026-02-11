@@ -34,7 +34,7 @@
     return { open, close, modal };
   }
 
-  function ChatMessage({ message, onImageClick, onVideoClick }) {
+  function ChatMessage({ message, onImageClick, onVideoClick, onCopy, onRating, copiedId, messageRatings }) {
     const isUser = message.role === 'user';
 
     const escapeHtml = (text) =>
@@ -102,6 +102,16 @@
       );
     }
 
+    const getMessageText = () => {
+      if (message.segments && message.segments.length) {
+        return message.segments
+          .filter(seg => seg.type === 'text')
+          .map(seg => seg.text)
+          .join('\n');
+      }
+      return message.text || '';
+    };
+
     return (
       <div className={`chat-message ${isUser ? 'user' : 'bot'}`}>
         <div className="chat-bubble">
@@ -130,6 +140,52 @@
             <MarkdownText text={message.text} />
           )}
         </div>
+        {!isUser && !message.typing && (
+          <div className="feedback-row">
+            <button 
+              className="feedback-button copy-button" 
+              type="button"
+              onClick={() => onCopy(getMessageText(), message.id)}
+              title="Copy message"
+            >
+              {copiedId === message.id ? (
+                <span className="feedback-icon">✓</span>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                </svg>
+              )}
+            </button>
+            <button 
+              className={`feedback-button thumbs-button ${messageRatings[message.id] === 'up' ? 'active-up' : ''}`}
+              type="button"
+              onClick={() => onRating(message.id, 'up')}
+              title="Thumbs up"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+              </svg>
+            </button>
+            <button 
+              className={`feedback-button thumbs-button ${messageRatings[message.id] === 'down' ? 'active-down' : ''}`}
+              type="button"
+              onClick={() => onRating(message.id, 'down')}
+              title="Thumbs down"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
+              </svg>
+            </button>
+            <button className="ellipsis-button" type="button" title="More options">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="1" />
+                <circle cx="19" cy="12" r="1" />
+                <circle cx="5" cy="12" r="1" />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -217,10 +273,48 @@
     const [input, setInput] = React.useState('');
     const [sending, setSending] = React.useState(false);
     const [attachedImages, setAttachedImages] = React.useState([]);
+    const [copiedId, setCopiedId] = React.useState(null);
+    const [messageRatings, setMessageRatings] = React.useState({});
+    const [conversations, setConversations] = React.useState([]);
+    const [currentChatId, setCurrentChatId] = React.useState(null);
     const chatThreadRef = React.useRef(null);
     const thinkingTimeoutsRef = React.useRef({});
 
     const { open: openModal, modal } = useModal();
+
+   
+    React.useEffect(() => {
+      const saved = localStorage.getItem('cfc-conversations');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setConversations(parsed);
+        } catch (e) {
+          console.error('conversations failed:', e);
+        }
+      }
+    }, []);
+    React.useEffect(() => {
+      if (conversations.length > 0) {
+        localStorage.setItem('cfc-conversations', JSON.stringify(conversations));
+      }
+    }, [conversations]);
+
+    const handleCopy = (content, messageId) => {
+      navigator.clipboard.writeText(content).then(() => {
+        setCopiedId(messageId);
+        setTimeout(() => setCopiedId(null), 2000);
+      }).catch((err) => {
+        console.error('Copied failed', err);
+      });
+    };
+
+    const handleRating = (messageId, rating) => {
+      setMessageRatings((prev) => ({
+        ...prev,
+        [messageId]: prev[messageId] === rating ? null : rating
+      }));
+    };
 
     const prepareConversationHistory = (msgs, maxMessages = 8) => {
       const filtered = msgs.filter((m) => m.role === 'user' || m.role === 'assistant');
@@ -434,6 +528,70 @@
         </div>,
       );
     };
+    const handleNewConversation = () => {
+      // Save current conversation if it has messages
+      if (messages.length > 0 && currentChatId) {
+        const title = messages.find(m => m.role === 'user')?.text?.slice(0, 50) || 'New Chat';
+        setConversations(prev => 
+          prev.map(c => 
+            c.id === currentChatId 
+              ? { ...c, title, messages, timestamp: new Date() }
+              : c
+          )
+        );
+      } else if (messages.length > 0) {
+        // Create new conversation for unsaved messages
+        const title = messages.find(m => m.role === 'user')?.text?.slice(0, 50) || 'New Chat';
+        const newChat = {
+          id: `chat-${Date.now()}`,
+          title,
+          messages,
+          timestamp: new Date()
+        };
+        setConversations(prev => [newChat, ...prev]);
+      }
+      
+      // Start fresh conversation
+      const newChatId = `chat-${Date.now()}`;
+      setCurrentChatId(newChatId);
+      setMessages([]);
+      setInput('');
+      setAttachedImages([]);
+      setMessageRatings({});
+    };
+
+    const handleSelectChat = (chatId) => {
+      // Save current conversation before switching
+      if (messages.length > 0 && currentChatId && currentChatId !== chatId) {
+        const title = messages.find(m => m.role === 'user')?.text?.slice(0, 50) || 'New Chat';
+        setConversations(prev => 
+          prev.map(c => 
+            c.id === currentChatId 
+              ? { ...c, title, messages, timestamp: new Date() }
+              : c
+          )
+        );
+      }
+
+      // Load selected conversation
+      const chat = conversations.find(c => c.id === chatId);
+      if (chat) {
+        setCurrentChatId(chatId);
+        setMessages(chat.messages || []);
+        setInput('');
+        setAttachedImages([]);
+      }
+    };
+
+    const handleDeleteChat = (chatId) => {
+      setConversations(prev => prev.filter(c => c.id !== chatId));
+      if (currentChatId === chatId) {
+        setCurrentChatId(null);
+        setMessages([]);
+        setInput('');
+        setAttachedImages([]);
+      }
+    };
 
     return (
       <Layout>
@@ -444,11 +602,72 @@
               <p>Ask questions about your software and get quick, informed answers.</p>
             </div>
           </div>
+          <div className="chat-layout">
+            <aside className="chat-sidebar">
+              <div className="sidebar-header">
+                <button className="new-chat-btn" onClick={handleNewConversation}>
+                  <span className="plus-icon">+</span>
+                  <span>New Conversation</span>
+                </button>
+              </div>
+              
+              <div className="conversation-list">
+                {conversations.map((chat) => (
+                  <div
+                    key={chat.id}
+                    className={`conversation-item ${currentChatId === chat.id ? 'active' : ''}`}
+                    onClick={() => handleSelectChat(chat.id)}
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <span className="chat-title">{chat.title}</span>
+                    <button
+                      className="delete-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteChat(chat.id);
+                      }}
+                      title="Delete chat"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+                {conversations.length === 0 && (
+                  <div className="empty-state">
+                    <span>No saved chats yet</span>
+                  </div>
+                )}
+              </div>
+              
+              <div className="sidebar-footer">
+                <div className="chat-counter">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                  <span>{conversations.length} {conversations.length === 1 ? 'chat' : 'chats'}</span>
+                </div>
+              </div>
+            </aside>
+          
 
           <Card className="chat-card">
             <div className="chat-thread" id="chatThread" ref={chatThreadRef}>
               {messages.map((m) => (
-                <ChatMessage key={m.id} message={m} onImageClick={handleImageClick} onVideoClick={handleVideoClick} />
+                <ChatMessage 
+                  key={m.id} 
+                  message={m} 
+                  onImageClick={handleImageClick} 
+                  onVideoClick={handleVideoClick}
+                  onCopy={handleCopy}
+                  onRating={handleRating}
+                  copiedId={copiedId}
+                  messageRatings={messageRatings}
+                />
               ))}
             </div>
             <form className="chat-composer" onSubmit={handleSubmit}>
@@ -506,6 +725,8 @@
               )}
             </form>
           </Card>
+          </div>
+
         </div>
         {modal}
       </Layout>

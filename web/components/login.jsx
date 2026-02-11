@@ -40,7 +40,7 @@
       } else {
         setEmailError('');
       }
-      setUser({ email, displayName: extractDisplayName(email) , password});
+      setUser({ email, name: extractDisplayName(email) , password});
       const lower = email.trim().toLowerCase();
       let target = 'chat';
       if (lower === 'admin@cfctech.com') target = 'admin';
