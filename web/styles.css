@@ -535,23 +535,7 @@ html.dark-mode .badge-blue {
   font-size: 0.75rem;
   color: var(--color-text-muted);
 }
-.otp-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 20px;
-  width: 100%;
-}
-.resend-button {
-  background: none ;
-  border: none t;
-  color: black ;
-  cursor: pointer ;
-  padding: 0 ;
-  font-size: 14px ;
-  box-shadow: none ;
-  transform: none ;
-}
+
 
 /* Docs page */
 .docs-grid {
