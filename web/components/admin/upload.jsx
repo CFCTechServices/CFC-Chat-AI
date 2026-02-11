@@ -1,6 +1,4 @@
-// Admin page: upload and bulk upload for docs/videos
 (() => {
-  const { Layout } = window.CFC.Layout;
   const { Card, PrimaryButton } = window.CFC.Primitives;
 
   const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.m4v', '.mkv', '.webm'];
@@ -8,8 +6,7 @@
   function isVideoFile(file) {
     if (!file) return false;
     if (file.type && file.type.startsWith('video/')) return true;
-    const name = file.name || '';
-    const lower = name.toLowerCase();
+    const lower = (file.name || '').toLowerCase();
     return VIDEO_EXTENSIONS.some((ext) => lower.endsWith(ext));
   }
 
@@ -66,7 +63,7 @@
     });
   }
 
-  function AdminPage() {
+  function UploadTab() {
     const [singleFile, setSingleFile] = React.useState(null);
     const [singleStatus, setSingleStatus] = React.useState(null);
     const [singleProgress, setSingleProgress] = React.useState(0);
@@ -143,81 +140,70 @@
     };
 
     return (
-      <Layout>
-        <div className="page admin-page">
-          <div className="page-header-row">
-            <div>
-              <h1>Admin Console</h1>
-              <p>Upload CFC documents and videos for ingestion. Files are routed to the correct pipeline automatically.</p>
+      <div className="admin-grid">
+        <Card className="admin-card">
+          <h2>Upload</h2>
+          <p className="muted">Upload a single document or video. We&apos;ll detect the file type and ingest it appropriately.</p>
+          <div className="file-picker">
+            <input type="file" onChange={handleSingleChange} className="file-input" />
+            {singleFile && (
+              <div className="file-chip">
+                <span>{singleFile.name}</span>
+                <span className="file-chip-kind">{isVideoFile(singleFile) ? 'Video' : 'Document'}</span>
+              </div>
+            )}
+          </div>
+          {singleProgress > 0 && (
+            <div className="progress-bar">
+              <div className="progress-fill" style={{ width: `${singleProgress}%` }} />
             </div>
+          )}
+          <div className="admin-actions">
+            <PrimaryButton type="button" onClick={handleSingleUpload}>Upload &amp; ingest</PrimaryButton>
           </div>
+          {singleStatus && (
+            <div className={`status-pill status-${singleStatus.state || 'info'}`}>
+              {singleStatus.message}
+            </div>
+          )}
+        </Card>
 
-          <div className="admin-grid">
-            <Card className="admin-card">
-              <h2>Upload</h2>
-              <p className="muted">Upload a single document or video. We&apos;ll detect the file type and ingest it appropriately.</p>
-              <div className="file-picker">
-                <input type="file" onChange={handleSingleChange} className="file-input" />
-                {singleFile && (
-                  <div className="file-chip">
-                    <span>{singleFile.name}</span>
-                    <span className="file-chip-kind">{isVideoFile(singleFile) ? 'Video' : 'Document'}</span>
-                  </div>
-                )}
-              </div>
-              {singleProgress > 0 && (
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: `${singleProgress}%` }} />
-                </div>
-              )}
-              <div className="admin-actions">
-                <PrimaryButton type="button" onClick={handleSingleUpload}>Upload &amp; ingest</PrimaryButton>
-              </div>
-              {singleStatus && (
-                <div className={`status-pill status-${singleStatus.state || 'info'}`}>
-                  {singleStatus.message}
-                </div>
-              )}
-            </Card>
-
-            <Card className="admin-card">
-              <h2>Bulk Upload</h2>
-              <p className="muted">Select a collection of documents and videos. Each file is queued, uploaded, and ingested with progress tracking.</p>
-              <div className="file-picker">
-                <input type="file" multiple onChange={handleBulkChange} className="file-input" />
-              </div>
-              <div className="admin-actions">
-                <PrimaryButton type="button" onClick={handleBulkUpload} disabled={bulkBusy || !bulkFiles.length}>
-                  {bulkBusy ? 'Uploading…' : 'Start bulk upload'}
-                </PrimaryButton>
-              </div>
-              <div className="bulk-list">
-                {bulkItems.map((item) => (
-                  <div key={item.id} className="bulk-item">
-                    <div className="bulk-row">
-                      <span className="bulk-name">{item.file.name}</span>
-                      <span className={`bulk-status bulk-${item.status}`}>
-                        {item.status === 'ready' && 'Ready'}
-                        {item.status === 'uploading' && 'Uploading…'}
-                        {item.status === 'done' && 'Ingested'}
-                        {item.status === 'error' && 'Error'}
-                      </span>
-                    </div>
-                    <div className="progress-bar small">
-                      <div className="progress-fill" style={{ width: `${item.progress || 0}%` }} />
-                    </div>
-                    {item.detail && <div className="bulk-detail">{item.detail}</div>}
-                  </div>
-                ))}
-              </div>
-            </Card>
+        <Card className="admin-card">
+          <h2>Bulk Upload</h2>
+          <p className="muted">Select a collection of documents and videos. Each file is queued, uploaded, and ingested with progress tracking.</p>
+          <div className="file-picker">
+            <input type="file" multiple onChange={handleBulkChange} className="file-input" />
           </div>
-        </div>
-      </Layout>
+          <div className="admin-actions">
+            <PrimaryButton type="button" onClick={handleBulkUpload} disabled={bulkBusy || !bulkFiles.length}>
+              {bulkBusy ? 'Uploading…' : 'Start bulk upload'}
+            </PrimaryButton>
+          </div>
+          <div className="bulk-list">
+            {bulkItems.map((item) => (
+              <div key={item.id} className="bulk-item">
+                <div className="bulk-row">
+                  <span className="bulk-name">{item.file.name}</span>
+                  <span className={`bulk-status bulk-${item.status}`}>
+                    {item.status === 'ready' && 'Ready'}
+                    {item.status === 'uploading' && 'Uploading…'}
+                    {item.status === 'done' && 'Ingested'}
+                    {item.status === 'error' && 'Error'}
+                  </span>
+                </div>
+                <div className="progress-bar small">
+                  <div className="progress-fill" style={{ width: `${item.progress || 0}%` }} />
+                </div>
+                {item.detail && <div className="bulk-detail">{item.detail}</div>}
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
     );
   }
 
   window.CFC = window.CFC || {};
-  window.CFC.Pages = window.CFC.Pages || {};
-  window.CFC.Pages.AdminPage = AdminPage;
+  window.CFC.Admin = window.CFC.Admin || {};
+  window.CFC.Admin.UploadTab = UploadTab;
 })();
