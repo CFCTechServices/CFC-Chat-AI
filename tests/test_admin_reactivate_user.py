@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for admin change-role endpoint
+Test script for admin unban user endpoint (restore banned users)
 """
 import requests
 import json
@@ -21,9 +21,8 @@ load_dotenv(BASE_DIR / ".env")
 ADMIN_EMAIL: str = os.getenv("TEST_ADMIN_EMAIL")
 ADMIN_PASSWORD: str = os.getenv("TEST_ADMIN_PASSWORD")
 
-# Target user whose role you want to change (loaded from environment)
+# Target user to reactivate (loaded from environment)
 TARGET_USER_ID: str = os.getenv("TEST_TARGET_USER_ID")
-NEW_ROLE: str = "dev"  # TODO: One of: 'user', 'dev', 'admin'
 
 # API base URL
 API_BASE_URL = "http://localhost:8000"
@@ -65,26 +64,21 @@ def authenticate_with_supabase(email: str, password: str) -> Optional[str]:
         print(f"❌ Error during authentication: {e}")
         return None
 
-def test_change_role(jwt_token: str, user_id: str, new_role: str):
+def test_reactivate_user(jwt_token: str, user_id: str):
     """
-    Test the admin change-role endpoint.
+    Test the admin reactivate user endpoint.
     """
-    print(f"\n🔄 Attempting to change user role...")
+    print(f"\n✅ Attempting to reactivate user...")
     print(f"   User ID: {user_id}")
-    print(f"   New Role: {new_role}")
     
-    url = f"{API_BASE_URL}/api/admin/change-role"
+    url = f"{API_BASE_URL}/api/admin/users/{user_id}/reactivate"
     headers = {
         "Authorization": f"Bearer {jwt_token}",
         "Content-Type": "application/json"
     }
-    payload = {
-        "user_id": user_id,
-        "new_role": new_role
-    }
     
     try:
-        response = requests.post(url, headers=headers, json=payload)
+        response = requests.post(url, headers=headers)
         
         print(f"\n📊 Response Status: {response.status_code}")
         print(f"📝 Response Body:")
@@ -95,10 +89,15 @@ def test_change_role(jwt_token: str, user_id: str, new_role: str):
             print(response.text)
         
         if response.status_code == 200:
-            print(f"\n✅ SUCCESS! User role changed to '{new_role}'")
-            print(f"   You can verify this in the 'public.profiles' table in your database.")
+            print(f"\n✅ SUCCESS! User has been reactivated")
+            print(f"   🔓 User can now login again")
+            print(f"   ✨ Status set back to 'active'")
+            print(f"   🗄️  Verify in 'public.profiles' table:")
+            print(f"      - status='active'")
+            print(f"      - deleted_at=NULL")
+            print(f"      - deleted_by=NULL")
         elif response.status_code == 400:
-            print(f"\n⚠️  Bad Request: Invalid role or parameters")
+            print(f"\n⚠️  Bad Request: User is not deactivated or doesn't need reactivation")
         elif response.status_code == 403:
             print(f"\n⚠️  Forbidden: User is not an admin")
         elif response.status_code == 404:
@@ -111,22 +110,17 @@ def test_change_role(jwt_token: str, user_id: str, new_role: str):
 
 def main():
     print("=" * 70)
-    print("🧪 Admin Change Role Endpoint Test Script")
+    print("🧪 Admin Reactivate User Endpoint Test Script")
     print("=" * 70)
     
     # Validate configuration
     if not TARGET_USER_ID:
         print("\n❌ ERROR: TARGET_USER_ID is not set!")
         print("Please update the TARGET_USER_ID variable in this script.")
-        print("\nTo find a user ID:")
-        print("1. Go to Supabase -> Authentication -> Users")
-        print("2. Click on a user to see their UUID")
-        print("3. Copy the UUID and paste it into TARGET_USER_ID")
-        return
-    
-    if NEW_ROLE not in ['user', 'dev', 'admin']:
-        print(f"\n❌ ERROR: Invalid role '{NEW_ROLE}'")
-        print("NEW_ROLE must be one of: 'user', 'dev', 'admin'")
+        print("\nTo find a deactivated user ID:")
+        print("1. Go to Supabase -> Table Editor -> profiles")
+        print("2. Filter: status = 'inactive'")
+        print("3. Copy the user's UUID")
         return
     
     if not ADMIN_EMAIL or not ADMIN_PASSWORD:
@@ -144,12 +138,13 @@ def main():
     
     print("✅ Authentication successful!")
     
-    # Test change role endpoint
-    test_change_role(jwt_token, TARGET_USER_ID, NEW_ROLE)
+    # Test reactivate user endpoint
+    test_reactivate_user(jwt_token, TARGET_USER_ID)
     
     print("\n" + "=" * 70)
     print("🏁 Test Complete")
     print("=" * 70)
+    print("\n💡 User should now be able to login again!")
 
 if __name__ == "__main__":
     main()

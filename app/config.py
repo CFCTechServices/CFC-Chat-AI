@@ -39,8 +39,21 @@ class Settings:
     PINECONE_NAMESPACE: Optional[str] = os.getenv("PINECONE_NAMESPACE")
     
     # Supabase / Content Storage Settings
+    # IMPORTANT: Two different keys for different purposes!
     SUPABASE_URL: Optional[str] = os.getenv("SUPABASE_URL")
+    
+    # ANON KEY - Public key for client-side authentication
+    # - Safe to expose to frontend
+    # - Respects Row Level Security (RLS)
+    # - Used for: User authentication, client-facing operations
     SUPABASE_ANON_KEY: Optional[str] = os.getenv("SUPABASE_ANON_KEY")
+    
+    # SERVICE ROLE KEY - Admin key for backend operations
+    # - NEVER expose to frontend/client
+    # - Bypasses Row Level Security (RLS)
+    # - Used for: Admin endpoints, server-side operations, bypassing RLS
+    SUPABASE_SERVICE_ROLE_KEY: Optional[str] = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    
     SUPABASE_BUCKET: Optional[str] = os.getenv("SUPABASE_BUCKET")
     SUPABASE_BUCKET_VIDEOS: Optional[str] = os.getenv("SUPABASE_BUCKET_VIDEOS", SUPABASE_BUCKET)
     LOCAL_CONTENT_ROOT = PROCESSED_DIR / "content_repository"

@@ -102,7 +102,16 @@
         // If session exists, UserProvider will update automatically via onAuthStateChange
       } catch (err) {
         console.error(err);
-        setError(err.message);
+
+        // Map Supabase Auth errors to user-friendly messages
+        let errorMessage = err.message;
+
+        // When a user is banned in Supabase Auth, show "Account is inactive"
+        if (errorMessage && errorMessage.toLowerCase().includes('banned')) {
+          errorMessage = 'Account is inactive';
+        }
+
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }

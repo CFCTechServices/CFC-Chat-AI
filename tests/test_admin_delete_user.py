@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Test script for admin change-role endpoint
+Test script for admin delete user endpoint (hard delete)
+WARNING: This permanently deletes users and all their data!
 """
 import requests
 import json
@@ -17,13 +18,12 @@ load_dotenv(BASE_DIR / ".env")
 # CONFIGURATION - UPDATE THESE
 # ==============================
 
-# Admin credentials for authentication (loaded from environment)
+# Admin credentials for authentication (loaded from environment, None by default for safety)
 ADMIN_EMAIL: str = os.getenv("TEST_ADMIN_EMAIL")
 ADMIN_PASSWORD: str = os.getenv("TEST_ADMIN_PASSWORD")
 
-# Target user whose role you want to change (loaded from environment)
+# Target user to PERMANENTLY DELETE (loaded from environment, None by default for safety)
 TARGET_USER_ID: str = os.getenv("TEST_TARGET_USER_ID")
-NEW_ROLE: str = "dev"  # TODO: One of: 'user', 'dev', 'admin'
 
 # API base URL
 API_BASE_URL = "http://localhost:8000"
@@ -65,26 +65,32 @@ def authenticate_with_supabase(email: str, password: str) -> Optional[str]:
         print(f"❌ Error during authentication: {e}")
         return None
 
-def test_change_role(jwt_token: str, user_id: str, new_role: str):
+def test_delete_user(jwt_token: str, user_id: str):
     """
-    Test the admin change-role endpoint.
+    Test the admin delete user endpoint (PERMANENT deletion).
     """
-    print(f"\n🔄 Attempting to change user role...")
+    print(f"\n⚠️  PERMANENT DELETION - THIS CANNOT BE UNDONE!")
     print(f"   User ID: {user_id}")
-    print(f"   New Role: {new_role}")
+    print(f"   This will delete:")
+    print(f"   - User authentication record")
+    print(f"   - User profile")
+    print(f"   - All chat sessions and messages")
+    print(f"   - (Invitations and feedback will be anonymized)")
     
-    url = f"{API_BASE_URL}/api/admin/change-role"
+    confirm = input(f"\n⚠️  Are you sure you want to PERMANENTLY delete this user? (type 'DELETE' to confirm): ")
+    
+    if confirm != "DELETE":
+        print("\n❌ Deletion cancelled.")
+        return
+    
+    url = f"{API_BASE_URL}/api/admin/users/{user_id}"
     headers = {
         "Authorization": f"Bearer {jwt_token}",
         "Content-Type": "application/json"
     }
-    payload = {
-        "user_id": user_id,
-        "new_role": new_role
-    }
     
     try:
-        response = requests.post(url, headers=headers, json=payload)
+        response = requests.delete(url, headers=headers)
         
         print(f"\n📊 Response Status: {response.status_code}")
         print(f"📝 Response Body:")
@@ -95,10 +101,14 @@ def test_change_role(jwt_token: str, user_id: str, new_role: str):
             print(response.text)
         
         if response.status_code == 200:
-            print(f"\n✅ SUCCESS! User role changed to '{new_role}'")
-            print(f"   You can verify this in the 'public.profiles' table in your database.")
+            print(f"\n✅ SUCCESS! User has been PERMANENTLY deleted")
+            print(f"   🗑️  User removed from authentication")
+            print(f"   🗑️  Profile deleted from database")
+            print(f"   🗑️  All chat sessions and messages deleted (CASCADE)")
+            print(f"   ℹ️  Invitations and feedback anonymized (SET NULL)")
+            print(f"   ⚠️  This action CANNOT be undone!")
         elif response.status_code == 400:
-            print(f"\n⚠️  Bad Request: Invalid role or parameters")
+            print(f"\n⚠️  Bad Request: Check if you're trying to delete yourself")
         elif response.status_code == 403:
             print(f"\n⚠️  Forbidden: User is not an admin")
         elif response.status_code == 404:
@@ -111,8 +121,11 @@ def test_change_role(jwt_token: str, user_id: str, new_role: str):
 
 def main():
     print("=" * 70)
-    print("🧪 Admin Change Role Endpoint Test Script")
+    print("🧪 Admin DELETE User Endpoint Test Script (PERMANENT)")
     print("=" * 70)
+    print("\n⚠️  WARNING: This script tests PERMANENT user deletion!")
+    print("⚠️  ALL user data will be DESTROYED via CASCADE!")
+    print("⚠️  Use the BAN endpoint for reversible soft delete!")
     
     # Validate configuration
     if not TARGET_USER_ID:
@@ -122,11 +135,6 @@ def main():
         print("1. Go to Supabase -> Authentication -> Users")
         print("2. Click on a user to see their UUID")
         print("3. Copy the UUID and paste it into TARGET_USER_ID")
-        return
-    
-    if NEW_ROLE not in ['user', 'dev', 'admin']:
-        print(f"\n❌ ERROR: Invalid role '{NEW_ROLE}'")
-        print("NEW_ROLE must be one of: 'user', 'dev', 'admin'")
         return
     
     if not ADMIN_EMAIL or not ADMIN_PASSWORD:
@@ -144,8 +152,8 @@ def main():
     
     print("✅ Authentication successful!")
     
-    # Test change role endpoint
-    test_change_role(jwt_token, TARGET_USER_ID, NEW_ROLE)
+    # Test delete user endpoint
+    test_delete_user(jwt_token, TARGET_USER_ID)
     
     print("\n" + "=" * 70)
     print("🏁 Test Complete")

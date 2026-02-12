@@ -88,14 +88,19 @@ def _simple_summary(segments: List[Dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 # --------- Supabase helpers ---------
-def _supabase():
-    """Instantiate a Supabase client using service role or anon key."""
+def build_local_repo():
+    from app.services.supabase_content_repository import SupabaseContentRepository
     url = (os.getenv("SUPABASE_URL") or "").strip()
-    # Prefer service role for server-side writes; fall back to anon if missing
-    key = (os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY") or "").strip()
+    # Backend video processing uses SERVICE_ROLE_KEY for storage operations
+    key = (os.getenv("SUPABASE_SERVICE_ROLE_KEY") or "").strip()
     if not url or not key:
-        raise RuntimeError("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY/ANON_KEY in .env")
-    return create_client(url, key)
+        raise RuntimeError(
+            "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env. "
+            "SERVICE_ROLE_KEY is required for video processing."
+        )
+    os.environ["SUPABASE_URL"] = url
+    os.environ["SUPABASE_SERVICE_ROLE_KEY"] = key
+    return SupabaseContentRepository()
 
 def _bucket_name() -> str:
     """Return the bucket name used for all video-related assets."""
@@ -104,7 +109,13 @@ def _bucket_name() -> str:
 
 def _upload_bytes(bucket: str, storage_path: str, data: bytes, content_type: str | None = None) -> str:
     """Upload raw bytes to Supabase Storage and return the public URL."""
-    sb = _supabase()
+    # Create Supabase client with SERVICE_ROLE_KEY for video operations
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if not url or not key:
+        raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required for video operations")
+    
+    sb = create_client(url, key)
     opts = {"upsert": "true"}
     if content_type:
         opts["contentType"] = content_type

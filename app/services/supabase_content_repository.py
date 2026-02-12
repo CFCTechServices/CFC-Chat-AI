@@ -26,11 +26,16 @@ class SupabaseContentRepository:
     """Handles persistence in Supabase Storage."""
     def __init__(self) -> None:
         self.url = os.getenv("SUPABASE_URL")
-        # Prefer service role for server-side writes; fall back to anon if missing
-        self.key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY")
+        # Backend content repository uses SERVICE_ROLE_KEY for storage operations
+        self.key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
         self.bucket = os.getenv("SUPABASE_BUCKET", "cfc-videos")
+        
         if not self.url or not self.key:
-            raise RuntimeError("Missing SUPABASE_URL or key in .env")
+            raise RuntimeError(
+                "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. "
+                "SERVICE_ROLE_KEY is required for backend storage operations."
+            )
+        
         self.client = create_client(self.url, self.key)
 
     # ----- generic helpers -----

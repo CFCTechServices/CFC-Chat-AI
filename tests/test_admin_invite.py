@@ -22,12 +22,12 @@ load_dotenv(BASE_DIR / ".env")
 # Option 1: If you already have an admin JWT token, paste it here
 ADMIN_JWT_TOKEN: Optional[str] = None  # Set to None to use email/password below
 
-# Option 2: If you need to authenticate, provide admin credentials
-ADMIN_EMAIL: Optional[str] = None  # TODO: Set your admin email here
-ADMIN_PASSWORD: Optional[str] = None  # TODO: Set your admin password here
+# Option 2: If you need to authenticate, provide admin credentials (loaded from environment)
+ADMIN_EMAIL: Optional[str] = os.getenv("TEST_ADMIN_EMAIL")
+ADMIN_PASSWORD: Optional[str] = os.getenv("TEST_ADMIN_PASSWORD")
 
 # The email address to send the invitation to
-TARGET_EMAIL = "[EMAIL_ADDRESS]"  # TODO: Set target email here
+TARGET_EMAIL = "ogxpsych@gmail.com"  # TODO: Set target email here
 
 # API base URL
 API_BASE_URL = "http://localhost:8000"

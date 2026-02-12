@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for admin change-role endpoint
+Test script for admin deactivate user endpoint (soft delete)
 """
 import requests
 import json
@@ -21,9 +21,9 @@ load_dotenv(BASE_DIR / ".env")
 ADMIN_EMAIL: str = os.getenv("TEST_ADMIN_EMAIL")
 ADMIN_PASSWORD: str = os.getenv("TEST_ADMIN_PASSWORD")
 
-# Target user whose role you want to change (loaded from environment)
+# Target user to deactivate (loaded from environment)
 TARGET_USER_ID: str = os.getenv("TEST_TARGET_USER_ID")
-NEW_ROLE: str = "dev"  # TODO: One of: 'user', 'dev', 'admin'
+DEACTIVATE_REASON: str = "Account suspended"  # Optional reason
 
 # API base URL
 API_BASE_URL = "http://localhost:8000"
@@ -65,22 +65,21 @@ def authenticate_with_supabase(email: str, password: str) -> Optional[str]:
         print(f"❌ Error during authentication: {e}")
         return None
 
-def test_change_role(jwt_token: str, user_id: str, new_role: str):
+def test_deactivate_user(jwt_token: str, user_id: str, reason: str):
     """
-    Test the admin change-role endpoint.
+    Test the admin deactivate user endpoint.
     """
-    print(f"\n🔄 Attempting to change user role...")
+    print(f"\n🚫 Attempting to deactivate user...")
     print(f"   User ID: {user_id}")
-    print(f"   New Role: {new_role}")
+    print(f"   Reason: {reason}")
     
-    url = f"{API_BASE_URL}/api/admin/change-role"
+    url = f"{API_BASE_URL}/api/admin/users/{user_id}/deactivate"
     headers = {
         "Authorization": f"Bearer {jwt_token}",
         "Content-Type": "application/json"
     }
     payload = {
-        "user_id": user_id,
-        "new_role": new_role
+        "reason": reason
     }
     
     try:
@@ -95,10 +94,13 @@ def test_change_role(jwt_token: str, user_id: str, new_role: str):
             print(response.text)
         
         if response.status_code == 200:
-            print(f"\n✅ SUCCESS! User role changed to '{new_role}'")
-            print(f"   You can verify this in the 'public.profiles' table in your database.")
+            print(f"\n✅ SUCCESS! User has been deactivated")
+            print(f"   ℹ️  User cannot login anymore")
+            print(f"   💾 All user data has been preserved")
+            print(f"   🔄 User can be reactivated by updating status back to 'active'")
+            print(f"   🗄️  Verify in 'public.profiles' table: status='inactive', deleted_at is set")
         elif response.status_code == 400:
-            print(f"\n⚠️  Bad Request: Invalid role or parameters")
+            print(f"\n⚠️  Bad Request: Check if user is already deactivated or you're trying to deactivate yourself")
         elif response.status_code == 403:
             print(f"\n⚠️  Forbidden: User is not an admin")
         elif response.status_code == 404:
@@ -111,7 +113,7 @@ def test_change_role(jwt_token: str, user_id: str, new_role: str):
 
 def main():
     print("=" * 70)
-    print("🧪 Admin Change Role Endpoint Test Script")
+    print("🧪 Admin Deactivate User Endpoint Test Script")
     print("=" * 70)
     
     # Validate configuration
@@ -122,11 +124,6 @@ def main():
         print("1. Go to Supabase -> Authentication -> Users")
         print("2. Click on a user to see their UUID")
         print("3. Copy the UUID and paste it into TARGET_USER_ID")
-        return
-    
-    if NEW_ROLE not in ['user', 'dev', 'admin']:
-        print(f"\n❌ ERROR: Invalid role '{NEW_ROLE}'")
-        print("NEW_ROLE must be one of: 'user', 'dev', 'admin'")
         return
     
     if not ADMIN_EMAIL or not ADMIN_PASSWORD:
@@ -144,12 +141,16 @@ def main():
     
     print("✅ Authentication successful!")
     
-    # Test change role endpoint
-    test_change_role(jwt_token, TARGET_USER_ID, NEW_ROLE)
+    # Test deactivate user endpoint
+    test_deactivate_user(jwt_token, TARGET_USER_ID, DEACTIVATE_REASON)
     
     print("\n" + "=" * 70)
     print("🏁 Test Complete")
     print("=" * 70)
+    print("\n💡 To reactivate this user, update the database:")
+    print(f"   UPDATE public.profiles")
+    print(f"   SET status = 'active', deleted_at = NULL, deleted_by = NULL")
+    print(f"   WHERE id = '{TARGET_USER_ID}';")
 
 if __name__ == "__main__":
     main()

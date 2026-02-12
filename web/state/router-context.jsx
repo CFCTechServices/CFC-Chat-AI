@@ -2,15 +2,16 @@
 (() => {
   const RouterContext = React.createContext(null);
 
-  function getDefaultRouteForEmail(email) {
-    if (!email) return 'login';
-    const lower = email.toLowerCase();
-    if (lower === 'admin@cfctech.com') return 'admin';
-    return 'chat';
-  }
-
   function RouterProvider({ children }) {
-    const { user } = window.CFC.UserContext.useUser();
+    const userContext = window.CFC.UserContext.useUser();
+    const { user, role } = userContext || { user: null, role: 'user' };
+
+    function getDefaultRouteForUser() {
+      if (!user) return 'login';
+      // Use role from backend instead of email
+      if (role === 'admin') return 'admin';
+      return 'chat';
+    }
 
     const getInitialRoute = () => {
       try {
@@ -32,7 +33,7 @@
     React.useEffect(() => {
       if (!user) {
         setRoute('login');
-        try { window.localStorage.removeItem('cfc-route'); } catch {}
+        try { window.localStorage.removeItem('cfc-route'); } catch { }
         hasInitialized.current = false;
       } else {
         try {
@@ -40,7 +41,7 @@
           if (savedRoute && savedRoute !== 'transition') {
             setRoute(savedRoute);
           } else if (!hasInitialized.current) {
-            const defaultRoute = getDefaultRouteForEmail(user.email);
+            const defaultRoute = getDefaultRouteForUser();
             setRoute(defaultRoute);
             window.localStorage.setItem('cfc-route', defaultRoute);
           }
@@ -49,14 +50,14 @@
         }
         hasInitialized.current = true;
       }
-    }, [user]);
+    }, [user, role]);
 
     const performNavigation = React.useCallback((next, options = {}) => {
       if (next === 'transition') {
         setNextRoute(options.to || null);
       } else {
         setNextRoute(null);
-        try { window.localStorage.setItem('cfc-route', next); } catch {}
+        try { window.localStorage.setItem('cfc-route', next); } catch { }
       }
       setRoute(next);
       requestAnimationFrame(() => setVisualState('fade-in'));
