@@ -102,6 +102,15 @@
             </div>
           </div>
           <div className="app-header-right">
+            {showBackToLogin && (
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => navigate('login')}
+              >
+                Return to login
+              </button>
+            )}
             {user?.name ? (
               <span className="app-greeting">
                 {greetingName ? `Hi, ${greetingName}!` : 'Hi,'}
