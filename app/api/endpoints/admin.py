@@ -1,9 +1,11 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, EmailStr
 import logging
+import json
 import uuid
 from datetime import datetime, timezone
 from typing import Optional, List
+from pathlib import Path
 from app.core.auth import get_current_admin
 from app.core.supabase_service import supabase
 from app.config import settings
@@ -51,6 +53,27 @@ class DeleteUserResponse(BaseModel):
     user_id: str
     email: str
     permanently_deleted: bool = True
+
+class AdminSettings(BaseModel):
+    auto_approve_uploads: bool = False
+    email_notifications: bool = True
+    maintenance_mode: bool = False
+
+class AdminSettingsUpdate(BaseModel):
+    auto_approve_uploads: Optional[bool] = None
+    email_notifications: Optional[bool] = None
+    maintenance_mode: Optional[bool] = None
+
+class DocumentInfo(BaseModel):
+    name: str
+    size: int
+    status: str  # "ingested" or "pending"
+
+class IngestionStatsResponse(BaseModel):
+    total_documents: int
+    processing: int
+    completed: int
+    documents: List[DocumentInfo]
 
 class UserProfile(BaseModel):
     id: str
@@ -102,16 +125,12 @@ async def generate_invite(request: InviteRequest, admin: dict = Depends(get_curr
                 if email_sent:
                     logger.info(f"Email sent successfully to {request.email}. Response ID: {email_sent}")
                 else:
-                    logger.warning(f"Failed to send email to {request.email}")
-                    print(f"Warning: Invitation created but email failed to send to {request.email}")
+                    logger.warning(f"Invitation created but email failed to send to {request.email}")
             except Exception as email_error:
                 logger.error(f"Failed to send email to {request.email}: {email_error}")
-                print(f"Failed to send email to {request.email}: {email_error}")
-                print(f"Warning: Invitation created but email failed to send to {request.email}")
         else:
             logger.info(f"Email sending disabled. Invitation created for {request.email} with code {code}")
-            print(f"ℹ️  Email sending is disabled. Invitation created successfully.")
-            print(f"   Share this invite URL manually: {invite_url}")
+            logger.info(f"Share this invite URL manually: {invite_url}")
         
         return InviteResponse(
             message=f"Invite sent to {request.email}" if settings.ENABLE_EMAIL_INVITES else f"Invite created for {request.email} (email disabled)",
@@ -144,31 +163,16 @@ async def list_users(admin: dict = Depends(get_current_admin)):
         users = response.data
         
         # Sort: active users first, then by creation date (newest first)
-        def sort_key(user):
-            # Active users = 0, Inactive = 1, Deleted = 2
-            status_priority = {
-                'active': 0,
-                'inactive': 1,
-                'deleted': 2
-            }
-            priority = status_priority.get(user.get('status', 'active'), 1)
-            # Return tuple: (priority, negative timestamp for DESC order)
-            created = user.get('created_at', '')
-            return (priority, created)
-        
-        # Sort by priority ASC (0 first), then by created_at DESC (newest first)
+        STATUS_PRIORITY = {'active': 0, 'inactive': 1, 'deleted': 2}
+
         sorted_users = sorted(users, key=lambda u: (
-            sort_key(u)[0],  # Priority ascending (active=0 first)
-            sort_key(u)[1]   # Created_at (will be reversed separately)
+            STATUS_PRIORITY.get(u.get('status', 'active'), 1),
+            # Negate created_at for DESC within each status group (ISO strings sort lexicographically)
+            # Use a trick: prepend '-' doesn't work for strings, so we sort twice
         ))
-        # Reverse only within each priority group by created_at
-        # Simple approach: sort by priority, then created_at DESC
+        # Python's sort is stable, so sort by created_at DESC first, then by status ASC
         sorted_users = sorted(users, key=lambda u: u.get('created_at', ''), reverse=True)
-        sorted_users = sorted(sorted_users, key=lambda u: {
-            'active': 0,
-            'inactive': 1,
-            'deleted': 2
-        }.get(u.get('status', 'active'), 1))
+        sorted_users = sorted(sorted_users, key=lambda u: STATUS_PRIORITY.get(u.get('status', 'active'), 1))
         
         # Transform to response model (set last_active to None - placeholder)
         user_profiles = []
@@ -277,9 +281,9 @@ async def deactivate_user(
         try:
             auth_user = supabase.auth.admin.get_user_by_id(user_id)
             user_email = auth_user.user.email if auth_user.user else "unknown"
-        except:
+        except Exception:
             user_email = "unknown"
-        
+
         # Step 1: Ban user in Supabase Auth to prevent new logins
         try:
             supabase.auth.admin.update_user_by_id(
@@ -365,9 +369,9 @@ async def reactivate_user(
         try:
             auth_user = supabase.auth.admin.get_user_by_id(user_id)
             user_email = auth_user.user.email if auth_user.user else "unknown"
-        except:
+        except Exception:
             user_email = "unknown"
-        
+
         # Step 1: Unban user in Supabase Auth to allow new logins
         try:
             supabase.auth.admin.update_user_by_id(
@@ -415,6 +419,74 @@ async def reactivate_user(
             detail=f"Failed to reactivate user: {str(e)}"
         )
 
+# --- Admin Settings helpers ---
+SETTINGS_FILE = settings.DATA_DIR / "admin_settings.json"
+
+def _load_settings() -> AdminSettings:
+    if SETTINGS_FILE.exists():
+        try:
+            data = json.loads(SETTINGS_FILE.read_text())
+            return AdminSettings(**data)
+        except Exception:
+            logger.warning("Corrupt admin_settings.json, using defaults")
+    return AdminSettings()
+
+def _save_settings(s: AdminSettings) -> None:
+    SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    SETTINGS_FILE.write_text(json.dumps(s.model_dump(), indent=2))
+
+@router.get("/settings", response_model=AdminSettings)
+async def get_settings(admin: dict = Depends(get_current_admin)):
+    return _load_settings()
+
+@router.patch("/settings", response_model=AdminSettings)
+async def update_settings(updates: AdminSettingsUpdate, admin: dict = Depends(get_current_admin)):
+    current = _load_settings()
+    patch = updates.model_dump(exclude_none=True)
+    if not patch:
+        raise HTTPException(status_code=400, detail="No settings provided")
+    updated = current.model_copy(update=patch)
+    _save_settings(updated)
+    logger.info(f"Admin {admin.id} updated settings: {patch}")
+    return updated
+
+# --- Ingestion Stats ---
+SUPPORTED_EXTENSIONS = {".pdf", ".doc", ".docx", ".txt", ".md"}
+
+@router.get("/ingestion/stats", response_model=IngestionStatsResponse)
+async def get_ingestion_stats(admin: dict = Depends(get_current_admin)):
+    docs_dir = settings.DOCUMENTS_DIR
+    processed_dir = settings.PROCESSED_DIR / "content_repository"
+
+    # Collect all document files from documents dir (including doc/ and docx/ subdirs)
+    doc_files: list[tuple[str, int]] = []
+    if docs_dir.exists():
+        for path in docs_dir.rglob("*"):
+            if path.is_file() and path.suffix.lower() in SUPPORTED_EXTENSIONS:
+                doc_files.append((path.name, path.stat().st_size))
+
+    # Determine which docs have been processed
+    processed_names: set[str] = set()
+    if processed_dir.exists():
+        for item in processed_dir.iterdir():
+            if item.is_dir():
+                processed_names.add(item.name)
+
+    documents = []
+    for name, size in doc_files:
+        stem = Path(name).stem
+        status = "ingested" if stem in processed_names else "pending"
+        documents.append(DocumentInfo(name=name, size=size, status=status))
+
+    completed = sum(1 for d in documents if d.status == "ingested")
+
+    return IngestionStatsResponse(
+        total_documents=len(documents),
+        processing=0,
+        completed=completed,
+        documents=documents,
+    )
+
 @router.delete("/users/{user_id}", response_model=DeleteUserResponse)
 async def delete_user(
     user_id: str,
@@ -452,9 +524,9 @@ async def delete_user(
         try:
             auth_user = supabase.auth.admin.get_user_by_id(user_id)
             user_email = auth_user.user.email if auth_user.user else "unknown"
-        except:
+        except Exception:
             user_email = "unknown"
-        
+
         # HARD DELETE: Remove from auth.users
         # This triggers CASCADE and removes:
         # - public.profiles (ON DELETE CASCADE)
