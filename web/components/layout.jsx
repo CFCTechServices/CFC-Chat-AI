@@ -109,6 +109,15 @@
             ) : (
               <span className="app-greeting muted">Hi there!</span>
             )}
+            {showBackToLogin && (
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => navigate('login')}
+              >
+                Return to login
+              </button>
+            )}
             <DarkModeToggle />
           </div>
         </header>
@@ -118,15 +127,6 @@
         </main>
 
         <footer className="app-footer">
-          {showBackToLogin && (
-            <button
-              type="button"
-              className="link-button"
-              onClick={() => navigate('login')}
-            >
-              Return to login
-            </button>
-          )}
         </footer>
       </div>
     );

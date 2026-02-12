@@ -459,6 +459,18 @@
       };
       appendMessage(userMessage);
 
+      // Update conversation title if this is the first message and title is generic "Chat X"
+      if (currentChatId && messages.length === 0) {
+        setConversations(prev => 
+          prev.map(c => {
+            if (c.id === currentChatId && c.title.match(/^Chat \d+$/)) {
+              return { ...c, title: q.slice(0, 50) };
+            }
+            return c;
+          })
+        );
+      }
+
       const imagesForBackend = attachedImages.map((img) => img.url);
 
       setInput('');
@@ -539,7 +551,7 @@
               : c
           )
         );
-      } else if (messages.length > 0) {
+      } else if (messages.length > 0 && !currentChatId) {
         // Create new conversation for unsaved messages
         const title = messages.find(m => m.role === 'user')?.text?.slice(0, 50) || 'New Chat';
         const newChat = {
@@ -552,7 +564,30 @@
       }
       
       // Start fresh conversation
+      const existingChatNumbers = conversations
+        .map(c => {
+          const match = c.title.match(/^Chat (\d+)$/);
+          return match ? parseInt(match[1], 10) : 0;
+        })
+        .filter(n => n > 0);
+      
+      const nextNumber = existingChatNumbers.length > 0 
+        ? Math.max(...existingChatNumbers) + 1 
+        : 1;
+      
+      const newChatTitle = `Chat ${nextNumber}`;
+      
+      // Create new conversation immediately
       const newChatId = `chat-${Date.now()}`;
+      const newChat = {
+        id: newChatId,
+        title: newChatTitle,
+        messages: [],
+        timestamp: new Date()
+      };
+      
+      // Add new conversation to the list and set as current
+      setConversations(prev => [newChat, ...prev]);
       setCurrentChatId(newChatId);
       setMessages([]);
       setInput('');
@@ -596,66 +631,68 @@
     return (
       <Layout>
         <div className="page chat-page">
-          <div className="page-header-row">
-            <div>
-              <h1>Chat with CFC AI</h1>
-              <p>Ask questions about your software and get quick, informed answers.</p>
-            </div>
-          </div>
           <div className="chat-layout">
-            <aside className="chat-sidebar">
-              <div className="sidebar-header">
-                <button className="new-chat-btn" onClick={handleNewConversation}>
-                  <span className="plus-icon">+</span>
-                  <span>New Conversation</span>
-                </button>
-              </div>
-              
-              <div className="conversation-list">
-                {conversations.map((chat) => (
-                  <div
-                    key={chat.id}
-                    className={`conversation-item ${currentChatId === chat.id ? 'active' : ''}`}
-                    onClick={() => handleSelectChat(chat.id)}
-                  >
+          <Card className="chat-card">
+            <div className="chat-card-inner">
+              <aside className="chat-sidebar">
+                <div className="sidebar-header">
+                  <button className="new-chat-btn" onClick={handleNewConversation}>
+                    <span className="plus-icon">+</span>
+                    <span>New Conversation</span>
+                  </button>
+                </div>
+                
+                <div className="conversation-list">
+                  {conversations.map((chat) => (
+                    <div
+                      key={chat.id}
+                      className={`conversation-item ${currentChatId === chat.id ? 'active' : ''}`}
+                      onClick={() => handleSelectChat(chat.id)}
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                      </svg>
+                      <span className="chat-title">{chat.title}</span>
+                      <button
+                        className="delete-btn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteChat(chat.id);
+                        }}
+                        title="Delete chat"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                  {conversations.length === 0 && (
+                    <div className="empty-state">
+                      <span>No saved chats yet</span>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="sidebar-footer">
+                  <div className="chat-counter">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                     </svg>
-                    <span className="chat-title">{chat.title}</span>
-                    <button
-                      className="delete-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteChat(chat.id);
-                      }}
-                      title="Delete chat"
-                    >
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </button>
+                    <span>{conversations.length} {conversations.length === 1 ? 'chat' : 'chats'}</span>
                   </div>
-                ))}
-                {conversations.length === 0 && (
-                  <div className="empty-state">
-                    <span>No saved chats yet</span>
-                  </div>
-                )}
-              </div>
-              
-              <div className="sidebar-footer">
-                <div className="chat-counter">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                  </svg>
-                  <span>{conversations.length} {conversations.length === 1 ? 'chat' : 'chats'}</span>
                 </div>
-              </div>
-            </aside>
-          
+              </aside>
 
-          <Card className="chat-card">
+              <div className="chat-main-content">
+                <div className="page-header-row">
+                  <div>
+                    <h1>Chat with CFC AI</h1>
+                    <p>Ask questions about your software and get quick, informed answers.</p>
+                  </div>
+                </div>
+          
             <div className="chat-thread" id="chatThread" ref={chatThreadRef}>
               {messages.map((m) => (
                 <ChatMessage 
@@ -724,6 +761,8 @@
                 </div>
               )}
             </form>
+              </div>
+            </div>
           </Card>
           </div>
 

@@ -92,6 +92,12 @@ code {
   flex-direction: column;
 }
 
+/* Full height for chat page */
+.app-root:has(.chat-page) {
+  height: 100vh;
+  overflow: hidden;
+}
+
 .page-fader {
   opacity: 1;
   transition: opacity 220ms ease;
@@ -264,6 +270,15 @@ html.dark-mode .theme-toggle:hover .theme-toggle-thumb {
   margin: 0 auto;
 }
 
+/* Full screen layout for chat page */
+.app-main:has(.chat-page) {
+  padding: 0;
+  max-width: none;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+}
+
 .app-footer {
   border-top: 1px solid var(--color-border);
   background: var(--color-surface);
@@ -273,6 +288,13 @@ html.dark-mode .theme-toggle:hover .theme-toggle-thumb {
   align-items: center;
   font-size: 0.8rem;
   color: var(--color-text-muted);
+}
+
+/* Hide footer when empty */
+.app-footer:empty {
+  display: none;
+  padding: 0;
+  border: none;
 }
 
 .link-button {
@@ -310,6 +332,12 @@ html.dark-mode .link-button {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.page.chat-page {
+  gap: 0;
+  height: 100%;
+  width: 100%;
 }
 
 .page-header-row {
@@ -729,30 +757,51 @@ html.dark-mode .notes-card {
 }
 
 /* Chat page */
+.chat-layout {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+
+
+}
+
 .chat-card {
   display: flex;
   flex-direction: column;
-  flex: 1;              
-  min-height: 600px;
-  max-height: calc(100vh - 140px);
-  border-radius: 16px;
-}
-.chat-layout {
-  display: flex;
-  gap: 16px;
   flex: 1;
+  width: 100%;
+  border-radius: 0;
+  overflow: hidden;
+  box-shadow: none;
+  border: none;
+}
+
+.chat-card-inner {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  overflow: hidden;
+  gap: 0;
 }
 
 .chat-sidebar {
-  width: 260px;
+  width: 280px;
   flex-shrink: 0;
   background: var(--color-surface);
-  border-radius: 4px;
-  border: 3px solid #334155;
-  height: calc(100vh - 140px);
+  border-right: 3px solid #334155;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.chat-main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 20px;
 }
 
 .sidebar-header {
@@ -780,7 +829,6 @@ html.dark-mode .notes-card {
 .new-chat-btn:hover {
   background: #059669;
 }
-
 
 .conversation-list {
   flex: 1;
