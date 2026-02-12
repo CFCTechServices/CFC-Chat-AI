@@ -1,40 +1,38 @@
 <!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CFC Chat‑Talk</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/ui/styles.css" />
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="text/babel" data-presets="env,react" src="/ui/state/user-context.jsx"></script>
+    <script type="text/babel" data-presets="env,react" src="/ui/state/theme-context.jsx"></script>
+    <script type="text/babel" data-presets="env,react" src="/ui/state/router-context.jsx"></script>
+    <script type="text/babel" data-presets="env,react" src="/ui/components/primitives.jsx"></script>
+    <script type="text/babel" data-presets="env,react" src="/ui/components/layout.jsx"></script>
+    <script type="text/babel" data-presets="env,react" src="/ui/components/login.jsx"></script>
+    <script type="text/babel" data-presets="env,react" src="/ui/components/docs.jsx"></script>
+    <script type="text/babel" data-presets="env,react" src="/ui/components/admin/tabs.jsx"></script>
+    <script type="text/babel" data-presets="env,react" src="/ui/components/admin/toggle.jsx"></script>
+    <script type="text/babel" data-presets="env,react" src="/ui/components/admin/upload.jsx"></script>
+    <script type="text/babel" data-presets="env,react" src="/ui/components/admin/user.jsx"></script>
+    <script type="text/babel" data-presets="env,react" src="/ui/components/admin/content.jsx"></script>
+    <script type="text/babel" data-presets="env,react" src="/ui/components/admin/ingestion.jsx"></script>
+    <script type="text/babel" data-presets="env,react" src="/ui/components/admin/settings.jsx"></script>
+    <script type="text/babel" data-presets="env,react" src="/ui/components/admin/admin.page.jsx"></script>
+    <script type="text/babel" data-presets="env,react" src="/ui/components/chat.jsx"></script>
+    <script type="text/babel" data-presets="env,react" src="/ui/components/transition.jsx"></script>
+    <script type="text/babel" data-presets="env,react" src="/ui/main.jsx"></script>
+  </body>
+  </html>
 
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>CFC Chat-Talk</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/ui/styles.css" />
 
-  <!-- React & Babel -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-  <!-- Supabase -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <!-- Setup Contexts -->
-  <script type="text/babel" data-presets="env,react" src="/ui/setup.jsx"></script>
-
-  <!-- App Components -->
-  <script type="text/babel" data-presets="env,react" src="/ui/components/primitives.jsx"></script>
-  <script type="text/babel" data-presets="env,react" src="/ui/components/layout.jsx"></script>
-  <script type="text/babel" data-presets="env,react" src="/ui/components/transition.jsx"></script>
-  <script type="text/babel" data-presets="env,react" src="/ui/components/login.jsx"></script>
-  <script type="text/babel" data-presets="env,react" src="/ui/components/chat.jsx"></script>
-  <script type="text/babel" data-presets="env,react" src="/ui/components/admin.jsx"></script>
-</head>
-
-<body>
-  <div id="root"></div>
-
-  <!-- Main App Logic -->
-  <script type="text/babel" data-presets="env,react" src="/ui/app.jsx"></script>
-</body>
-
-</html>

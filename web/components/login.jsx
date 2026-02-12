@@ -1,212 +1,102 @@
-// Login page with Invite and Supabase Auth
+// Login page
+
 (() => {
   const { Card, PrimaryButton, TextInput } = window.CFC.Primitives;
   const { Layout } = window.CFC.Layout;
   const { useUser } = window.CFC.UserContext;
   const { useRouter } = window.CFC.RouterContext;
-  const { useState, useEffect } = React;
 
   function LoginPage() {
-    const [step, setStep] = useState(2); // 1: Invite, 2: Login
-    const [inviteCode, setInviteCode] = useState("");
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
-    const [isSignUp, setIsSignUp] = useState(false);
-    const [inviteEmail, setInviteEmail] = useState(""); // Email from invite code
+    const [email, setEmail] = React.useState('');
+    const [password, setPassword] = React.useState('');
+    const [passwordError, setPasswordError] = React.useState('');
+    const [emailError, setEmailError] = React.useState('');
 
-    // Auto-detect invite code and email from URL
-    useEffect(() => {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get("code") || params.get("invite");
-      const emailParam = params.get("email");
+    const { setUser } = useUser();
+    const { navigate } = useRouter();
 
-      if (code) {
-        setInviteCode(code);
-        setStep(1);
-
-        // If email is in URL, pre-fill it
-        if (emailParam) {
-          setEmail(emailParam);
-          setInviteEmail(emailParam);
-        }
-      }
-    }, []);
-
-    const handleInviteSubmit = async (e) => {
-      e.preventDefault();
-      setLoading(true);
-      setError("");
-      try {
-        const res = await fetch("/api/auth/validate-invite", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ invite_code: inviteCode }),
-        });
-        const data = await res.json();
-        if (data.valid) {
-          // Store the email from the invite
-          if (data.email) {
-            setEmail(data.email);
-            setInviteEmail(data.email);
-          }
-          setStep(2);
-          setIsSignUp(true);
-        } else {
-          setError(data.message || "Invalid invite code");
-        }
-      } catch (err) {
-        setError("Failed to validate invite code");
-      } finally {
-        setLoading(false);
-      }
+    const validateEmail = (value) => {
+      const trimmed = value.trim();
+      const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return re.test(trimmed);
     };
+    const extractDisplayName = (email) => {
 
-    const handleAuth = async (e) => {
-      e.preventDefault();
-      setLoading(true);
-      setError("");
-
-      try {
-        const supabase = window.supabaseClient;
-        if (!supabase) throw new Error("Supabase client not initialized");
-
-        let result;
-        if (isSignUp) {
-          // Validate email matches invite email
-          if (inviteEmail && email !== inviteEmail) {
-            throw new Error(`Email must match the invited email: ${inviteEmail}`);
-          }
-
-          // Pass invite_code in user metadata for the database trigger
-          result = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: {
-                invite_code: inviteCode
-              }
-            }
-          });
-        } else {
-          result = await supabase.auth.signInWithPassword({ email, password });
+      const rawName = email.trim();
+      let displayName = 'Guest';
+      if (rawName && rawName.includes('@')) {
+        const parts = rawName.split('@')[0].split(/[\._\-]+/).filter(Boolean).filter(p => isNaN(p));
+        if (parts.length > 0) {
+          displayName = parts.map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(' ');
         }
-
-        if (result.error) throw result.error;
-
-        if (isSignUp && !result.data.session) {
-          setError("Sign up successful! Please check your email to confirm.");
-          setIsSignUp(false); // Switch to login view
-        }
-        // If session exists, UserProvider will update automatically via onAuthStateChange
-      } catch (err) {
-        console.error(err);
-
-        // Map Supabase Auth errors to user-friendly messages
-        let errorMessage = err.message;
-
-        // When a user is banned in Supabase Auth, show "Account is inactive"
-        if (errorMessage && errorMessage.toLowerCase().includes('banned')) {
-          errorMessage = 'Account is inactive';
-        }
-
-        setError(errorMessage);
-      } finally {
-        setLoading(false);
       }
+      return displayName;
     };
+    const handleSubmit = async (e) => {
+      e.preventDefault();
+      if (!validateEmail(email.trim())) {
+        setEmailError('Please enter a valid email address.');
+        return;
+      } else {
+        setEmailError('');
+      }
+      setUser({ email, displayName: extractDisplayName(email) , password});
+      const lower = email.trim().toLowerCase();
+      let target = 'chat';
+      if (lower === 'admin@cfctech.com') target = 'admin';
 
+      navigate('transition', { to: target, withFade: true });
+    };
     return (
-      <Layout>
+      <Layout>  
         <div className="page login-page">
           <div className="login-hero">
-            <h1>Welcome to CFC Chat-Talk</h1>
-            <p>AI-powered assistance for your animal feed software queries.</p>
+            <h1>Welcome to CFC AI</h1>
+            <p>
+              A focused assistant for Concept5 and CFC knowledge.
+              <br />
+              Ask clear questions and get concise, guided answers in seconds.
+            </p>
             <div className="login-badges">
-              <span className="badge badge-sand">AI Powered</span>
-              <span className="badge badge-green">Docs Search</span>
-              <span className="badge badge-blue">Secure</span>
+              <span className="badge badge-sand">Built for your workflows</span>
+              <span className="badge badge-green">Instant answers</span>
+              <span className="badge badge-blue">Guided help</span>
             </div>
           </div>
 
+
           <Card className="login-card">
-            {step === 1 ? (
-              <form onSubmit={handleInviteSubmit} className="login-form">
-                <h2>Enter Invite Code</h2>
-                <TextInput
-                  label="Invite Code"
-                  type="text"
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value)}
-                  placeholder="e.g. CFC-2024-X8Y"
-                  error={error}
-                />
-                <PrimaryButton type="submit" disabled={loading || !inviteCode}>
-                  {loading ? "Validating..." : "Continue"}
-                </PrimaryButton>
-                <div
-                  style={{ marginTop: '15px', textAlign: 'center', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.9rem' }}
-                  onClick={() => { setStep(2); setIsSignUp(false); }}
-                >
-                  Already have an account? Sign In
-                </div>
-              </form>
-            ) : (
-              <form onSubmit={handleAuth} className="login-form">
-                <h2>{isSignUp ? "Create Account" : "Sign In"}</h2>
-                {inviteEmail && isSignUp && (
-                  <div className="invite-info-box">
-                    ℹ️ This invitation is for: <strong>{inviteEmail}</strong>
-                  </div>
-                )}
-                <TextInput
-                  label="Email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@cfctech.com"
-                  autoComplete="email"
-                  disabled={!!inviteEmail}
-                />
-                <TextInput
-                  label="Password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                />
-                {error && <div className="field-error-text">{error}</div>}
-
-                <PrimaryButton type="submit" disabled={loading || !email || !password}>
-                  {loading ? "Processing..." : (isSignUp ? "Sign Up" : "Sign In")}
-                </PrimaryButton>
-
-                <div
-                  style={{ marginTop: '15px', textAlign: 'center', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.9rem' }}
-                  onClick={() => {
-                    if (isSignUp) {
-                      setIsSignUp(false);
-                    } else {
-                      setStep(1);
-                      setIsSignUp(true);
-                    }
-                  }}
-                >
-                  {isSignUp ? "Already have an account? Sign In" : "Need an account? Redeem Invite"}
-                </div>
-                {isSignUp && (
-                  <div
-                    style={{ marginTop: '10px', textAlign: 'center', cursor: 'pointer', fontSize: '0.8rem' }}
-                    onClick={() => { setStep(2); setIsSignUp(false); }}
-                  >
-                    ← Back to Login
-                  </div>
-                )}
-              </form>
-            )}
+            <form onSubmit={handleSubmit} className="login-form">
+              <h2>Sign in</h2>
+              <p> Access is restricted to authorized users only. 
+              </p>
+              <TextInput
+                label="Email Address"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                autoComplete="email"
+                error={emailError}
+              />
+              <TextInput
+                label="Password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+              />
+              <PrimaryButton type="submit">
+                {'Continue'}
+              </PrimaryButton>
+              <p className="footer-text">
+                  Don't have access? Contact your administrator to request access.
+                </p>
+            </form>
+              
           </Card>
+
         </div>
       </Layout>
     );
