@@ -20,7 +20,7 @@ export function initAsk({ askFormId, askQuestionId, askSendId, askThreadId }) {
     askSend.disabled = true;
 
     try {
-      const res = await fetch('/ask', {
+      const res = await fetch('/api/chat/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: q, top_k: 4 }),

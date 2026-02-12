@@ -3,8 +3,14 @@ from typing import List, Dict, Any
 from supabase import create_client
 import os
 import uuid
+import logging
 from pathlib import Path
 
+from app.config import settings
+from app.api.models.requests import IngestRequest
+from app.api.endpoints.ingest import ingest_document
+
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Supabase storage settings

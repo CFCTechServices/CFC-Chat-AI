@@ -1,6 +1,11 @@
 // Simple in-app router context (no external dependency)
 (() => {
   const RouterContext = React.createContext(null);
+  const VALID_ROUTES = ['login', 'chat', 'admin', 'docs', 'transition'];
+
+  function isValidRoute(route) {
+    return VALID_ROUTES.includes(route);
+  }
 
   function RouterProvider({ children }) {
     const userContext = window.CFC.UserContext.useUser();
@@ -8,7 +13,6 @@
 
     function getDefaultRouteForUser() {
       if (!user) return 'login';
-      // Use role from backend instead of email
       if (role === 'admin') return 'admin';
       return 'chat';
     }
@@ -16,7 +20,7 @@
     const getInitialRoute = () => {
       try {
         const savedRoute = window.localStorage.getItem('cfc-route');
-        if (savedRoute && savedRoute !== 'transition') {
+        if (savedRoute && isValidRoute(savedRoute) && savedRoute !== 'transition') {
           return savedRoute;
         }
       } catch {
@@ -38,7 +42,7 @@
       } else {
         try {
           const savedRoute = window.localStorage.getItem('cfc-route');
-          if (savedRoute && savedRoute !== 'transition') {
+          if (savedRoute && isValidRoute(savedRoute) && savedRoute !== 'transition') {
             setRoute(savedRoute);
           } else if (!hasInitialized.current) {
             const defaultRoute = getDefaultRouteForUser();

@@ -1,9 +1,12 @@
 import os
+import logging
 from typing import Optional
 from fastapi import HTTPException, Header
 from supabase import Client, create_client
 from dotenv import load_dotenv
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # Load environment variables from .env file
 load_dotenv(Path(__file__).parent.parent / ".env")
@@ -73,7 +76,8 @@ async def get_current_user(token: str = Security(get_current_user_token)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
+        logger.error(f"Authentication failed: {e}")
+        raise HTTPException(status_code=401, detail="Authentication failed")
 
 def get_user_scoped_client(token: str):
     """
@@ -135,10 +139,11 @@ async def get_current_admin(user=Security(get_current_user)):
             raise HTTPException(status_code=403, detail="Insufficient permissions")
             
         return user
+    except HTTPException:
+        raise
     except Exception as e:
-        if isinstance(e, HTTPException):
-            raise e
-        raise HTTPException(status_code=403, detail=f"Authorization failed: {str(e)}")
+        logger.error(f"Authorization check failed for user {user.id}: {e}")
+        raise HTTPException(status_code=403, detail="Authorization failed")
 
 def check_invite_code(invite_code: str) -> bool:
     """
@@ -146,17 +151,12 @@ def check_invite_code(invite_code: str) -> bool:
     Assumes a postgres function `check_invite_code` exists.
     """
     if not supabase:
-        print("Error: Supabase client not initialized.")
+        logger.error("Supabase client not initialized")
         return False
-    
+
     try:
-        # The RPC function expects 'lookup_code' as the parameter name based on the error logs.
         response = supabase.rpc("check_invite_code", {"lookup_code": invite_code}).execute()
-        # RPC usually returns data directly in response.data
         return bool(response.data)
     except Exception as e:
-        print(f"RPC Error: {e}")
-        return False
-        print(f"RPC Error: {e}")
-        # It might be a mismatch in parameter name if we get a 400ish error from PostgREST
+        logger.error(f"RPC check_invite_code failed: {e}")
         return False

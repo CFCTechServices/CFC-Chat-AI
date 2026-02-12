@@ -1,7 +1,9 @@
+import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.core.auth import check_invite_code
 
+logger = logging.getLogger(__name__)
 router = APIRouter(tags=["auth"])
 
 class ValidateInviteRequest(BaseModel):
@@ -45,5 +47,5 @@ async def validate_invite(request: ValidateInviteRequest):
         else:
             return ValidateInviteResponse(valid=False, message="Invalid invite code.")
     except Exception as e:
-        print(f"Error validating invite: {e}")
+        logger.error(f"Error validating invite: {e}")
         return ValidateInviteResponse(valid=False, message="Invalid invite code.")

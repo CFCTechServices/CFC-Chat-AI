@@ -2,9 +2,12 @@
 Email service for sending invitations via Resend
 """
 import os
+import logging
 from typing import Optional
 import resend
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 # Initialize Resend with API key
 resend.api_key = settings.RESEND_API_KEY
@@ -23,7 +26,7 @@ def send_invite_email(email: str, invite_code: str, invite_url: str) -> bool:
         bool: True if email was sent successfully, False otherwise
     """
     if not settings.RESEND_API_KEY:
-        print("Warning: RESEND_API_KEY not configured. Email not sent.")
+        logger.warning("RESEND_API_KEY not configured. Email not sent.")
         return False
     
     try:
@@ -139,7 +142,7 @@ def send_invite_email(email: str, invite_code: str, invite_url: str) -> bool:
         
         # Send the email using Resend
         params = {
-            "from": "CFC Animal Feed <noreply@yourdomain.com>",  # Update with your verified domain
+            "from": f"CFC Animal Feed <{os.getenv('RESEND_FROM_EMAIL', 'noreply@yourdomain.com')}>",
             "to": [email],
             "subject": "You're invited to CFC Animal Feed Software",
             "html": html_content,
@@ -149,5 +152,5 @@ def send_invite_email(email: str, invite_code: str, invite_url: str) -> bool:
         return response.get("id") if response else False
         
     except Exception as e:
-        print(f"Error sending email via Resend: {e}")
+        logger.error(f"Error sending email via Resend: {e}")
         return False
