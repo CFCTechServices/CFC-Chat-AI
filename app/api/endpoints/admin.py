@@ -3,7 +3,7 @@ from pydantic import BaseModel, EmailStr
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List
 from app.core.auth import get_current_admin
 from app.core.supabase_service import supabase
 from app.config import settings
@@ -51,6 +51,22 @@ class DeleteUserResponse(BaseModel):
     user_id: str
     email: str
     permanently_deleted: bool = True
+
+class UserProfile(BaseModel):
+    id: str
+    email: str
+    full_name: Optional[str] = None
+    avatar_url: Optional[str] = None
+    role: str
+    status: str
+    created_at: str
+    deleted_at: Optional[str] = None
+    deleted_by: Optional[str] = None
+    last_active: Optional[str] = None  # Placeholder - not tracked in DB yet
+
+class ListUsersResponse(BaseModel):
+    users: List[UserProfile]
+    total: int
 
 # Endpoints
 
@@ -108,6 +124,75 @@ async def generate_invite(request: InviteRequest, admin: dict = Depends(get_curr
         logger.error(f"Failed to generate invitation: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to generate invitation: {e}")
 
+
+@router.get("/users", response_model=ListUsersResponse)
+async def list_users(admin: dict = Depends(get_current_admin)):
+    """
+    List all users with their profile information.
+    Only accessible by admins.
+    Returns users sorted by: active users first, then by created_at DESC.
+    """
+    try:
+        # Fetch all users from profiles table
+        response = supabase.table("profiles")\
+            .select("id, email, full_name, avatar_url, role, status, created_at, deleted_at, deleted_by")\
+            .execute()
+        
+        if not response.data:
+            return ListUsersResponse(users=[], total=0)
+        
+        users = response.data
+        
+        # Sort: active users first, then by creation date (newest first)
+        def sort_key(user):
+            # Active users = 0, Inactive = 1, Deleted = 2
+            status_priority = {
+                'active': 0,
+                'inactive': 1,
+                'deleted': 2
+            }
+            priority = status_priority.get(user.get('status', 'active'), 1)
+            # Return tuple: (priority, negative timestamp for DESC order)
+            created = user.get('created_at', '')
+            return (priority, created)
+        
+        # Sort by priority ASC (0 first), then by created_at DESC (newest first)
+        sorted_users = sorted(users, key=lambda u: (
+            sort_key(u)[0],  # Priority ascending (active=0 first)
+            sort_key(u)[1]   # Created_at (will be reversed separately)
+        ))
+        # Reverse only within each priority group by created_at
+        # Simple approach: sort by priority, then created_at DESC
+        sorted_users = sorted(users, key=lambda u: u.get('created_at', ''), reverse=True)
+        sorted_users = sorted(sorted_users, key=lambda u: {
+            'active': 0,
+            'inactive': 1,
+            'deleted': 2
+        }.get(u.get('status', 'active'), 1))
+        
+        # Transform to response model (set last_active to None - placeholder)
+        user_profiles = []
+        for user in sorted_users:
+            user_profiles.append(UserProfile(
+                **user,
+                last_active=None  # Placeholder - not tracked in DB yet
+            ))
+        
+        logger.info(f"Admin {admin.id} retrieved list of {len(user_profiles)} users")
+        
+        return ListUsersResponse(
+            users=user_profiles,
+            total=len(user_profiles)
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to list users: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve users: {str(e)}"
+        )
 
 @router.post("/change-role", response_model=ChangeRoleResponse)
 async def change_user_role(request: ChangeRoleRequest, admin: dict = Depends(get_current_admin)):
