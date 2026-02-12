@@ -268,6 +268,7 @@ html.dark-mode .theme-toggle:hover .theme-toggle-thumb {
   max-width: 1120px;
   width: 100%;
   margin: 0 auto;
+  overflow: auto;
 }
 
 /* Full screen layout for chat page */
@@ -277,6 +278,9 @@ html.dark-mode .theme-toggle:hover .theme-toggle-thumb {
   margin: 0;
   width: 100%;
   height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .app-footer {
@@ -338,6 +342,8 @@ html.dark-mode .link-button {
   gap: 0;
   height: 100%;
   width: 100%;
+  overflow: hidden;
+  flex: 1;
 }
 
 .page-header-row {
@@ -763,8 +769,8 @@ html.dark-mode .notes-card {
   flex-direction: column;
   height: 100%;
   width: 100%;
-
-
+  overflow: hidden;
+  min-height: 0;
 }
 
 .chat-card {
@@ -772,10 +778,13 @@ html.dark-mode .notes-card {
   flex-direction: column;
   flex: 1;
   width: 100%;
+  height: 100%;
   border-radius: 0;
   overflow: hidden;
   box-shadow: none;
   border: none;
+  min-height: 0;
+  padding: 0;
 }
 
 .chat-card-inner {
@@ -784,6 +793,8 @@ html.dark-mode .notes-card {
   flex: 1;
   overflow: hidden;
   gap: 0;
+  min-height: 0;
+  height: 100%;
 }
 
 .chat-sidebar {
@@ -802,6 +813,9 @@ html.dark-mode .notes-card {
   flex-direction: column;
   overflow: hidden;
   padding: 20px;
+  gap: 12px;
+  min-height: 0;
+  height: 100%;
 }
 
 .sidebar-header {
@@ -948,6 +962,7 @@ html.dark-mode .notes-card {
 .chat-thread {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 10px 8px;
   border-radius: 14px;
   background: var(--color-surface-secondary);
@@ -955,6 +970,7 @@ html.dark-mode .notes-card {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-height: 0;
 }
 
 .chat-message {
@@ -1165,7 +1181,6 @@ html.dark-mode .notes-card {
 }
 
 .chat-composer {
-  margin-top: 10px;
   border-radius: 14px;
   padding: 8px 10px 10px;
   background: var(--color-surface-secondary);
@@ -1173,6 +1188,7 @@ html.dark-mode .notes-card {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  flex-shrink: 0;
 }
 
 .composer-row {
