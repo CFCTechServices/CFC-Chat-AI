@@ -104,32 +104,99 @@
 
     return (
       <div className={`chat-message ${isUser ? 'user' : 'bot'}`}>
-        <div className="chat-bubble">
-          {message.segments && message.segments.length ? (
-            message.segments.map((seg, idx) => {
-              if (seg.type === 'text') {
-                return <MarkdownText key={idx} text={seg.text} />;
-              }
-              if (seg.type === 'image') {
-                return (
-                  <img
-                    key={idx}
-                    src={seg.url}
-                    alt={seg.alt || 'Image'}
-                    className="chat-image"
-                    onClick={() => onImageClick && onImageClick(seg.url)}
-                  />
-                );
-              }
-              if (seg.type === 'video') {
-                return <VideoBubble key={idx} segment={seg} onVideoClick={onVideoClick} />;
-              }
-              return null;
-            })
+        {isUser ? (
+          <div className="chat-bubble">
+            {message.segments && message.segments.length ? (
+              message.segments.map((seg, idx) => {
+                if (seg.type === 'text') return <MarkdownText key={idx} text={seg.text} />;
+                if (seg.type === 'image') return <img key={idx} src={seg.url} alt={seg.alt || 'Image'} className="chat-image" onClick={() => onImageClick && onImageClick(seg.url)} />;
+                if (seg.type === 'video') return <VideoBubble key={idx} segment={seg} onVideoClick={onVideoClick} />;
+                return null;
+              })
+            ) : (
+              <MarkdownText text={message.text} />
+            )}
+          </div>
+        ) : (
+          <div className="chat-bubble-group">
+            <div className="chat-bubble">
+              {message.segments && message.segments.length ? (
+                message.segments.map((seg, idx) => {
+                  if (seg.type === 'text') return <MarkdownText key={idx} text={seg.text} />;
+                  if (seg.type === 'image') return <img key={idx} src={seg.url} alt={seg.alt || 'Image'} className="chat-image" onClick={() => onImageClick && onImageClick(seg.url)} />;
+                  if (seg.type === 'video') return <VideoBubble key={idx} segment={seg} onVideoClick={onVideoClick} />;
+                  return null;
+                })
+              ) : (
+                <MarkdownText text={message.text} />
+              )}
+            </div>
+            {!message.typing && message.text && <MessageActions message={message} />}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function MessageActions({ message }) {
+    const [feedback, setFeedback] = React.useState(null); // 'up' | 'down' | null
+    const [copied, setCopied] = React.useState(false);
+
+    const handleCopy = () => {
+      const text = message.text || '';
+      navigator.clipboard.writeText(text).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+    };
+
+    const handleFeedback = (type) => {
+      setFeedback((prev) => (prev === type ? null : type));
+      // TODO: send feedback to backend
+    };
+
+    return (
+      <div className="message-actions">
+        <button
+          type="button"
+          className={`msg-action-btn ${copied ? 'active' : ''}`}
+          onClick={handleCopy}
+          title={copied ? 'Copied!' : 'Copy message'}
+          aria-label="Copy message"
+        >
+          {copied ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
           ) : (
-            <MarkdownText text={message.text} />
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
           )}
-        </div>
+        </button>
+        <button
+          type="button"
+          className={`msg-action-btn ${feedback === 'up' ? 'active' : ''}`}
+          onClick={() => handleFeedback('up')}
+          title="Helpful"
+          aria-label="Mark as helpful"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill={feedback === 'up' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className={`msg-action-btn ${feedback === 'down' ? 'active' : ''}`}
+          onClick={() => handleFeedback('down')}
+          title="Not helpful"
+          aria-label="Mark as not helpful"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill={feedback === 'down' ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10zM17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
+          </svg>
+        </button>
       </div>
     );
   }
@@ -213,10 +280,15 @@
   }
 
   function ChatPage() {
+    const initialChatId = React.useRef(`chat-${Date.now()}`).current;
     const [messages, setMessages] = React.useState([]);
     const [input, setInput] = React.useState('');
     const [sending, setSending] = React.useState(false);
     const [attachedImages, setAttachedImages] = React.useState([]);
+    const [chatHistory, setChatHistory] = React.useState([
+      { id: initialChatId, title: 'Welcome Chat', messages: [] },
+    ]);
+    const [activeChatId, setActiveChatId] = React.useState(initialChatId);
     const chatThreadRef = React.useRef(null);
     const thinkingTimeoutsRef = React.useRef({});
 
@@ -242,6 +314,17 @@
         chatThreadRef.current.scrollTop = chatThreadRef.current.scrollHeight;
       }
     }, [messages]);
+
+    // Keep the sidebar entry for the active chat in sync with current messages
+    React.useEffect(() => {
+      const nonTyping = messages.filter((m) => !m.typing);
+      if (nonTyping.length === 0) return;
+      const firstUserMsg = nonTyping.find((m) => m.role === 'user');
+      const title = firstUserMsg ? firstUserMsg.text.slice(0, 40) : 'New Chat';
+      setChatHistory((prev) =>
+        prev.map((c) => (c.id === activeChatId ? { ...c, title, messages: nonTyping } : c)),
+      );
+    }, [messages, activeChatId]);
 
     React.useEffect(() => {
       messages.forEach((msg) => {
@@ -435,77 +518,127 @@
       );
     };
 
+    const handleNewChat = () => {
+      const newId = `chat-${Date.now()}`;
+      setChatHistory((prev) => [{ id: newId, title: 'New Chat', messages: [] }, ...prev]);
+      setActiveChatId(newId);
+      setMessages([]);
+      setInput('');
+      setAttachedImages([]);
+    };
+
+    const handleSelectChat = (chatId) => {
+      if (chatId === activeChatId) return;
+      const selected = chatHistory.find((c) => c.id === chatId);
+      if (selected) {
+        setActiveChatId(chatId);
+        setMessages(selected.messages || []);
+        setInput('');
+        setAttachedImages([]);
+      }
+    };
+
     return (
-      <Layout>
-        <div className="page chat-page">
-          <div className="page-header-row">
-            <div>
+      <Layout fullWidth>
+        <div className="chat-layout">
+          {/* Sidebar */}
+          <aside className="chat-sidebar">
+            <button type="button" className="btn-primary sidebar-new-chat" onClick={handleNewChat}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="8" y1="3" x2="8" y2="13" />
+                <line x1="3" y1="8" x2="13" y2="8" />
+              </svg>
+              New Chat
+            </button>
+            <div className="sidebar-history">
+              {chatHistory.map((chat) => (
+                <button
+                  key={chat.id}
+                  type="button"
+                  className={`sidebar-chat-item ${chat.id === activeChatId ? 'active' : ''}`}
+                  onClick={() => handleSelectChat(chat.id)}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                  </svg>
+                  <span className="sidebar-chat-title">{chat.title}</span>
+                </button>
+              ))}
+            </div>
+            <div className="sidebar-count">{chatHistory.length} chat{chatHistory.length !== 1 ? 's' : ''}</div>
+          </aside>
+
+          {/* Main chat area */}
+          <section className="chat-main">
+            <div className="chat-main-header">
               <h1>Chat with CFC AI</h1>
               <p>Ask questions about your software and get quick, informed answers.</p>
             </div>
-          </div>
 
-          <Card className="chat-card">
             <div className="chat-thread" id="chatThread" ref={chatThreadRef}>
               {messages.map((m) => (
                 <ChatMessage key={m.id} message={m} onImageClick={handleImageClick} onVideoClick={handleVideoClick} />
               ))}
             </div>
-            <form className="chat-composer" onSubmit={handleSubmit}>
-              <div className="composer-row">
-                <button
-                  type="button"
-                  className={`composer-info-icon ${messages.length > 12 ? 'visible' : ''}`}
-                  onClick={() => openModal(
-                    <div className="conversation-info-modal">
-                      <h3>Long Conversation Notice</h3>
-                      <p>
-                        This conversation is getting long. CFC AI may begin to lose sight of the original goal in very long conversations.
-                      </p>
-                      <p>
-                        For separate questions or new topics, consider refreshing the page to start a new conversation. This ensures the most reliable and focused responses.
-                      </p>
-                    </div>,
-                  )}
-                  title="Conversation length info"
-                  aria-label="Conversation length information"
-                >
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="10" cy="10" r="9" stroke="currentColor" strokeWidth="1.5" fill="none" />
-                    <path d="M10 7V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                    <circle cx="10" cy="13" r="1" fill="currentColor" />
-                  </svg>
-                </button>
-                <input
-                  type="text"
-                  className="composer-input"
-                  placeholder="Ask anything about CFC software…"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                />
-                <label className="btn-primary composer-button" title="Attach images">
-                  <span>Attach</span>
-                  <input type="file" accept="image/*" multiple onChange={handleImageChange} />
-                </label>
-                <button type="submit" className="btn-primary composer-button" disabled={sending}>
-                  {sending ? 'Sending…' : 'Send'}
-                </button>
-              </div>
-              {attachedImages.length > 0 && (
-                <div className="attached-images">
-                  {attachedImages.map((img) => (
-                    <img
-                      key={img.id}
-                      src={img.url}
-                      alt="Attachment"
-                      className="attached-thumb"
-                      onClick={() => handleImageClick(img.url)}
-                    />
-                  ))}
+
+            {/* Floating composer */}
+            <Card className="chat-composer-card">
+              <form className="chat-composer" onSubmit={handleSubmit}>
+                <div className="composer-row">
+                  <button
+                    type="button"
+                    className={`composer-info-icon ${messages.length > 12 ? 'visible' : ''}`}
+                    onClick={() => openModal(
+                      <div className="conversation-info-modal">
+                        <h3>Long Conversation Notice</h3>
+                        <p>
+                          This conversation is getting long. CFC AI may begin to lose sight of the original goal in very long conversations.
+                        </p>
+                        <p>
+                          For separate questions or new topics, consider refreshing the page to start a new conversation. This ensures the most reliable and focused responses.
+                        </p>
+                      </div>,
+                    )}
+                    title="Conversation length info"
+                    aria-label="Conversation length information"
+                  >
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <circle cx="10" cy="10" r="9" stroke="currentColor" strokeWidth="1.5" fill="none" />
+                      <path d="M10 7V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                      <circle cx="10" cy="13" r="1" fill="currentColor" />
+                    </svg>
+                  </button>
+                  <input
+                    type="text"
+                    className="composer-input"
+                    placeholder="Ask anything about CFC software…"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                  />
+                  <label className="btn-primary composer-button" title="Attach images">
+                    <span>Attach</span>
+                    <input type="file" accept="image/*" multiple onChange={handleImageChange} />
+                  </label>
+                  <button type="submit" className="btn-primary composer-button" disabled={sending}>
+                    {sending ? 'Sending…' : 'Send'}
+                  </button>
                 </div>
-              )}
-            </form>
-          </Card>
+                {attachedImages.length > 0 && (
+                  <div className="attached-images">
+                    {attachedImages.map((img) => (
+                      <img
+                        key={img.id}
+                        src={img.url}
+                        alt="Attachment"
+                        className="attached-thumb"
+                        onClick={() => handleImageClick(img.url)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </form>
+            </Card>
+          </section>
         </div>
         {modal}
       </Layout>

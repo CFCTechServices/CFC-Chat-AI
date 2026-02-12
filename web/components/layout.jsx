@@ -58,7 +58,7 @@
     );
   }
 
-  function Layout({ children }) {
+  function Layout({ children, fullWidth }) {
     const { user } = useUser();
     const { route, navigate, visualState } = useRouter();
 
@@ -113,21 +113,23 @@
           </div>
         </header>
 
-        <main className={`app-main page-fader ${visualState}`}>
+        <main className={`app-main ${fullWidth ? 'app-main--full' : ''} page-fader ${visualState}`}>
           {children}
         </main>
 
-        <footer className="app-footer">
-          {showBackToLogin && (
-            <button
-              type="button"
-              className="link-button"
-              onClick={() => navigate('login')}
-            >
-              Return to login
-            </button>
-          )}
-        </footer>
+        {!fullWidth && (
+          <footer className="app-footer">
+            {showBackToLogin && (
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => navigate('login')}
+              >
+                Return to login
+              </button>
+            )}
+          </footer>
+        )}
       </div>
     );
   }
