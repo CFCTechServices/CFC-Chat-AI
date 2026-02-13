@@ -103,15 +103,8 @@
           </div>
           <div className="app-header-right">
             {showBackToLogin && (
-              <button
-                type="button"
-                className="link-button"
-                onClick={() => navigate('login')}
-              >
-                Return to login
-              </button>
-            )}
-            <nav className="toolbar" aria-label="Primary navigation">
+              <React.Fragment>
+                <nav className="toolbar" aria-label="Primary navigation">
               <button
                 type="button"
                 className={`toolbar-btn ${route === 'chat' ? 'active' : ''}`}
@@ -155,6 +148,17 @@
               </span>
             ) : (
               <span className="app-greeting muted">Hi there!</span>
+            )}
+            {showBackToLogin && (
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => navigate('login')}
+              >
+                Return to login
+              </button>
+            )}
+              </React.Fragment>
             )}
             <DarkModeToggle />
           </div>
