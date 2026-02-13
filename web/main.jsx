@@ -3,7 +3,7 @@
   const { ThemeProvider } = window.CFC.ThemeContext;
   const { UserProvider } = window.CFC.UserContext;
   const { RouterProvider, useRouter } = window.CFC.RouterContext;
-  const { LoginPage, DocsPage, AdminPage, ChatPage, TransitionPage, ResetPasswordPage } = window.CFC.Pages;
+  const { LoginPage, DocsPage, AdminPage, ChatPage, TransitionPage, HistoryPage, SettingsPage } = window.CFC.Pages;
 
   function App() {
     return (
@@ -19,22 +19,13 @@
 
   function AppRoutes() {
     const { route } = useRouter();
-    const { loading } = window.CFC.UserContext.useUser();
-
-    // Show a loading screen while Supabase is initializing
-    if (loading) {
-      return (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'var(--color-text-muted, #888)' }}>
-          Loading...
-        </div>
-      );
-    }
 
     if (route === 'transition') return <TransitionPage />;
     if (route === 'docs') return <DocsPage />;
     if (route === 'admin') return <AdminPage />;
     if (route === 'chat') return <ChatPage />;
-    if (route === 'reset-password') return <ResetPasswordPage />;
+    if (route === 'settings') return <SettingsPage />;
+    if (route === 'history') return <HistoryPage />;
     return <LoginPage />;
   }
 

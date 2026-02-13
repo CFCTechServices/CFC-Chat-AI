@@ -3,8 +3,9 @@ CFC Animal Feed Software Chatbot API
 Main FastAPI application with organized structure
 """
 from fastapi.staticfiles import StaticFiles
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 import logging
 from pathlib import Path
 from dotenv import load_dotenv
@@ -87,6 +88,20 @@ async def startup_event():
     logger.info("Data directories initialized")
     logger.info(f"API running at http://{settings.API_HOST}:{settings.API_PORT}")
     logger.info(f"API documentation available at http://{settings.API_HOST}:{settings.API_PORT}/docs")
+
+# ---------- SPA catch-all (must be AFTER all API routes) ----------
+# Client-side routes like /chat, /admin, /settings etc. need to serve
+# index.html so the React SPA can boot and handle the route itself.
+_SPA_ROUTES = {"", "chat", "admin", "settings", "history", "docs", "login", "transition"}
+
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    """Serve index.html for client-side routes so page reloads work."""
+    first_segment = full_path.strip("/").split("/")[0]
+    if first_segment in _SPA_ROUTES:
+        return FileResponse(WEB_DIR / "index.html")
+    raise HTTPException(status_code=404, detail="Not Found")
+
 
 @app.on_event("shutdown")
 async def shutdown_event():

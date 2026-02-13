@@ -1,9 +1,8 @@
-// App layout shell (header/footer) with profile management
+// App layout shell (header/footer) and dark mode toggle
 (() => {
   const { useTheme } = window.CFC.ThemeContext;
   const { useUser } = window.CFC.UserContext;
   const { useRouter } = window.CFC.RouterContext;
-  const { useState, useEffect, useRef, useCallback } = React;
 
   function DarkModeToggle() {
     const { isDark, toggleTheme } = useTheme();
@@ -19,7 +18,16 @@
         <span className="theme-toggle-track">
           <span className="theme-toggle-thumb">
             {isDark ? (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <circle cx="12" cy="12" r="5" />
                 <line x1="12" y1="1" x2="12" y2="3" />
                 <line x1="12" y1="21" x2="12" y2="23" />
@@ -31,7 +39,16 @@
                 <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
               </svg>
             ) : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
               </svg>
             )}
@@ -41,158 +58,38 @@
     );
   }
 
-  function ProfileDropdown() {
-    const { user, session, profile, setProfile } = useUser();
-    const [open, setOpen] = useState(false);
-    const [editing, setEditing] = useState(false);
-    const [fullName, setFullName] = useState('');
-    const [saving, setSaving] = useState(false);
-    const [profileData, setProfileData] = useState(null);
-    const dropdownRef = useRef(null);
-
-    useEffect(() => {
-      if (open && session && !profileData) {
-        fetch('/api/profile/me', {
-          headers: { 'Authorization': `Bearer ${session.access_token}` },
-        })
-          .then(res => res.ok ? res.json() : null)
-          .then(data => {
-            if (data) {
-              setProfileData(data);
-              setFullName(data.full_name || '');
-            }
-          })
-          .catch(() => {});
-      }
-    }, [open, session, profileData]);
-
-    useEffect(() => {
-      const handleClickOutside = (e) => {
-        if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-          setOpen(false);
-          setEditing(false);
-        }
-      };
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, []);
-
-    const handleSave = async () => {
-      if (!session) return;
-      setSaving(true);
-      try {
-        const res = await fetch('/api/profile/me', {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ full_name: fullName }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setProfileData(data);
-          setEditing(false);
-          if (setProfile) setProfile({ ...profile, full_name: data.full_name });
-        }
-      } catch (e) {
-        console.error('Failed to update profile:', e);
-      } finally {
-        setSaving(false);
-      }
-    };
-
-    const displayName = profileData?.full_name || profile?.full_name || user?.email?.split('@')[0] || '';
-
-    return (
-      <div ref={dropdownRef} style={{ position: 'relative' }}>
-        <button
-          className="link-button"
-          onClick={() => setOpen(!open)}
-          style={{ fontSize: '0.95rem', cursor: 'pointer' }}
-          aria-haspopup="true"
-          aria-expanded={open}
-          aria-label="Profile menu"
-        >
-          {displayName ? `Hi, ${displayName}!` : 'Hi!'}
-        </button>
-
-        {open && (
-          <div style={{
-            position: 'absolute',
-            top: '100%',
-            right: 0,
-            marginTop: '8px',
-            backgroundColor: 'var(--color-surface, white)',
-            border: '1px solid var(--color-border, #e5e7eb)',
-            borderRadius: '10px',
-            padding: '16px',
-            minWidth: '260px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-            zIndex: 100,
-          }}>
-            <div style={{ marginBottom: '12px', fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-              {user?.email}
-            </div>
-
-            {profileData && (
-              <div style={{ marginBottom: '12px' }}>
-                <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: '4px' }}>Role</div>
-                <div style={{ fontWeight: 600 }}>{profileData.role}</div>
-              </div>
-            )}
-
-            {!editing ? (
-              <div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: '4px' }}>Name</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span>{profileData?.full_name || 'Not set'}</span>
-                  <button
-                    className="link-button"
-                    onClick={() => setEditing(true)}
-                    style={{ fontSize: '0.8rem' }}
-                  >
-                    Edit
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: '4px' }}>Name</div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Your full name"
-                    style={{
-                      flex: 1,
-                      padding: '4px 8px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--color-border)',
-                      fontSize: '0.9rem',
-                      backgroundColor: 'var(--color-surface)',
-                      color: 'var(--color-text)',
-                    }}
-                  />
-                  <button className="btn-primary" onClick={handleSave} disabled={saving} style={{ padding: '4px 10px', fontSize: '0.8rem' }}>
-                    {saving ? '...' : 'Save'}
-                  </button>
-                  <button className="btn-secondary" onClick={() => setEditing(false)} style={{ padding: '4px 10px', fontSize: '0.8rem' }}>
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  function Layout({ children }) {
-    const { user, role, supabase } = useUser();
+  function Layout({ children, fullWidth }) {
+    const { user } = useUser();
     const { route, navigate, visualState } = useRouter();
+
+    const showBackToLogin = route !== 'login' && route !== 'transition';
+    const [greetingName, setGreetingName] = React.useState('');
+    const [hasAnimatedGreeting, setHasAnimatedGreeting] = React.useState(false);
+
+    React.useEffect(() => {
+      if (!user?.name) {
+        setGreetingName('');
+        setHasAnimatedGreeting(false);
+        return;
+      }
+      const target = (user.name.split(' ')[0] || '').toString();
+
+      if (route === 'transition' && !hasAnimatedGreeting) {
+        let idx = 0;
+        setGreetingName('');
+        const interval = setInterval(() => {
+          idx += 1;
+          setGreetingName(target.slice(0, idx));
+          if (idx >= target.length) {
+            clearInterval(interval);
+            setHasAnimatedGreeting(true);
+          }
+        }, 140);
+        return () => clearInterval(interval);
+      }
+
+      setGreetingName(target);
+    }, [user?.name, route, hasAnimatedGreeting]);
 
     return (
       <div className="app-root">
@@ -203,53 +100,87 @@
               <div className="app-title">Support Assistant</div>
               <div className="app-subtitle">Conversational help for CFC Technologies</div>
             </div>
-
-            {/* Admin Navigation */}
-            {user && role === 'admin' && (
-              <div style={{ marginLeft: '40px', display: 'flex', gap: '10px' }}>
-                <button
-                  className={route === 'chat' ? 'btn-primary' : 'btn-secondary'}
-                  onClick={() => navigate('chat')}
-                  style={{ padding: '4px 12px', fontSize: '0.9rem' }}
-                >
-                  Chat
-                </button>
-                <button
-                  className={route === 'admin' ? 'btn-primary' : 'btn-secondary'}
-                  onClick={() => navigate('admin')}
-                  style={{ padding: '4px 12px', fontSize: '0.9rem' }}
-                >
-                  Admin
-                </button>
-              </div>
-            )}
           </div>
           <div className="app-header-right">
-            {user?.email ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                <ProfileDropdown />
-                <button
-                  className="link-button"
-                  onClick={() => supabase?.auth?.signOut()}
-                  style={{ fontSize: '0.9rem' }}
-                >
-                  Sign Out
-                </button>
-              </div>
+            {showBackToLogin && (
+              <React.Fragment>
+                <nav className="toolbar" aria-label="Primary navigation">
+              <button
+                type="button"
+                className={`toolbar-btn ${route === 'chat' ? 'active' : ''}`}
+                onClick={() => navigate('chat', { withFade: true })}
+                title="Chat"
+                aria-label="Chat"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a4 4 0 0 1-4 4H7l-4 4V5a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className={`toolbar-btn ${route === 'history' ? 'active' : ''}`}
+                onClick={() => navigate('history', { withFade: true })}
+                title="History"
+                aria-label="History"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="1 4 1 10 7 10" />
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                  <polyline points="12 7 12 12 16 14" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className={`toolbar-btn ${route === 'settings' ? 'active' : ''}`}
+                onClick={() => navigate('settings', { withFade: true })}
+                title="Settings"
+                aria-label="Settings"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0A1.65 1.65 0 0 0 9 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82h0A1.65 1.65 0 0 0 20.91 11H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+                </svg>
+              </button>
+            </nav>
+            {user?.name ? (
+              <span className="app-greeting">
+                {greetingName ? `Hi, ${greetingName}!` : 'Hi,'}
+              </span>
             ) : (
               <span className="app-greeting muted">Hi there!</span>
+            )}
+            {showBackToLogin && (
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => navigate('login')}
+              >
+                Return to login
+              </button>
+            )}
+              </React.Fragment>
             )}
             <DarkModeToggle />
           </div>
         </header>
 
-        <main className={`app-main page-fader ${visualState}`}>
+        <main className={`app-main ${fullWidth ? 'app-main--full' : ''} page-fader ${visualState}`}>
           {children}
         </main>
 
-        <footer className="app-footer">
-          &copy; 2026 CFC Tech Services
-        </footer>
+        {!fullWidth && (
+          <footer className="app-footer">
+            {showBackToLogin && (
+              <button
+                type="button"
+                className="link-button"
+                onClick={() => navigate('login')}
+              >
+                Return to login
+              </button>
+            )}
+          </footer>
+        )}
       </div>
     );
   }
