@@ -14,6 +14,7 @@
     const [loading, setLoading] = useState(true);
     const [profile, setProfile] = useState(null);
     const [sbClient, setSbClient] = useState(null);
+    const [passwordRecoveryMode, setPasswordRecoveryMode] = useState(false);
     const initStarted = useRef(false);
 
     useEffect(() => {
@@ -74,8 +75,11 @@
             handleSession(client, session);
           });
 
-          // Listen for auth state changes (login, logout, token refresh)
-          client.auth.onAuthStateChange((_event, session) => {
+          // Listen for auth state changes (login, logout, token refresh, password recovery)
+          client.auth.onAuthStateChange((event, session) => {
+            if (event === 'PASSWORD_RECOVERY') {
+              setPasswordRecoveryMode(true);
+            }
             handleSession(client, session);
           });
         })
@@ -85,6 +89,8 @@
         });
     }, []);
 
+    const clearPasswordRecovery = () => setPasswordRecoveryMode(false);
+
     const value = useMemo(() => ({
       user,
       session,
@@ -93,8 +99,10 @@
       profile,
       setUser,
       setProfile,
-      supabase: sbClient
-    }), [user, session, role, loading, profile, sbClient]);
+      supabase: sbClient,
+      passwordRecoveryMode,
+      clearPasswordRecovery,
+    }), [user, session, role, loading, profile, sbClient, passwordRecoveryMode]);
 
     return (
       <UserContext.Provider value={value}>

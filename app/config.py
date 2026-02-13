@@ -67,7 +67,7 @@ class Settings:
     
     # Resend API Configuration (for email invitations)
     RESEND_API_KEY: Optional[str] = os.getenv("RESEND_API_KEY")
-    FRONTEND_BASE_URL: str = os.getenv("FRONTEND_BASE_URL", "http://localhost:3000")
+    FRONTEND_BASE_URL: str = os.getenv("FRONTEND_BASE_URL", "http://localhost:8000/ui")
     
     # Email Configuration
     # Set to False to create invitations without sending emails (useful when Resend domain is not verified)

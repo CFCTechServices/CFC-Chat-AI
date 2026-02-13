@@ -1,7 +1,7 @@
 // Simple in-app router context (no external dependency)
 (() => {
   const RouterContext = React.createContext(null);
-  const VALID_ROUTES = ['login', 'chat', 'admin', 'docs', 'transition'];
+  const VALID_ROUTES = ['login', 'chat', 'admin', 'docs', 'transition', 'reset-password'];
 
   function isValidRoute(route) {
     return VALID_ROUTES.includes(route);
@@ -9,7 +9,7 @@
 
   function RouterProvider({ children }) {
     const userContext = window.CFC.UserContext.useUser();
-    const { user, role } = userContext || { user: null, role: 'user' };
+    const { user, role, passwordRecoveryMode } = userContext || { user: null, role: 'user', passwordRecoveryMode: false };
 
     function getDefaultRouteForUser() {
       if (!user) return 'login';
@@ -35,6 +35,12 @@
     const hasInitialized = React.useRef(false);
 
     React.useEffect(() => {
+      // Password recovery takes priority — Supabase creates a temp session
+      if (passwordRecoveryMode) {
+        setRoute('reset-password');
+        return;
+      }
+
       if (!user) {
         setRoute('login');
         try { window.localStorage.removeItem('cfc-route'); } catch { }
@@ -54,7 +60,7 @@
         }
         hasInitialized.current = true;
       }
-    }, [user, role]);
+    }, [user, role, passwordRecoveryMode]);
 
     const performNavigation = React.useCallback((next, options = {}) => {
       if (next === 'transition') {

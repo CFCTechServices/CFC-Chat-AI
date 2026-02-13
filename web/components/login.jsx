@@ -17,6 +17,7 @@
     const [inviteEmail, setInviteEmail] = useState("");
 
     const { supabase, loading: authLoading } = useUser();
+    const { navigate } = useRouter();
     const clientReady = !!supabase || !!window.supabaseClient;
 
     // Auto-detect invite code and email from URL
@@ -182,6 +183,14 @@
                   placeholder="Enter your password"
                   autoComplete="current-password"
                 />
+                {!isSignUp && (
+                  <div
+                    style={{ textAlign: 'right', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.85rem', color: 'var(--color-text-muted, #666)', marginTop: '-4px' }}
+                    onClick={() => navigate('reset-password')}
+                  >
+                    Forgot Password?
+                  </div>
+                )}
                 {error && (
                   <div style={{
                     padding: '10px 14px',
