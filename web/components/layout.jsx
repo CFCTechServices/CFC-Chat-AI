@@ -102,6 +102,44 @@
             </div>
           </div>
           <div className="app-header-right">
+            <nav className="toolbar" aria-label="Primary navigation">
+              <button
+                type="button"
+                className={`toolbar-btn ${route === 'chat' ? 'active' : ''}`}
+                onClick={() => navigate('chat', { withFade: true })}
+                title="Chat"
+                aria-label="Chat"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a4 4 0 0 1-4 4H7l-4 4V5a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className={`toolbar-btn ${route === 'history' ? 'active' : ''}`}
+                onClick={() => navigate('history', { withFade: true })}
+                title="History"
+                aria-label="History"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="1 4 1 10 7 10" />
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                  <polyline points="12 7 12 12 16 14" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                className={`toolbar-btn ${route === 'settings' ? 'active' : ''}`}
+                onClick={() => navigate('settings', { withFade: true })}
+                title="Settings"
+                aria-label="Settings"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0A1.65 1.65 0 0 0 9 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82h0A1.65 1.65 0 0 0 20.91 11H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+                </svg>
+              </button>
+            </nav>
             {user?.name ? (
               <span className="app-greeting">
                 {greetingName ? `Hi, ${greetingName}!` : 'Hi,'}

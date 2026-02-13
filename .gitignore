@@ -1,3 +1,5 @@
+# Ignore local backup and scratch files
+chat_backup/
 ########################################
 #       Node / Build Artifacts
 ########################################
