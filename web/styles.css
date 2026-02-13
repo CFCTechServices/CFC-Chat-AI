@@ -48,6 +48,21 @@ html {
   transition: background-color 0.3s ease;
 }
 
+/* Text size preferences */
+html.text-size-small { font-size: 14px; }
+html.text-size-medium { font-size: 16px; }
+html.text-size-large { font-size: 18px; }
+
+/* Reduced motion preference */
+html.reduced-motion * { transition: none !important; animation: none !important; }
+
+/* High contrast mode overrides */
+html.high-contrast {
+  --color-border: #93C5FD;
+  --color-text-subtle: #D1D5DB;
+}
+html.high-contrast .card { box-shadow: 0 10px 30px rgba(64, 101, 174, 0.25); }
+
 /* Apply smooth color transitions to elements using theme variables */
 * {
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
@@ -156,6 +171,48 @@ code {
   align-items: center;
   gap: 10px;
   height: 100%;
+}
+
+/* Top toolbar icons */
+.toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 6px;
+}
+
+.toolbar-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-secondary);
+  color: var(--color-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.toolbar-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.toolbar-btn:hover {
+  background: var(--color-surface);
+}
+
+.toolbar-btn.active {
+  background: rgba(55, 157, 99, 0.2);
+  border-color: var(--color-green);
+  color: var(--color-green);
+}
+
+.toolbar-btn.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .app-greeting {
@@ -1840,4 +1897,107 @@ html.dark-mode .modal-body {
   .chat-thread {
     padding: 12px 16px;
   }
+}
+
+/* History page */
+.history-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.history-search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-surface-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.history-search-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--color-text);
+  flex: 1;
+  font-size: 0.95rem;
+}
+
+.search-icon,
+.filter-icon {
+  color: var(--color-text-muted);
+}
+
+.history-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-surface-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.history-filter-select {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 6px 10px;
+  outline: none;
+  color: var(--color-text);
+  font-size: 0.95rem;
+}
+
+.history-filter-select:focus {
+  border-color: var(--color-blue);
+  box-shadow: 0 0 0 1px rgba(64, 101, 174, 0.2);
+}
+
+.history-filter-select option {
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.history-item {
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-secondary);
+  padding: 14px 16px;
+}
+
+.history-item-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.history-item-preview {
+  margin-top: 6px;
+  color: var(--color-text-subtle);
+  font-size: 0.95rem;
+}
+
+.history-item-meta {
+  margin-top: 10px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  color: var(--color-text-muted);
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
 }
