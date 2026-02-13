@@ -1,4 +1,4 @@
-// Simple in-app router context (no external dependency)
+// Simple in-app router context with browser history support
 (() => {
   const RouterContext = React.createContext(null);
 
@@ -9,10 +9,27 @@
     return 'chat';
   }
 
+  // Map route names to URL paths and back
+  const routeToPath = (route) => {
+    if (!route || route === 'login') return '/';
+    return `/${route}`;
+  };
+
+  const pathToRoute = (path) => {
+    const clean = path.replace(/^\/+|\/+$/g, '');
+    if (!clean || clean === 'login') return 'login';
+    return clean;
+  };
+
   function RouterProvider({ children }) {
     const { user } = window.CFC.UserContext.useUser();
 
     const getInitialRoute = () => {
+      // Prefer the URL path first
+      const urlRoute = pathToRoute(window.location.pathname);
+      if (urlRoute && urlRoute !== 'login') {
+        return urlRoute;
+      }
       try {
         const savedRoute = window.localStorage.getItem('cfc-route');
         if (savedRoute && savedRoute !== 'transition') {
@@ -28,21 +45,25 @@
     const [nextRoute, setNextRoute] = React.useState(null);
     const [visualState, setVisualState] = React.useState('idle');
     const hasInitialized = React.useRef(false);
+    const skipPush = React.useRef(false); // avoid pushing when handling popstate
 
     React.useEffect(() => {
       if (!user) {
         setRoute('login');
         try { window.localStorage.removeItem('cfc-route'); } catch {}
         hasInitialized.current = false;
+        window.history.replaceState({ route: 'login' }, '', routeToPath('login'));
       } else {
         try {
           const savedRoute = window.localStorage.getItem('cfc-route');
           if (savedRoute && savedRoute !== 'transition') {
             setRoute(savedRoute);
+            window.history.replaceState({ route: savedRoute }, '', routeToPath(savedRoute));
           } else if (!hasInitialized.current) {
             const defaultRoute = getDefaultRouteForEmail(user.email);
             setRoute(defaultRoute);
             window.localStorage.setItem('cfc-route', defaultRoute);
+            window.history.replaceState({ route: defaultRoute }, '', routeToPath(defaultRoute));
           }
         } catch {
           // ignore
@@ -50,6 +71,20 @@
         hasInitialized.current = true;
       }
     }, [user]);
+
+    // Listen for browser back/forward
+    React.useEffect(() => {
+      const handlePopState = (event) => {
+        const newRoute = event.state?.route || pathToRoute(window.location.pathname);
+        skipPush.current = true;
+        try { window.localStorage.setItem('cfc-route', newRoute); } catch {}
+        setRoute(newRoute);
+        requestAnimationFrame(() => setVisualState('fade-in'));
+        setTimeout(() => setVisualState('idle'), 280);
+      };
+      window.addEventListener('popstate', handlePopState);
+      return () => window.removeEventListener('popstate', handlePopState);
+    }, []);
 
     const performNavigation = React.useCallback((next, options = {}) => {
       if (next === 'transition') {
@@ -59,6 +94,13 @@
         try { window.localStorage.setItem('cfc-route', next); } catch {}
       }
       setRoute(next);
+
+      // Push to browser history (unless triggered by popstate)
+      if (!skipPush.current && next !== 'transition') {
+        window.history.pushState({ route: next }, '', routeToPath(next));
+      }
+      skipPush.current = false;
+
       requestAnimationFrame(() => setVisualState('fade-in'));
       setTimeout(() => setVisualState('idle'), 280);
     }, []);

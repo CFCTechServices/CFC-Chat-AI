@@ -4,7 +4,7 @@ from app.config import settings
 
 router = APIRouter(tags=["health"])
 
-@router.get("/", response_model=HealthResponse)
+@router.get("/health", response_model=HealthResponse)
 async def health_check():
     """Health check endpoint."""
     return HealthResponse(
@@ -13,7 +13,7 @@ async def health_check():
         version=settings.API_VERSION
     )
 
-@router.get("/health", response_model=HealthResponse)
+@router.get("/health/detailed", response_model=HealthResponse)
 async def detailed_health_check():
     """Detailed health check endpoint."""
     # In a production environment, you might check:
