@@ -21,6 +21,19 @@
 
     const { open: openModal, modal } = useModal();
 
+    // ---- Random welcome phrase for empty chat ----
+    const welcomePhrases = [
+      'Chat with CFC AI',
+      'What can CFC AI help with today?',
+      'Ready when you are',
+      'Ask anything about CFC software…',
+      'How can I help you today?',
+    ];
+    const welcomePhrase = React.useMemo(
+      () => welcomePhrases[Math.floor(Math.random() * welcomePhrases.length)],
+      [activeChatId],
+    );
+
     // ---- Conversation history for API context ----
     const prepareConversationHistory = (msgs, maxMessages = 8) => {
       const filtered = msgs.filter((m) => m.role === 'user' || m.role === 'assistant');
@@ -266,6 +279,26 @@
       }
     };
 
+    const handleDeleteChat = (chatId) => {
+      const remaining = chatHistory.filter((c) => c.id !== chatId);
+      if (remaining.length === 0) {
+        // Always keep at least one chat
+        const newId = `chat-${Date.now()}`;
+        setChatHistory([{ id: newId, title: 'New Chat', messages: [] }]);
+        setActiveChatId(newId);
+        setMessages([]);
+      } else if (chatId === activeChatId) {
+        // Deleted the active chat – switch to the first remaining one
+        setChatHistory(remaining);
+        setActiveChatId(remaining[0].id);
+        setMessages(remaining[0].messages || []);
+      } else {
+        setChatHistory(remaining);
+      }
+      setInput('');
+      setAttachedImages([]);
+    };
+
     // ---- Render ----
     return (
       <Layout fullWidth>
@@ -275,15 +308,17 @@
             activeChatId={activeChatId}
             onNewChat={handleNewChat}
             onSelectChat={handleSelectChat}
+            onDeleteChat={handleDeleteChat}
           />
 
           <section className="chat-main">
-            <div className="chat-main-header">
-              <h1>Chat with CFC AI</h1>
-              <p>Ask questions about your software and get quick, informed answers.</p>
-            </div>
-
             <div className="chat-thread" id="chatThread" ref={chatThreadRef}>
+              {messages.length === 0 && (
+                <div className="chat-empty-state">
+                  <h1>{welcomePhrase}</h1>
+                  <p>Ask questions about your software and get quick, informed answers.</p>
+                </div>
+              )}
               {messages.map((m) => (
                 <ChatMessage key={m.id} message={m} onImageClick={handleImageClick} onVideoClick={handleVideoClick} />
               ))}

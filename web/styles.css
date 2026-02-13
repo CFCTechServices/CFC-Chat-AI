@@ -1229,6 +1229,33 @@ html.dark-mode .toggle-thumb {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-chat-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-chat-item:hover .sidebar-chat-delete {
+  opacity: 1;
+}
+
+.sidebar-chat-delete:hover {
+  background: var(--color-danger, #e74c3c);
+  color: #fff;
 }
 
 .sidebar-footer {
@@ -1263,19 +1290,35 @@ html.dark-mode .toggle-thumb {
   min-height: 0; /* allow shrinking so thread scrolls */
 }
 
-.chat-main-header {
-  padding: 20px 32px 12px;
-  flex-shrink: 0;
+.chat-empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 32px;
+  opacity: 0.7;
+  user-select: none;
+  animation: fadeInWelcome 0.5s ease;
 }
 
-.chat-main-header h1 {
-  margin: 0 0 4px;
+.chat-empty-state h1 {
+  margin: 0 0 8px;
   font-size: 1.6rem;
+  font-weight: 600;
+  color: var(--color-text);
 }
 
-.chat-main-header p {
+.chat-empty-state p {
   margin: 0;
+  font-size: 0.95rem;
   color: var(--color-text-muted);
+}
+
+@keyframes fadeInWelcome {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 0.7; transform: translateY(0); }
 }
 
 .chat-thread {
@@ -1792,10 +1835,6 @@ html.dark-mode .modal-body {
 
   .chat-composer-card {
     margin: 0 12px 10px;
-  }
-
-  .chat-main-header {
-    padding: 16px 16px 8px;
   }
 
   .chat-thread {

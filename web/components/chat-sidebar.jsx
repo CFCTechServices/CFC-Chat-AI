@@ -1,6 +1,6 @@
 // Chat sidebar – manages chat history list and new-chat action
 (() => {
-  function ChatSidebar({ chatHistory, activeChatId, onNewChat, onSelectChat }) {
+  function ChatSidebar({ chatHistory, activeChatId, onNewChat, onSelectChat, onDeleteChat }) {
     return (
       <aside className="chat-sidebar">
         <button type="button" className="btn-primary sidebar-new-chat" onClick={onNewChat}>
@@ -12,17 +12,33 @@
         </button>
         <div className="sidebar-history">
           {chatHistory.map((chat) => (
-            <button
+            <div
               key={chat.id}
-              type="button"
               className={`sidebar-chat-item ${chat.id === activeChatId ? 'active' : ''}`}
               onClick={() => onSelectChat(chat.id)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => { if (e.key === 'Enter') onSelectChat(chat.id); }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
               <span className="sidebar-chat-title">{chat.title}</span>
-            </button>
+              <button
+                type="button"
+                className="sidebar-chat-delete"
+                title="Delete chat"
+                onClick={(e) => { e.stopPropagation(); onDeleteChat(chat.id); }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                  <path d="M10 11v6" />
+                  <path d="M14 11v6" />
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                </svg>
+              </button>
+            </div>
           ))}
         </div>
         <div className="sidebar-footer">
