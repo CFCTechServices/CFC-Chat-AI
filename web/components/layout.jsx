@@ -59,8 +59,16 @@
   }
 
   function Layout({ children, fullWidth }) {
-    const { user } = useUser();
+    const { user, supabase } = useUser();
     const { route, navigate, visualState } = useRouter();
+
+    const handleSignOut = async () => {
+      const client = supabase || window.supabaseClient;
+      if (client) {
+        await client.auth.signOut();
+      }
+      navigate('login');
+    };
 
     const showBackToLogin = route !== 'login' && route !== 'transition';
     const [greetingName, setGreetingName] = React.useState('');
@@ -153,9 +161,9 @@
               <button
                 type="button"
                 className="link-button"
-                onClick={() => navigate('login')}
+                onClick={handleSignOut}
               >
-                Return to login
+                Sign Out
               </button>
             )}
               </React.Fragment>
@@ -174,9 +182,9 @@
               <button
                 type="button"
                 className="link-button"
-                onClick={() => navigate('login')}
+                onClick={handleSignOut}
               >
-                Return to login
+                Sign Out
               </button>
             )}
           </footer>

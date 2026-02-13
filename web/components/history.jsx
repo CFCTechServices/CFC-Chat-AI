@@ -2,9 +2,10 @@
 (() => {
   const { Layout } = window.CFC.Layout;
   const { Card } = window.CFC.Primitives;
+  const { useUser } = window.CFC.UserContext;
 
-  function formatRelative(dateMs) {
-    const diff = Date.now() - dateMs;
+  function formatRelative(dateStr) {
+    const diff = Date.now() - new Date(dateStr).getTime();
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return 'just now';
     if (mins < 60) return `${mins}m ago`;
@@ -15,29 +16,32 @@
   }
 
   function useHistoryData() {
-    const [items, setItems] = React.useState(() => {
-      try {
-        const raw = window.localStorage.getItem('cfc-history');
-        if (raw) return JSON.parse(raw);
-      } catch {}
-      // Fallback demo data
-      return [
-        {
-          id: 'welcome',
-          title: 'Welcome Chat',
-          preview: 'Hello! How can I help you today?',
-          messageCount: 1,
-          updatedAt: Date.now() - 24 * 60 * 1000,
-        },
-      ];
-    });
+    const { session } = useUser();
+    const [items, setItems] = React.useState([]);
+    const [loading, setLoading] = React.useState(true);
 
-    const save = (next) => {
-      setItems(next);
-      try { window.localStorage.setItem('cfc-history', JSON.stringify(next)); } catch {}
-    };
+    React.useEffect(() => {
+      if (!session?.access_token) return;
+      setLoading(true);
+      fetch('/api/chat/sessions', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      })
+        .then(res => res.ok ? res.json() : [])
+        .then(data => {
+          const mapped = data.map(s => ({
+            id: s.id,
+            title: s.title || 'Untitled Chat',
+            preview: '',
+            messageCount: 0,
+            updatedAt: s.created_at,
+          }));
+          setItems(mapped);
+        })
+        .catch(() => setItems([]))
+        .finally(() => setLoading(false));
+    }, [session?.access_token]);
 
-    return { items, setItems: save };
+    return { items, loading };
   }
 
   function HistoryToolbar({ query, onQuery, range, onRange }) {
@@ -101,13 +105,14 @@
   }
 
   function HistoryPage() {
-    const { items } = useHistoryData();
+    const { items, loading: historyLoading } = useHistoryData();
     const [query, setQuery] = React.useState('');
     const [range, setRange] = React.useState('all');
 
     const filtered = React.useMemo(() => {
       const now = Date.now();
-      const withinRange = (ts) => {
+      const withinRange = (dateStr) => {
+        const ts = new Date(dateStr).getTime();
         if (range === 'all') return true;
         if (range === '24h') return now - ts <= 24 * 60 * 60 * 1000;
         if (range === '7d') return now - ts <= 7 * 24 * 60 * 60 * 1000;
@@ -133,7 +138,13 @@
           <Card>
             <HistoryToolbar query={query} onQuery={setQuery} range={range} onRange={setRange} />
             <div className="history-list">
-              {filtered.length === 0 ? (
+              {historyLoading ? (
+                <div className="content-empty-state" style={{ minHeight: 180 }}>
+                  <div className="empty-state-content">
+                    <p className="empty-state-text">Loading conversations...</p>
+                  </div>
+                </div>
+              ) : filtered.length === 0 ? (
                 <div className="content-empty-state" style={{ minHeight: 180 }}>
                   <div className="empty-state-content">
                     <div className="empty-state-icon">
