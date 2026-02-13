@@ -1,4 +1,5 @@
 // Login page
+
 (() => {
   const { Card, PrimaryButton, TextInput } = window.CFC.Primitives;
   const { Layout } = window.CFC.Layout;
@@ -6,9 +7,11 @@
   const { useRouter } = window.CFC.RouterContext;
 
   function LoginPage() {
-    const [name, setName] = React.useState('');
     const [email, setEmail] = React.useState('');
+    const [password, setPassword] = React.useState('');
+    const [passwordError, setPasswordError] = React.useState('');
     const [emailError, setEmailError] = React.useState('');
+
     const { setUser } = useUser();
     const { navigate } = useRouter();
 
@@ -17,38 +20,35 @@
       const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       return re.test(trimmed);
     };
+    const extractDisplayName = (email) => {
 
-    const handleSubmit = (e) => {
+      const rawName = email.trim();
+      let displayName = 'Guest';
+      if (rawName && rawName.includes('@')) {
+        const parts = rawName.split('@')[0].split(/[\._\-]+/).filter(Boolean).filter(p => isNaN(p));
+        if (parts.length > 0) {
+          displayName = parts.map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(' ');
+        }
+      }
+      return displayName;
+    };
+    const handleSubmit = async (e) => {
       e.preventDefault();
-      const trimmedEmail = email.trim();
-      if (!validateEmail(trimmedEmail)) {
+      if (!validateEmail(email.trim())) {
         setEmailError('Please enter a valid email address.');
         return;
+      } else {
+        setEmailError('');
       }
-      setEmailError('');
-
-      const rawName = name.trim();
-      let displayName = 'Guest';
-      if (rawName) {
-        const parts = rawName.split(/\s+/);
-        const first = parts[0];
-        const capFirst = first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
-        const rest = parts.slice(1).join(' ');
-        displayName = rest ? `${capFirst} ${rest}` : capFirst;
-      }
-
-      const nextUser = { name: displayName, email: trimmedEmail };
-      setUser(nextUser);
-
-      const lower = trimmedEmail.toLowerCase();
+      setUser({ email, displayName: extractDisplayName(email) , password});
+      const lower = email.trim().toLowerCase();
       let target = 'chat';
       if (lower === 'admin@cfctech.com') target = 'admin';
 
       navigate('transition', { to: target, withFade: true });
     };
-
     return (
-      <Layout>
+      <Layout>  
         <div className="page login-page">
           <div className="login-hero">
             <h1>Welcome to CFC AI</h1>
@@ -64,29 +64,39 @@
             </div>
           </div>
 
+
           <Card className="login-card">
             <form onSubmit={handleSubmit} className="login-form">
               <h2>Sign in</h2>
+              <p> Access is restricted to authorized users only. 
+              </p>
               <TextInput
-                label="Name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Adam Smith"
-                autoComplete="name"
-              />
-              <TextInput
-                label="Email"
+                label="Email Address"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@cfctech.com"
+                placeholder="Enter your email"
                 autoComplete="email"
                 error={emailError}
               />
-              <PrimaryButton type="submit">Continue</PrimaryButton>
+              <TextInput
+                label="Password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                autoComplete="current-password"
+              />
+              <PrimaryButton type="submit">
+                {'Continue'}
+              </PrimaryButton>
+              <p className="footer-text">
+                  Don't have access? Contact your administrator to request access.
+                </p>
             </form>
+              
           </Card>
+
         </div>
       </Layout>
     );
