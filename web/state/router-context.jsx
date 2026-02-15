@@ -50,6 +50,7 @@
     const [nextRoute, setNextRoute] = React.useState(null);
     const [visualState, setVisualState] = React.useState('idle');
     const hasInitialized = React.useRef(false);
+    const prevRole = React.useRef(role);
     const skipPush = React.useRef(false); // avoid pushing when handling popstate
 
     React.useEffect(() => {
@@ -63,11 +64,24 @@
         setRoute('login');
         try { window.localStorage.removeItem('cfc-route'); } catch { }
         hasInitialized.current = false;
+        prevRole.current = 'user';
         window.history.replaceState({ route: 'login' }, '', routeToPath('login'));
       } else {
+        // Detect when role changes from default 'user' to actual role (e.g. 'admin')
+        // This happens because the role fetch is async and completes after user is set
+        const roleJustResolved = prevRole.current !== role;
+        prevRole.current = role;
+
         try {
           const savedRoute = window.localStorage.getItem('cfc-route');
-          if (savedRoute && isValidRoute(savedRoute) && savedRoute !== 'transition') {
+
+          if (roleJustResolved && role === 'admin') {
+            // Role just loaded as admin — override to admin default
+            const defaultRoute = getDefaultRouteForUser();
+            setRoute(defaultRoute);
+            window.localStorage.setItem('cfc-route', defaultRoute);
+            window.history.replaceState({ route: defaultRoute }, '', routeToPath(defaultRoute));
+          } else if (savedRoute && isValidRoute(savedRoute) && savedRoute !== 'transition') {
             setRoute(savedRoute);
             window.history.replaceState({ route: savedRoute }, '', routeToPath(savedRoute));
           } else if (!hasInitialized.current) {
