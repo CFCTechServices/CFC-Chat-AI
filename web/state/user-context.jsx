@@ -3,6 +3,15 @@
   const { createContext, useContext, useState, useEffect, useMemo, useRef } = React;
   const UserContext = createContext(null);
 
+  // Detect recovery tokens from the URL BEFORE React renders anything.
+  // This must happen synchronously at module load time because the router's
+  // useEffect fires before ours and will replaceState('/'), stripping the hash.
+  const _initialHash = window.location.hash || '';
+  const _initialSearch = window.location.search || '';
+  const _isRecoveryUrl = _initialHash.includes('type=recovery')
+    || _initialSearch.includes('type=recovery')
+    || _initialSearch.includes('code=');
+
   function useUser() {
     return useContext(UserContext);
   }
@@ -14,7 +23,7 @@
     const [loading, setLoading] = useState(true);
     const [profile, setProfile] = useState(null);
     const [sbClient, setSbClient] = useState(null);
-    const [passwordRecoveryMode, setPasswordRecoveryMode] = useState(false);
+    const [passwordRecoveryMode, setPasswordRecoveryMode] = useState(_isRecoveryUrl);
     const initStarted = useRef(false);
 
     useEffect(() => {
@@ -70,17 +79,21 @@
           window.supabaseClient = client;
           setSbClient(client);
 
-          // Check existing session
-          client.auth.getSession().then(({ data: { session } }) => {
-            handleSession(client, session);
-          });
-
-          // Listen for auth state changes (login, logout, token refresh, password recovery)
-          client.auth.onAuthStateChange((event, session) => {
+          // Register auth listener BEFORE getSession() so PASSWORD_RECOVERY
+          // events from hash processing are not missed.
+          const { data: { subscription } } = client.auth.onAuthStateChange((event, session) => {
             if (event === 'PASSWORD_RECOVERY') {
               setPasswordRecoveryMode(true);
             }
             handleSession(client, session);
+          });
+
+          // Check existing session (will trigger onAuthStateChange if hash tokens exist)
+          client.auth.getSession().then(({ data: { session } }) => {
+            // Only handle here if onAuthStateChange hasn't already provided a session
+            if (session) {
+              handleSession(client, session);
+            }
           });
         })
         .catch(err => {

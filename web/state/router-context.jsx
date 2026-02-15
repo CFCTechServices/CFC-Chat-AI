@@ -48,6 +48,7 @@
 
     const [route, setRoute] = React.useState(getInitialRoute);
     const [nextRoute, setNextRoute] = React.useState(null);
+    const [routeParams, setRouteParams] = React.useState({});
     const [visualState, setVisualState] = React.useState('idle');
     const hasInitialized = React.useRef(false);
     const prevRole = React.useRef(role);
@@ -57,6 +58,13 @@
       // Password recovery takes priority — Supabase creates a temp session
       if (passwordRecoveryMode) {
         setRoute('reset-password');
+        // Preserve the current hash so Supabase can still read recovery tokens from it
+        const currentHash = window.location.hash || '';
+        window.history.replaceState(
+          { route: 'reset-password' },
+          '',
+          routeToPath('reset-password') + currentHash
+        );
         return;
       }
 
@@ -118,6 +126,7 @@
         setNextRoute(null);
         try { window.localStorage.setItem('cfc-route', next); } catch { }
       }
+      setRouteParams(options.params || {});
       setRoute(next);
 
       // Push to browser history (unless triggered by popstate)
@@ -140,7 +149,7 @@
     }, [performNavigation]);
 
     return (
-      <RouterContext.Provider value={{ route, navigate, nextRoute, visualState }}>
+      <RouterContext.Provider value={{ route, navigate, nextRoute, routeParams, visualState }}>
         {children}
       </RouterContext.Provider>
     );

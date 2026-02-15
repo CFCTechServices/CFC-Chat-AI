@@ -3,6 +3,7 @@
   const { Layout } = window.CFC.Layout;
   const { Card } = window.CFC.Primitives;
   const { useUser } = window.CFC.UserContext;
+  const { useRouter } = window.CFC.RouterContext;
 
   function formatRelative(dateStr) {
     const diff = Date.now() - new Date(dateStr).getTime();
@@ -23,7 +24,7 @@
     React.useEffect(() => {
       if (!session?.access_token) return;
       setLoading(true);
-      fetch('/api/chat/sessions', {
+      fetch('/api/chat/sessions?detail=true', {
         headers: { 'Authorization': `Bearer ${session.access_token}` },
       })
         .then(res => res.ok ? res.json() : [])
@@ -31,8 +32,8 @@
           const mapped = data.map(s => ({
             id: s.id,
             title: s.title || 'Untitled Chat',
-            preview: '',
-            messageCount: 0,
+            preview: s.last_message || '',
+            messageCount: s.message_count || 0,
             updatedAt: s.created_at,
           }));
           setItems(mapped);
@@ -80,9 +81,16 @@
     );
   }
 
-  function HistoryItem({ item }) {
+  function HistoryItem({ item, onClick }) {
     return (
-      <div className="history-item">
+      <div
+        className="history-item"
+        onClick={onClick}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter') onClick(); }}
+        style={{ cursor: 'pointer' }}
+      >
         <div className="history-item-title">{item.title}</div>
         <div className="history-item-preview">{item.preview}</div>
         <div className="history-item-meta">
@@ -106,8 +114,13 @@
 
   function HistoryPage() {
     const { items, loading: historyLoading } = useHistoryData();
+    const { navigate } = useRouter();
     const [query, setQuery] = React.useState('');
     const [range, setRange] = React.useState('all');
+
+    const handleOpenChat = (sessionId) => {
+      navigate('chat', { withFade: true, params: { sessionId } });
+    };
 
     const filtered = React.useMemo(() => {
       const now = Date.now();
@@ -159,7 +172,7 @@
                 </div>
               ) : (
                 filtered.map((item) => (
-                  <HistoryItem key={item.id} item={item} />
+                  <HistoryItem key={item.id} item={item} onClick={() => handleOpenChat(item.id)} />
                 ))
               )}
             </div>

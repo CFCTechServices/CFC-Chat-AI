@@ -92,7 +92,7 @@ async def startup_event():
 # ---------- SPA catch-all (must be AFTER all API routes) ----------
 # Client-side routes like /chat, /admin, /settings etc. need to serve
 # index.html so the React SPA can boot and handle the route itself.
-_SPA_ROUTES = {"", "chat", "admin", "settings", "history", "docs", "login", "transition"}
+_SPA_ROUTES = {"", "chat", "admin", "settings", "history", "docs", "login", "transition", "reset-password"}
 
 @app.get("/{full_path:path}")
 async def serve_spa(full_path: str):

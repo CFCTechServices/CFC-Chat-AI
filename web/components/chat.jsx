@@ -5,17 +5,38 @@
   const { ChatMessage } = window.CFC.ChatMessage;
   const { ChatComposer } = window.CFC.ChatComposer;
   const { useModal, buildVideoSegmentsFromAnswer, buildImageSegmentsFromAnswer } = window.CFC.ChatUtils;
+  const { useUser } = window.CFC.UserContext;
+
+  // Helper: build auth headers
+  function authHeaders(token) {
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    };
+  }
+
+  // Convert DB message rows into the UI message shape
+  function dbMsgToUI(msg) {
+    return {
+      id: msg.id,
+      role: msg.role,
+      text: msg.content,
+      segments: [{ type: 'text', text: msg.content }],
+    };
+  }
 
   function ChatPage() {
-    const initialChatId = React.useRef(`chat-${Date.now()}`).current;
+    const { session } = useUser();
+    const { routeParams } = window.CFC.RouterContext.useRouter();
+    const token = session?.access_token;
+
     const [messages, setMessages] = React.useState([]);
     const [input, setInput] = React.useState('');
     const [sending, setSending] = React.useState(false);
     const [attachedImages, setAttachedImages] = React.useState([]);
-    const [chatHistory, setChatHistory] = React.useState([
-      { id: initialChatId, title: 'Welcome Chat', messages: [] },
-    ]);
-    const [activeChatId, setActiveChatId] = React.useState(initialChatId);
+    const [chatHistory, setChatHistory] = React.useState([]);
+    const [activeChatId, setActiveChatId] = React.useState(null);
+    const [loadingSessions, setLoadingSessions] = React.useState(true);
     const chatThreadRef = React.useRef(null);
     const thinkingTimeoutsRef = React.useRef({});
 
@@ -26,13 +47,61 @@
       'Chat with CFC AI',
       'What can CFC AI help with today?',
       'Ready when you are',
-      'Ask anything about CFC software…',
+      'Ask anything about CFC software\u2026',
       'How can I help you today?',
     ];
     const welcomePhrase = React.useMemo(
       () => welcomePhrases[Math.floor(Math.random() * welcomePhrases.length)],
       [activeChatId],
     );
+
+    // ---- Load sessions from DB on mount ----
+    React.useEffect(() => {
+      if (!token) return;
+      setLoadingSessions(true);
+      fetch('/api/chat/sessions', { headers: authHeaders(token) })
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => {
+          const mapped = data.map((s) => ({
+            id: s.id,
+            title: s.title || 'Untitled Chat',
+            messages: [], // loaded on select
+          }));
+          setChatHistory(mapped);
+
+          // If navigated from history with a specific sessionId, open that one
+          const targetId = routeParams?.sessionId;
+          const targetExists = targetId && mapped.some((s) => s.id === targetId);
+          const selected = targetExists ? targetId : (mapped.length > 0 ? mapped[0].id : null);
+
+          if (selected) {
+            setActiveChatId(selected);
+            loadSessionMessages(selected);
+          }
+        })
+        .catch(() => setChatHistory([]))
+        .finally(() => setLoadingSessions(false));
+    }, [token]);
+
+    // ---- Load messages for a session from DB ----
+    const loadSessionMessages = async (sessionId) => {
+      if (!token) return;
+      try {
+        const res = await fetch(`/api/chat/sessions/${sessionId}`, {
+          headers: authHeaders(token),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const uiMsgs = data.map(dbMsgToUI);
+        setMessages(uiMsgs);
+        // Update cached messages in sidebar history
+        setChatHistory((prev) =>
+          prev.map((c) => (c.id === sessionId ? { ...c, messages: uiMsgs } : c)),
+        );
+      } catch {
+        // ignore
+      }
+    };
 
     // ---- Conversation history for API context ----
     const prepareConversationHistory = (msgs, maxMessages = 8) => {
@@ -57,7 +126,7 @@
       }
     }, [messages]);
 
-    // ---- Sync active chat into sidebar history ----
+    // ---- Update sidebar title when messages change ----
     React.useEffect(() => {
       const nonTyping = messages.filter((m) => !m.typing);
       if (nonTyping.length === 0) return;
@@ -66,6 +135,14 @@
       setChatHistory((prev) =>
         prev.map((c) => (c.id === activeChatId ? { ...c, title, messages: nonTyping } : c)),
       );
+      // Persist title to DB (fire-and-forget)
+      if (token && activeChatId && firstUserMsg) {
+        fetch(`/api/chat/sessions/${activeChatId}`, {
+          method: 'PATCH',
+          headers: authHeaders(token),
+          body: JSON.stringify({ title }),
+        }).catch(() => {});
+      }
     }, [messages, activeChatId]);
 
     // ---- "Thinking" indicator after 7s ----
@@ -172,11 +249,27 @@
       }, speed);
     };
 
+    // ---- Ensure we have an active DB session, creating one if needed ----
+    const ensureSession = async () => {
+      if (activeChatId) return activeChatId;
+      // Create a new session in DB
+      const res = await fetch('/api/chat/sessions', {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify({ title: 'New Chat' }),
+      });
+      if (!res.ok) throw new Error('Failed to create chat session');
+      const sess = await res.json();
+      setChatHistory((prev) => [{ id: sess.id, title: sess.title || 'New Chat', messages: [] }, ...prev]);
+      setActiveChatId(sess.id);
+      return sess.id;
+    };
+
     // ---- Submit question ----
     const handleSubmit = async (e) => {
       e.preventDefault();
       const q = input.trim();
-      if (!q || sending) return;
+      if (!q || sending || !token) return;
 
       const imageSegs = attachedImages.map((img) => ({ type: 'image', url: img.url, alt: 'Attached image' }));
       appendMessage({
@@ -186,7 +279,6 @@
         segments: [{ type: 'text', text: q }, ...imageSegs],
       });
 
-      const imagesForBackend = attachedImages.map((img) => img.url);
       setInput('');
       setAttachedImages([]);
       setSending(true);
@@ -195,25 +287,24 @@
       appendMessage({ id: botId, role: 'assistant', text: '', segments: [], typing: true });
 
       try {
-        const conversationHistory = prepareConversationHistory(
-          messages.filter((m) => m.role === 'user' || m.role === 'assistant'),
-        ).map((m) => ({ role: m.role, content: m.text }));
+        const sessionId = await ensureSession();
 
-        const res = await fetch('/ask', {
+        const res = await fetch('/api/chat/message', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders(token),
           body: JSON.stringify({
-            question: q + (imagesForBackend.length ? ` (images: ${imagesForBackend.join(', ')})` : ''),
-            top_k: 4,
-            conversation_history: conversationHistory.length > 0 ? conversationHistory : undefined,
+            session_id: sessionId,
+            content: q,
           }),
         });
         const data = await res.json();
-        if (!data.success) throw new Error(data.detail || 'Error from assistant');
+        if (!res.ok) throw new Error(data.detail || 'Error from assistant');
 
-        const answer = data.answer || 'No answer available.';
-        const videoSegments = buildVideoSegmentsFromAnswer(data);
-        const answerImages = buildImageSegmentsFromAnswer(data);
+        const answer = data.content || 'No answer available.';
+        const citations = data.citations || [];
+        // Build image/video segments from citations metadata if available
+        const videoSegments = buildVideoSegmentsFromAnswer({ context_used: citations });
+        const answerImages = buildImageSegmentsFromAnswer({ relevant_images: citations.flatMap(c => c.image_paths || []).map(p => ({ path: p })) });
         simulateStreaming(answer, botId, [...answerImages, ...videoSegments]);
       } catch (err) {
         setMessages((prev) =>
@@ -259,39 +350,70 @@
     };
 
     // ---- Sidebar handlers ----
-    const handleNewChat = () => {
-      const newId = `chat-${Date.now()}`;
-      setChatHistory((prev) => [{ id: newId, title: 'New Chat', messages: [] }, ...prev]);
-      setActiveChatId(newId);
-      setMessages([]);
-      setInput('');
-      setAttachedImages([]);
-    };
-
-    const handleSelectChat = (chatId) => {
-      if (chatId === activeChatId) return;
-      const selected = chatHistory.find((c) => c.id === chatId);
-      if (selected) {
-        setActiveChatId(chatId);
-        setMessages(selected.messages || []);
+    const handleNewChat = async () => {
+      if (!token) return;
+      try {
+        const res = await fetch('/api/chat/sessions', {
+          method: 'POST',
+          headers: authHeaders(token),
+          body: JSON.stringify({ title: 'New Chat' }),
+        });
+        if (!res.ok) return;
+        const sess = await res.json();
+        const newEntry = { id: sess.id, title: sess.title || 'New Chat', messages: [] };
+        setChatHistory((prev) => [newEntry, ...prev]);
+        setActiveChatId(sess.id);
+        setMessages([]);
         setInput('');
         setAttachedImages([]);
+      } catch {
+        // ignore
       }
     };
 
-    const handleDeleteChat = (chatId) => {
+    const handleSelectChat = async (chatId) => {
+      if (chatId === activeChatId) return;
+      setActiveChatId(chatId);
+      setInput('');
+      setAttachedImages([]);
+      // Check if we already have messages cached
+      const cached = chatHistory.find((c) => c.id === chatId);
+      if (cached && cached.messages && cached.messages.length > 0) {
+        setMessages(cached.messages);
+      } else {
+        setMessages([]);
+        await loadSessionMessages(chatId);
+      }
+    };
+
+    const handleDeleteChat = async (chatId) => {
+      if (!token) return;
+      // Delete from DB
+      try {
+        await fetch(`/api/chat/sessions/${chatId}`, {
+          method: 'DELETE',
+          headers: authHeaders(token),
+        });
+      } catch {
+        // continue with local removal even if API fails
+      }
+
       const remaining = chatHistory.filter((c) => c.id !== chatId);
       if (remaining.length === 0) {
-        // Always keep at least one chat
-        const newId = `chat-${Date.now()}`;
-        setChatHistory([{ id: newId, title: 'New Chat', messages: [] }]);
-        setActiveChatId(newId);
+        setChatHistory([]);
+        setActiveChatId(null);
         setMessages([]);
       } else if (chatId === activeChatId) {
-        // Deleted the active chat – switch to the first remaining one
         setChatHistory(remaining);
         setActiveChatId(remaining[0].id);
-        setMessages(remaining[0].messages || []);
+        // Load messages for the new active chat
+        const cached = remaining[0];
+        if (cached.messages && cached.messages.length > 0) {
+          setMessages(cached.messages);
+        } else {
+          setMessages([]);
+          loadSessionMessages(remaining[0].id);
+        }
       } else {
         setChatHistory(remaining);
       }

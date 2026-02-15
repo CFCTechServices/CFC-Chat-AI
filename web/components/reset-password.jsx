@@ -32,7 +32,11 @@
           body: JSON.stringify({ email }),
         });
         const data = await res.json();
-        setSuccess(data.message);
+        if (data.success) {
+          setSuccess(data.message);
+        } else {
+          setError(data.message || "Failed to send reset email.");
+        }
       } catch (err) {
         setError("Failed to send reset email. Please try again.");
       } finally {

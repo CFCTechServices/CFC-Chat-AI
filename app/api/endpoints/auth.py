@@ -79,6 +79,12 @@ async def forgot_password(request: ForgotPasswordRequest):
             },
             params={"redirect_to": redirect_url},
         )
+        if resp.status_code == 429:
+            logger.warning(f"Rate limited by Supabase for password reset: {resp.text}")
+            return ForgotPasswordResponse(
+                success=False,
+                message="Too many reset attempts. Please wait a few minutes before trying again.",
+            )
         if resp.status_code >= 400:
             logger.warning(f"Supabase recover returned {resp.status_code}: {resp.text}")
         else:
