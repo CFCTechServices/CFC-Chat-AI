@@ -16,7 +16,8 @@ load_dotenv(BASE_DIR / ".env")
 
 # Import the organized modules
 from app.config import settings
-from app.api.endpoints import health, ingest, chat, visibility, videos, auth, invite, sessions, admin, profile
+from app.api.endpoints import health, ingest, chat, visibility, videos, auth, invite, sessions, profile
+from app.api.endpoints.admin import router as admin_router
 
 from app.api.endpoints.upload import router as upload_router
 
@@ -63,7 +64,7 @@ app.include_router(videos.router)
 app.include_router(auth.router, prefix="/api/auth")
 app.include_router(invite.router, prefix="/api/auth")
 app.include_router(sessions.router, prefix="/api/chat")
-app.include_router(admin.router, prefix="/api/admin")
+app.include_router(admin_router, prefix="/api/admin")
 app.include_router(profile.router, prefix="/api/profile")
 
 
