@@ -88,14 +88,19 @@ def _simple_summary(segments: List[Dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 # --------- Supabase helpers ---------
-def _supabase():
-    """Instantiate a Supabase client using service role or anon key."""
+def build_local_repo():
+    from app.services.supabase_content_repository import SupabaseContentRepository
     url = (os.getenv("SUPABASE_URL") or "").strip()
-    # Prefer service role for server-side writes; fall back to anon if missing
-    key = (os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_ANON_KEY") or "").strip()
+    # Backend video processing uses SERVICE_ROLE_KEY for storage operations
+    key = (os.getenv("SUPABASE_SERVICE_ROLE_KEY") or "").strip()
     if not url or not key:
-        raise RuntimeError("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY/ANON_KEY in .env")
-    return create_client(url, key)
+        raise RuntimeError(
+            "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env. "
+            "SERVICE_ROLE_KEY is required for video processing."
+        )
+    os.environ["SUPABASE_URL"] = url
+    os.environ["SUPABASE_SERVICE_ROLE_KEY"] = key
+    return SupabaseContentRepository()
 
 def _bucket_name() -> str:
     """Return the bucket name used for all video-related assets."""
@@ -104,7 +109,13 @@ def _bucket_name() -> str:
 
 def _upload_bytes(bucket: str, storage_path: str, data: bytes, content_type: str | None = None) -> str:
     """Upload raw bytes to Supabase Storage and return the public URL."""
-    sb = _supabase()
+    # Create Supabase client with SERVICE_ROLE_KEY for video operations
+    url = os.getenv("SUPABASE_URL")
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    if not url or not key:
+        raise RuntimeError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required for video operations")
+    
+    sb = create_client(url, key)
     opts = {"upsert": "true"}
     if content_type:
         opts["contentType"] = content_type
@@ -263,6 +274,13 @@ def _build_chunks_from_segments(
     flush()
     return chunks
 
+# ---------- Embeddings & Pinecone ----------
+
+def _embedder():
+    """Load the SentenceTransformer model used for chunk embeddings."""
+    model_name = os.getenv("EMBED_MODEL", "all-MiniLM-L6-v2")
+    return SentenceTransformer(model_name)
+
 def _pinecone():
     """Bootstrap the Pinecone client."""
     api_key = os.getenv("PINECONE_API_KEY")
@@ -276,24 +294,6 @@ def _pinecone_index():
     index_name = getattr(settings, "PINECONE_VIDEO_INDEX_NAME", settings.PINECONE_INDEX_NAME)
     return pc.Index(index_name)
 
-# ---------- Embeddings & Pinecone ----------
-
-def _embedder():
-    """Load the SentenceTransformer model used for chunk embeddings."""
-    model_name = os.getenv("EMBED_MODEL", "all-MiniLM-L6-v2")
-    return SentenceTransformer(model_name)
-
-def _pinecone():
-    api_key = os.getenv("PINECONE_API_KEY")
-    if not api_key:
-        raise RuntimeError("Missing PINECONE_API_KEY in .env")
-    return Pinecone(api_key=api_key)
-
-def _pinecone_index():
-    pc = _pinecone()
-    index_name = getattr(settings, "PINECONE_VIDEO_INDEX_NAME", settings.PINECONE_INDEX_NAME)
-    return pc.Index(index_name)
-
 def _pinecone_namespace():
     """Return Pinecone namespace from settings or env; None for default namespace."""
     ns = getattr(settings, "PINECONE_NAMESPACE", None)
@@ -301,45 +301,6 @@ def _pinecone_namespace():
         return ns
     env_ns = (os.getenv("PINECONE_NAMESPACE") or "").strip()
     return env_ns or None
-
-def _build_chunks_from_segments(
-    slug: str,
-    segments: List[Dict[str, Any]],
-    max_chars: int = 800,
-    overlap_chars: int = 120,
-) -> List[Dict[str, Any]]:
-    """Group transcript segments into overlapping windows suitable for embedding."""
-    chunks: List[Dict[str, Any]] = []
-    buf, cur_start, cur_end, cur_len = [], None, None, 0
-
-    def flush():
-        nonlocal buf, cur_start, cur_end, cur_len
-        if not buf:
-            return
-        text = " ".join(buf).strip()
-        chunks.append({"slug": slug, "text": text, "start": cur_start, "end": cur_end})
-        buf, cur_start, cur_end, cur_len = [], None, None, 0
-
-    for s in segments:
-        t = s["text"].strip()
-        if not t:
-            continue
-        if cur_start is None:
-            cur_start = s["start"]
-        cur_end = s["end"]
-
-        if cur_len + len(t) + 1 > max_chars:
-            # overlap for context continuity
-            overlap = t[:overlap_chars]
-            flush()
-            if overlap:
-                buf = [overlap]
-                cur_start, cur_end, cur_len = s["start"], s["end"], len(overlap)
-        else:
-            buf.append(t)
-            cur_len += len(t) + 1
-    flush()
-    return chunks
 
 def _index_transcript_chunks(
     slug: str,

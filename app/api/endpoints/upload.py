@@ -2,21 +2,29 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from typing import List, Dict, Any
 from supabase import create_client
 import os
+import uuid
+import logging
 from pathlib import Path
-from dotenv import load_dotenv
 
 from app.config import settings
 from app.api.models.requests import IngestRequest
 from app.api.endpoints.ingest import ingest_document
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
-BASE_DIR = Path(__file__).resolve().parents[2]
-load_dotenv(BASE_DIR / ".env")
-
+# Supabase storage settings
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY")
-SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET")
+
+# Backend file upload uses SERVICE_ROLE_KEY for storage operations
+# This ensures proper permissions for backend file management
+SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET", "cfc-docs")
+
+# Local storage fallback
+UPLOAD_DIR = Path(__file__).parent.parent.parent / "data" / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @router.post("/upload")
@@ -47,9 +55,9 @@ async def upload_file(file: UploadFile = File(...)):
 
     # Optionally upload to Supabase (do not fail the request if this part errors)
     supabase_info = None
-    if SUPABASE_URL and SUPABASE_KEY and SUPABASE_BUCKET:
+    if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY and SUPABASE_BUCKET:
         try:
-            sb = create_client(SUPABASE_URL, SUPABASE_KEY)
+            sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
             res = sb.storage.from_(SUPABASE_BUCKET).upload(file.filename, contents)
             sup_path = getattr(res, "path", None) if res is not None else None
             supabase_info = {"path": sup_path}
@@ -93,9 +101,9 @@ async def bulk_upload(files: List[UploadFile] = File(...)) -> Dict[str, Any]:
     failure_count = 0
 
     sb = None
-    if SUPABASE_URL and SUPABASE_KEY and SUPABASE_BUCKET:
+    if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY and SUPABASE_BUCKET: # Changed SUPABASE_KEY to SUPABASE_SERVICE_ROLE_KEY
         try:
-            sb = create_client(SUPABASE_URL, SUPABASE_KEY)
+            sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) # Changed SUPABASE_KEY to SUPABASE_SERVICE_ROLE_KEY
         except Exception:
             sb = None
 
@@ -105,10 +113,16 @@ async def bulk_upload(files: List[UploadFile] = File(...)) -> Dict[str, Any]:
             if not file or not file.filename:
                 raise ValueError("Missing filename")
 
+            # Generate a unique file ID and name for Supabase
+            file_id = str(uuid.uuid4())
+            original_filename = file.filename
+            file_name_in_storage = f"{file_id}_{original_filename}"
+            item["file_id"] = file_id # Add file_id to item
+
             contents = await file.read()
 
             # Save locally
-            local_path = documents_dir / file.filename
+            local_path = documents_dir / original_filename # Use original filename for local save
             with local_path.open("wb") as f:
                 f.write(contents)
             item["local_path"] = str(local_path)

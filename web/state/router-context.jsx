@@ -1,12 +1,10 @@
 // Simple in-app router context with browser history support
 (() => {
   const RouterContext = React.createContext(null);
+  const VALID_ROUTES = ['login', 'chat', 'admin', 'docs', 'transition', 'reset-password'];
 
-  function getDefaultRouteForEmail(email) {
-    if (!email) return 'login';
-    const lower = email.toLowerCase();
-    if (lower === 'admin@cfctech.com') return 'admin';
-    return 'chat';
+  function isValidRoute(route) {
+    return VALID_ROUTES.includes(route);
   }
 
   // Map route names to URL paths and back
@@ -22,7 +20,14 @@
   };
 
   function RouterProvider({ children }) {
-    const { user } = window.CFC.UserContext.useUser();
+    const userContext = window.CFC.UserContext.useUser();
+    const { user, role, passwordRecoveryMode } = userContext || { user: null, role: 'user', passwordRecoveryMode: false };
+
+    function getDefaultRouteForUser() {
+      if (!user) return 'login';
+      if (role === 'admin') return 'admin';
+      return 'chat';
+    }
 
     const getInitialRoute = () => {
       // Prefer the URL path first
@@ -32,7 +37,7 @@
       }
       try {
         const savedRoute = window.localStorage.getItem('cfc-route');
-        if (savedRoute && savedRoute !== 'transition') {
+        if (savedRoute && isValidRoute(savedRoute) && savedRoute !== 'transition') {
           return savedRoute;
         }
       } catch {
@@ -43,24 +48,52 @@
 
     const [route, setRoute] = React.useState(getInitialRoute);
     const [nextRoute, setNextRoute] = React.useState(null);
+    const [routeParams, setRouteParams] = React.useState({});
     const [visualState, setVisualState] = React.useState('idle');
     const hasInitialized = React.useRef(false);
+    const prevRole = React.useRef(role);
     const skipPush = React.useRef(false); // avoid pushing when handling popstate
 
     React.useEffect(() => {
+      // Password recovery takes priority — Supabase creates a temp session
+      if (passwordRecoveryMode) {
+        setRoute('reset-password');
+        // Preserve the current hash so Supabase can still read recovery tokens from it
+        const currentHash = window.location.hash || '';
+        window.history.replaceState(
+          { route: 'reset-password' },
+          '',
+          routeToPath('reset-password') + currentHash
+        );
+        return;
+      }
+
       if (!user) {
         setRoute('login');
-        try { window.localStorage.removeItem('cfc-route'); } catch {}
+        try { window.localStorage.removeItem('cfc-route'); } catch { }
         hasInitialized.current = false;
+        prevRole.current = 'user';
         window.history.replaceState({ route: 'login' }, '', routeToPath('login'));
       } else {
+        // Detect when role changes from default 'user' to actual role (e.g. 'admin')
+        // This happens because the role fetch is async and completes after user is set
+        const roleJustResolved = prevRole.current !== role;
+        prevRole.current = role;
+
         try {
           const savedRoute = window.localStorage.getItem('cfc-route');
-          if (savedRoute && savedRoute !== 'transition') {
+
+          if (roleJustResolved && role === 'admin') {
+            // Role just loaded as admin — override to admin default
+            const defaultRoute = getDefaultRouteForUser();
+            setRoute(defaultRoute);
+            window.localStorage.setItem('cfc-route', defaultRoute);
+            window.history.replaceState({ route: defaultRoute }, '', routeToPath(defaultRoute));
+          } else if (savedRoute && isValidRoute(savedRoute) && savedRoute !== 'transition') {
             setRoute(savedRoute);
             window.history.replaceState({ route: savedRoute }, '', routeToPath(savedRoute));
           } else if (!hasInitialized.current) {
-            const defaultRoute = getDefaultRouteForEmail(user.email);
+            const defaultRoute = getDefaultRouteForUser();
             setRoute(defaultRoute);
             window.localStorage.setItem('cfc-route', defaultRoute);
             window.history.replaceState({ route: defaultRoute }, '', routeToPath(defaultRoute));
@@ -70,7 +103,7 @@
         }
         hasInitialized.current = true;
       }
-    }, [user]);
+    }, [user, role, passwordRecoveryMode]);
 
     // Listen for browser back/forward
     React.useEffect(() => {
@@ -91,8 +124,9 @@
         setNextRoute(options.to || null);
       } else {
         setNextRoute(null);
-        try { window.localStorage.setItem('cfc-route', next); } catch {}
+        try { window.localStorage.setItem('cfc-route', next); } catch { }
       }
+      setRouteParams(options.params || {});
       setRoute(next);
 
       // Push to browser history (unless triggered by popstate)
@@ -115,7 +149,7 @@
     }, [performNavigation]);
 
     return (
-      <RouterContext.Provider value={{ route, navigate, nextRoute, visualState }}>
+      <RouterContext.Provider value={{ route, navigate, nextRoute, routeParams, visualState }}>
         {children}
       </RouterContext.Provider>
     );
