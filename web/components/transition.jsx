@@ -20,15 +20,15 @@
     return (
       <Layout>
         <div className="page transition-screen">
-          <div className="transition-inner standalone">
-            <h1 className="transition-title">Welcome, {firstName}!</h1>
-            <p className="muted">
-              We&apos;re getting everything ready for you.
-              <br />
-              This will only take a moment.
-            </p>
-            <div className="transition-pill">Preparing your workspace</div>
-            <div className="transition-loader">
+          <div className="transition-inner standalone" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+            <img
+              src="/ui/logo-cfc.png"
+              alt="CFC Tech"
+              className="app-logo"
+              style={{ width: 240, display: 'block', margin: '0 auto' }}
+            />
+            <div className="transition-pill" style={{ marginTop: 8, display: 'inline-flex', justifyContent: 'center', alignItems: 'center' }}>Preparing your workspace</div>
+            <div className="transition-loader" style={{ marginTop: 12 }}>
               <div className="dot" />
               <div className="dot" />
               <div className="dot" />
