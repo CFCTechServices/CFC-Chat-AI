@@ -11,6 +11,7 @@
     const [inviteCode, setInviteCode] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [isSignUp, setIsSignUp] = useState(false);
@@ -79,6 +80,9 @@
           if (inviteEmail && email !== inviteEmail) {
             throw new Error(`Email must match the invited email: ${inviteEmail}`);
           }
+          if (password !== confirmPassword) {
+            throw new Error("Passwords do not match.");
+          }
           result = await client.auth.signUp({
             email,
             password,
@@ -93,6 +97,19 @@
         }
 
         if (result.error) throw result.error;
+
+        // Mark invite as used after successful signup
+        if (isSignUp && inviteCode) {
+          try {
+            await fetch("/api/auth/mark-invite-used", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ invite_code: inviteCode }),
+            });
+          } catch (markErr) {
+            console.error("Failed to mark invite as used:", markErr);
+          }
+        }
 
         if (isSignUp && !result.data.session) {
           setError("Sign up successful! Please check your email to confirm.");
@@ -181,8 +198,18 @@
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  autoComplete="current-password"
+                  autoComplete={isSignUp ? "new-password" : "current-password"}
                 />
+                {isSignUp && (
+                  <TextInput
+                    label="Confirm Password"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm your password"
+                    autoComplete="new-password"
+                  />
+                )}
                 {!isSignUp && (
                   <div
                     style={{ textAlign: 'right', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.85rem', color: 'var(--color-text-muted, #666)', marginTop: '-4px' }}
@@ -203,13 +230,14 @@
                     {error}
                   </div>
                 )}
-                <PrimaryButton type="submit" disabled={loading || !email || !password || !clientReady}>
+                <PrimaryButton type="submit" disabled={loading || !email || !password || (isSignUp && !confirmPassword) || !clientReady}>
                   {!clientReady ? "Connecting..." : loading ? "Processing..." : (isSignUp ? "Sign Up" : "Sign In")}
                 </PrimaryButton>
                 <div
                   style={{ marginTop: '15px', textAlign: 'center', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.9rem' }}
                   onClick={() => {
                     setError('');
+                    setConfirmPassword('');
                     if (isSignUp) {
                       setIsSignUp(false);
                     } else {
