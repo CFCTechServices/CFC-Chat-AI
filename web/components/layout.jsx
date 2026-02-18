@@ -191,19 +191,7 @@
           {children}
         </main>
 
-        {!fullWidth && (
-          <footer className="app-footer">
-            {showBackToLogin && (
-              <button
-                type="button"
-                className="link-button"
-                onClick={handleSignOut}
-              >
-                Sign Out
-              </button>
-            )}
-          </footer>
-        )}
+
       </div>
     );
   }
