@@ -170,7 +170,7 @@
                 />
               </div>
               <PrimaryButton type="submit" disabled={inviting} style={{ marginBottom: '0' }}>
-                {inviting ? 'Sending...' : 'Send Invite'}
+                {inviting ? 'Inviting...' : 'Invite'}
               </PrimaryButton>
               <button type="button" className="btn-secondary" onClick={() => setShowInvite(false)} style={{ marginBottom: '0' }}>
                 Cancel

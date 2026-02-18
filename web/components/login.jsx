@@ -1,4 +1,4 @@
-// Login page with Invite and Supabase Auth
+// Login page with email-whitelist signup flow
 (() => {
   const { Card, PrimaryButton, TextInput } = window.CFC.Primitives;
   const { Layout } = window.CFC.Layout;
@@ -7,59 +7,39 @@
   const { useState, useEffect } = React;
 
   function LoginPage() {
-    const [step, setStep] = useState(2); // 1: Invite, 2: Login
-    const [inviteCode, setInviteCode] = useState("");
+    // Steps: 1 = enter email, 2 = enter password (sign-up or sign-in)
+    const [step, setStep] = useState(2); // default to sign-in
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
     const [isSignUp, setIsSignUp] = useState(false);
-    const [inviteEmail, setInviteEmail] = useState("");
 
     const { supabase, loading: authLoading } = useUser();
     const { navigate } = useRouter();
     const clientReady = !!supabase || !!window.supabaseClient;
 
-    // Auto-detect invite code and email from URL
-    useEffect(() => {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get("code") || params.get("invite");
-      const emailParam = params.get("email");
-
-      if (code) {
-        setInviteCode(code);
-        setStep(1);
-        if (emailParam) {
-          setEmail(emailParam);
-          setInviteEmail(emailParam);
-        }
-      }
-    }, []);
-
-    const handleInviteSubmit = async (e) => {
+    // Check if email is on the invitation whitelist
+    const handleEmailCheck = async (e) => {
       e.preventDefault();
       setLoading(true);
       setError("");
       try {
-        const res = await fetch("/api/auth/validate-invite", {
+        const res = await fetch("/api/auth/check-email", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ invite_code: inviteCode }),
+          body: JSON.stringify({ email }),
         });
         const data = await res.json();
-        if (data.valid) {
-          if (data.email) {
-            setEmail(data.email);
-            setInviteEmail(data.email);
-          }
+        if (data.eligible) {
           setStep(2);
           setIsSignUp(true);
         } else {
-          setError(data.message || "Invalid invite code");
+          setError(data.message || "This email is not eligible for registration.");
         }
       } catch (err) {
-        setError("Failed to validate invite code");
+        setError("Failed to verify email. Please try again.");
       } finally {
         setLoading(false);
       }
@@ -77,45 +57,23 @@
 
         let result;
         if (isSignUp) {
-          if (inviteEmail && email !== inviteEmail) {
-            throw new Error(`Email must match the invited email: ${inviteEmail}`);
-          }
           if (password !== confirmPassword) {
             throw new Error("Passwords do not match.");
           }
-          result = await client.auth.signUp({
-            email,
-            password,
-            options: {
-              data: {
-                invite_code: inviteCode
-              }
-            }
-          });
+          result = await client.auth.signUp({ email, password });
         } else {
           result = await client.auth.signInWithPassword({ email, password });
         }
 
         if (result.error) throw result.error;
 
-        // Mark invite as used after successful signup
-        if (isSignUp && inviteCode) {
-          try {
-            await fetch("/api/auth/mark-invite-used", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ invite_code: inviteCode }),
-            });
-          } catch (markErr) {
-            console.error("Failed to mark invite as used:", markErr);
-          }
-        }
-
         if (isSignUp && !result.data.session) {
           setError("Sign up successful! Please check your email to confirm.");
           setIsSignUp(false);
+          setStep(2);
         }
         // If session exists, UserProvider will update automatically via onAuthStateChange
+        // and will call /api/auth/confirm-registration to mark the invite as registered
       } catch (err) {
         console.error(err);
         let errorMessage = err.message;
@@ -147,18 +105,31 @@
 
           <Card className="login-card">
             {step === 1 ? (
-              <form onSubmit={handleInviteSubmit} className="login-form">
-                <h2>Enter Invite Code</h2>
+              <form onSubmit={handleEmailCheck} className="login-form">
+                <h2>Sign Up</h2>
+                <p>Enter the email address your administrator invited.</p>
                 <TextInput
-                  label="Invite Code"
-                  type="text"
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value)}
-                  placeholder="e.g. CFC-2024-X8Y"
-                  error={error}
+                  label="Email Address"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your invited email"
+                  autoComplete="email"
                 />
-                <PrimaryButton type="submit" disabled={loading || !inviteCode}>
-                  {loading ? "Validating..." : "Continue"}
+                {error && (
+                  <div style={{
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    backgroundColor: 'var(--color-error-bg, #fef2f2)',
+                    color: 'var(--color-error, #dc2626)',
+                    fontSize: '0.9rem',
+                    border: '1px solid var(--color-error-border, #fecaca)'
+                  }}>
+                    {error}
+                  </div>
+                )}
+                <PrimaryButton type="submit" disabled={loading || !email}>
+                  {loading ? "Checking..." : "Next"}
                 </PrimaryButton>
                 <div
                   style={{ marginTop: '15px', textAlign: 'center', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.9rem' }}
@@ -171,7 +142,7 @@
               <form onSubmit={handleAuth} className="login-form">
                 <h2>{isSignUp ? "Create Account" : "Sign In"}</h2>
                 <p>Access is restricted to authorized users only.</p>
-                {inviteEmail && isSignUp && (
+                {isSignUp && (
                   <div style={{
                     padding: '10px 14px',
                     borderRadius: '8px',
@@ -180,18 +151,19 @@
                     fontSize: '0.9rem',
                     marginBottom: '12px',
                   }}>
-                    This invitation is for: <strong>{inviteEmail}</strong>
+                    Creating account for: <strong>{email}</strong>
                   </div>
                 )}
-                <TextInput
-                  label="Email Address"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  autoComplete="email"
-                  disabled={!!inviteEmail && isSignUp}
-                />
+                {!isSignUp && (
+                  <TextInput
+                    label="Email Address"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    autoComplete="email"
+                  />
+                )}
                 <TextInput
                   label="Password"
                   type="password"
@@ -222,10 +194,10 @@
                   <div style={{
                     padding: '10px 14px',
                     borderRadius: '8px',
-                    backgroundColor: 'var(--color-error-bg, #fef2f2)',
-                    color: 'var(--color-error, #dc2626)',
+                    backgroundColor: error.startsWith('Sign up successful') ? 'var(--color-success-bg, #f0fdf4)' : 'var(--color-error-bg, #fef2f2)',
+                    color: error.startsWith('Sign up successful') ? 'var(--color-success, #16a34a)' : 'var(--color-error, #dc2626)',
                     fontSize: '0.9rem',
-                    border: '1px solid var(--color-error-border, #fecaca)'
+                    border: `1px solid ${error.startsWith('Sign up successful') ? 'var(--color-success-border, #bbf7d0)' : 'var(--color-error-border, #fecaca)'}`
                   }}>
                     {error}
                   </div>
@@ -237,16 +209,18 @@
                   style={{ marginTop: '15px', textAlign: 'center', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.9rem' }}
                   onClick={() => {
                     setError('');
+                    setPassword('');
                     setConfirmPassword('');
                     if (isSignUp) {
                       setIsSignUp(false);
                     } else {
                       setStep(1);
                       setIsSignUp(true);
+                      setEmail('');
                     }
                   }}
                 >
-                  {isSignUp ? "Already have an account? Sign In" : "Need an account? Redeem Invite"}
+                  {isSignUp ? "Already have an account? Sign In" : "Need an account? Sign Up"}
                 </div>
                 <p className="footer-text">
                   Don't have access? Contact your administrator to request access.
