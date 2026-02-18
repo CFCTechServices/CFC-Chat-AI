@@ -203,23 +203,48 @@
           </div>
         )}
 
-        {/* Delete Confirmation */}
+        {/* Delete Confirmation Modal */}
         {deleteTarget && (
-          <Card style={{ marginBottom: '16px', padding: '16px', border: '1px solid #dc2626' }}>
-            <p style={{ marginBottom: '12px' }}>
-              Are you sure you want to <strong>permanently delete</strong> {deleteTarget.email}? This cannot be undone.
-            </p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                className="btn-secondary"
-                style={{ backgroundColor: '#dc2626', color: 'white', border: 'none' }}
-                onClick={() => handleDelete(deleteTarget.id)}
-              >
-                Delete Permanently
-              </button>
-              <button className="btn-secondary" onClick={() => setDeleteTarget(null)}>Cancel</button>
+          <>
+            <div
+              onClick={() => setDeleteTarget(null)}
+              style={{
+                position: 'fixed',
+                top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                zIndex: 9999,
+              }}
+            />
+            <div style={{
+              position: 'fixed',
+              top: '50%', left: '50%',
+              transform: 'translate(-50%, -50%)',
+              zIndex: 10000,
+              width: '90%',
+              maxWidth: '440px',
+              padding: '24px',
+              borderRadius: '12px',
+              backgroundColor: 'var(--color-surface, #1e293b)',
+              border: '1px solid var(--color-border, #334155)',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.4)',
+              color: 'var(--color-text, #e2e8f0)',
+            }}>
+              <h3 style={{ margin: '0 0 8px', fontSize: '1.1rem' }}>Delete User</h3>
+              <p style={{ margin: '0 0 20px', color: 'var(--color-text-muted, #94a3b8)', fontSize: '0.95rem' }}>
+                Are you sure you want to <strong>permanently delete</strong> {deleteTarget.email}? This cannot be undone.
+              </p>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button className="btn-secondary" onClick={() => setDeleteTarget(null)}>Cancel</button>
+                <button
+                  className="btn-secondary"
+                  style={{ backgroundColor: '#dc2626', color: 'white', border: 'none' }}
+                  onClick={() => handleDelete(deleteTarget.id)}
+                >
+                  Delete Permanently
+                </button>
+              </div>
             </div>
-          </Card>
+          </>
         )}
 
         {/* Loading state */}
