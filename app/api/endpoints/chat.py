@@ -41,7 +41,7 @@ class ChatMessageResponse(BaseModel):
 class FeedbackRequest(BaseModel):
     message_id: str
     session_id: str
-    rating: int # 1 or -1
+    rating: Optional[int] = None  # 1, -1, or None (cleared)
 
 @router.post("/message", response_model=ChatMessageResponse)
 async def send_message(request: ChatMessageRequest, user: Any = Depends(get_current_user)):
@@ -125,25 +125,98 @@ async def send_message(request: ChatMessageRequest, user: Any = Depends(get_curr
 @router.post("/feedback")
 async def submit_feedback(request: FeedbackRequest, user: Any = Depends(get_current_user)):
     """
-    Submit feedback for a message.
+    Submit or update feedback for a message.
+    Uses UPSERT keyed on (message_id, user_id) unique constraint.
+    Send rating=null to clear feedback.
     """
     try:
-        # Check if message belongs to a session owed by user? 
-        # Or just upsert. RLS (Row Level Security) in Supabase should handle safety, 
-        # but we can verify if we want.
+        # Verify the message belongs to a session owned by this user
+        msg_check = supabase.table("chat_messages")\
+            .select("id, session_id")\
+            .eq("id", request.message_id)\
+            .execute()
         
+        if not msg_check.data:
+            raise HTTPException(status_code=404, detail="Message not found")
+        
+        session_check = supabase.table("chat_sessions")\
+            .select("id")\
+            .eq("id", msg_check.data[0]["session_id"])\
+            .eq("user_id", user.id)\
+            .execute()
+        
+        if not session_check.data:
+            raise HTTPException(status_code=403, detail="Not your message")
+
+        # Validate score
+        if request.rating is not None and request.rating not in (-1, 1):
+            raise HTTPException(status_code=400, detail="Rating must be -1, 1, or null")
+
         data = {
             "message_id": request.message_id,
-            "user_id": user.id, # If feedback table tracks who gave it
-            "score": request.rating # -1 or 1
+            "user_id": user.id,
+            "score": request.rating,  # -1, 1, or None (cleared)
         }
         
-        # Using upsert to handle changing vote
-        # Assuming table 'feedback' has (message_id, user_id) as unique key or just message_id.
-        supabase.table("feedback").upsert(data).execute()
+        # UPSERT keyed on (message_id, user_id) unique constraint
+        supabase.table("feedback")\
+            .upsert(data, on_conflict="message_id,user_id")\
+            .execute()
         
-        return {"success": True}
+        return {"success": True, "score": request.rating}
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Error submitting feedback: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/feedback")
+async def get_feedback(session_id: str, user: Any = Depends(get_current_user)):
+    """
+    Get the current user's feedback for all messages in a session.
+    Returns a dict mapping message_id -> score.
+    """
+    try:
+        # Verify session ownership
+        session_check = supabase.table("chat_sessions")\
+            .select("id")\
+            .eq("id", session_id)\
+            .eq("user_id", user.id)\
+            .execute()
+        
+        if not session_check.data:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # Get all message IDs for this session
+        messages = supabase.table("chat_messages")\
+            .select("id")\
+            .eq("session_id", session_id)\
+            .execute()
+        
+        if not messages.data:
+            return {"feedback": {}}
+
+        message_ids = [m["id"] for m in messages.data]
+
+        # Fetch feedback for these messages by the current user
+        feedback_res = supabase.table("feedback")\
+            .select("message_id, score")\
+            .eq("user_id", user.id)\
+            .in_("message_id", message_ids)\
+            .execute()
+
+        # Build a map: message_id -> score
+        feedback_map = {}
+        for row in (feedback_res.data or []):
+            if row["score"] is not None:
+                feedback_map[row["message_id"]] = row["score"]
+
+        return {"feedback": feedback_map}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching feedback: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
