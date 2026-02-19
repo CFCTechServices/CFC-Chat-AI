@@ -1,6 +1,6 @@
 // Chat message bubble, typing indicator, video bubble, and feedback actions
 (() => {
-  function ChatMessage({ message, onImageClick, onVideoClick, token, sessionId }) {
+  function ChatMessage({ message, onImageClick, onVideoClick, token, sessionId, onFeedback }) {
     const isUser = message.role === 'user';
 
     const escapeHtml = (text) =>
@@ -91,14 +91,14 @@
             <div className="chat-bubble">
               {renderSegments(message.segments, message.text)}
             </div>
-            {!message.typing && message.text && <MessageActions message={message} token={token} sessionId={sessionId} />}
+            {!message.typing && message.text && <MessageActions message={message} token={token} sessionId={sessionId} onFeedback={onFeedback} />}
           </div>
         )}
       </div>
     );
   }
 
-  function MessageActions({ message, token, sessionId }) {
+  function MessageActions({ message, token, sessionId, onFeedback }) {
     const [feedback, setFeedback] = React.useState(message.feedback || null);
     const [copied, setCopied] = React.useState(false);
 
@@ -125,6 +125,7 @@
       // Optimistic update
       const prevFeedback = feedback;
       setFeedback(newFeedback);
+      if (onFeedback) onFeedback(message.id, newFeedback);
 
       // Fire API call (don't block UI)
       if (token && message.id) {
@@ -143,6 +144,7 @@
           // Revert on failure
           console.error('Failed to save feedback:', err);
           setFeedback(prevFeedback);
+          if (onFeedback) onFeedback(message.id, prevFeedback);
         });
       }
     };

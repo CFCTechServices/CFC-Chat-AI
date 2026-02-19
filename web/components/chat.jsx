@@ -39,6 +39,8 @@
     const [loadingSessions, setLoadingSessions] = React.useState(true);
     const chatThreadRef = React.useRef(null);
     const thinkingTimeoutsRef = React.useRef({});
+    const messagesRef = React.useRef(messages);
+    messagesRef.current = messages;
 
     const { open: openModal, modal } = useModal();
 
@@ -201,6 +203,20 @@
 
     // ---- Helpers ----
     const appendMessage = (msg) => setMessages((prev) => [...prev, msg]);
+
+    // ---- Sync feedback to messages + sidebar cache ----
+    const handleFeedbackUpdate = (messageId, feedbackValue) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, feedback: feedbackValue } : m)),
+      );
+      setChatHistory((prev) =>
+        prev.map((c) =>
+          c.id === activeChatId
+            ? { ...c, messages: (c.messages || []).map((m) => (m.id === messageId ? { ...m, feedback: feedbackValue } : m)) }
+            : c,
+        ),
+      );
+    };
 
     const handleImageChange = (e) => {
       const files = Array.from(e.target.files || []);
@@ -403,17 +419,22 @@
 
     const handleSelectChat = async (chatId) => {
       if (chatId === activeChatId) return;
+
+      // Save current messages to cache before switching away
+      if (activeChatId) {
+        const currentMessages = messagesRef.current;
+        const currentChatId = activeChatId;
+        setChatHistory((prev) =>
+          prev.map((c) => (c.id === currentChatId ? { ...c, messages: currentMessages } : c)),
+        );
+      }
+
       setActiveChatId(chatId);
       setInput('');
       setAttachedImages([]);
-      // Check if we already have messages cached
-      const cached = chatHistory.find((c) => c.id === chatId);
-      if (cached && cached.messages && cached.messages.length > 0) {
-        setMessages(cached.messages);
-      } else {
-        setMessages([]);
-        await loadSessionMessages(chatId);
-      }
+      // Always load fresh from DB to ensure we have full history
+      setMessages([]);
+      await loadSessionMessages(chatId);
     };
 
     const handleDeleteChat = async (chatId) => {
@@ -472,7 +493,7 @@
                 </div>
               )}
               {messages.map((m) => (
-                <ChatMessage key={m.id} message={m} onImageClick={handleImageClick} onVideoClick={handleVideoClick} token={token} sessionId={activeChatId} />
+                <ChatMessage key={m.id} message={m} onImageClick={handleImageClick} onVideoClick={handleVideoClick} token={token} sessionId={activeChatId} onFeedback={handleFeedbackUpdate} />
               ))}
             </div>
 
