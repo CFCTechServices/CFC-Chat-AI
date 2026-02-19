@@ -75,40 +75,56 @@
         prevRole.current = 'user';
         window.history.replaceState({ route: 'login' }, '', routeToPath('login'));
       } else {
-        // Detect when role changes from default 'user' to actual role (e.g. 'admin')
-        // This happens because the role fetch is async and completes after user is set
         const roleJustResolved = prevRole.current !== role;
         prevRole.current = role;
 
-        try {
-          const savedRoute = window.localStorage.getItem('cfc-route');
-
-          if (roleJustResolved && role === 'admin') {
-            // Role just loaded as admin — override to admin default
-            const defaultRoute = getDefaultRouteForUser();
-            setRoute(defaultRoute);
-            window.localStorage.setItem('cfc-route', defaultRoute);
-            window.history.replaceState({ route: defaultRoute }, '', routeToPath(defaultRoute));
-          } else if (savedRoute && isValidRoute(savedRoute) && savedRoute !== 'transition') {
-            setRoute(savedRoute);
-            window.history.replaceState({ route: savedRoute }, '', routeToPath(savedRoute));
-          } else if (!hasInitialized.current) {
-            const defaultRoute = getDefaultRouteForUser();
-            setRoute(defaultRoute);
-            window.localStorage.setItem('cfc-route', defaultRoute);
-            window.history.replaceState({ route: defaultRoute }, '', routeToPath(defaultRoute));
+        if (!hasInitialized.current) {
+          // First load after login — set initial route
+          try {
+            const savedRoute = window.localStorage.getItem('cfc-route');
+            if (savedRoute && isValidRoute(savedRoute) && savedRoute !== 'transition') {
+              setRoute(savedRoute);
+              window.history.replaceState({ route: savedRoute }, '', routeToPath(savedRoute));
+            } else {
+              const defaultRoute = getDefaultRouteForUser();
+              setRoute(defaultRoute);
+              window.localStorage.setItem('cfc-route', defaultRoute);
+              window.history.replaceState({ route: defaultRoute }, '', routeToPath(defaultRoute));
+            }
+          } catch {
+            // ignore
           }
-        } catch {
-          // ignore
+          hasInitialized.current = true;
+        } else if (roleJustResolved) {
+          // Role resolved async after init (e.g. 'user' → 'admin') — redirect to correct default
+          const defaultRoute = getDefaultRouteForUser();
+          setRoute(defaultRoute);
+          try { window.localStorage.setItem('cfc-route', defaultRoute); } catch {}
+          window.history.replaceState({ route: defaultRoute }, '', routeToPath(defaultRoute));
         }
-        hasInitialized.current = true;
+        // Otherwise: already initialized, role unchanged — don't touch history
       }
     }, [user, role, passwordRecoveryMode]);
 
     // Listen for browser back/forward
     React.useEffect(() => {
       const handlePopState = (event) => {
-        const newRoute = event.state?.route || pathToRoute(window.location.pathname);
+        let newRoute = event.state?.route || pathToRoute(window.location.pathname);
+
+        // If user is not logged in, force back to login regardless of history
+        if (!user && newRoute !== 'login' && newRoute !== 'reset-password') {
+          window.history.replaceState({ route: 'login' }, '', routeToPath('login'));
+          setRoute('login');
+          return;
+        }
+
+        // If route requires admin but user is not admin, redirect to their default
+        if (user && newRoute === 'admin' && role !== 'admin') {
+          const fallback = 'chat';
+          window.history.replaceState({ route: fallback }, '', routeToPath(fallback));
+          newRoute = fallback;
+        }
+
         skipPush.current = true;
         try { window.localStorage.setItem('cfc-route', newRoute); } catch {}
         setRoute(newRoute);
@@ -117,7 +133,7 @@
       };
       window.addEventListener('popstate', handlePopState);
       return () => window.removeEventListener('popstate', handlePopState);
-    }, []);
+    }, [user, role]);
 
     const performNavigation = React.useCallback((next, options = {}) => {
       if (next === 'transition') {

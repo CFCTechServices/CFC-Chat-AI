@@ -335,6 +335,13 @@ async def delete_user(
         # - public.chat_sessions (ON DELETE CASCADE)
         # - Related chat_messages (via session CASCADE)
         # - Sets NULL on invitations and feedback (ON DELETE SET NULL)
+
+        # Delete invitation records so the email can be re-invited
+        supabase.table("invitations")\
+            .delete()\
+            .eq("email", user_email)\
+            .execute()
+
         supabase.auth.admin.delete_user(user_id)
 
         # Log the action

@@ -9,8 +9,7 @@
   const _initialHash = window.location.hash || '';
   const _initialSearch = window.location.search || '';
   const _isRecoveryUrl = _initialHash.includes('type=recovery')
-    || _initialSearch.includes('type=recovery')
-    || _initialSearch.includes('code=');
+    || _initialSearch.includes('type=recovery');
 
   function useUser() {
     return useContext(UserContext);

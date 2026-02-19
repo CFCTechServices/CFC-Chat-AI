@@ -1,7 +1,8 @@
 import logging
 import requests as http_requests
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["auth"])
@@ -64,63 +65,60 @@ async def forgot_password(request: ForgotPasswordRequest):
     )
 
 
-class ValidateInviteRequest(BaseModel):
-    invite_code: str
+# ---------------------------------------------------------------------------
+# Invitation-based signup flow (no invite codes — email whitelist only)
+# ---------------------------------------------------------------------------
 
-class ValidateInviteResponse(BaseModel):
-    valid: bool
+class CheckEmailRequest(BaseModel):
+    email: EmailStr
+
+class CheckEmailResponse(BaseModel):
+    eligible: bool
     message: str
-    email: str = None  # Email associated with the invite code
 
-
-@router.post("/validate-invite", response_model=ValidateInviteResponse)
-async def validate_invite(request: ValidateInviteRequest):
+@router.post("/check-email", response_model=CheckEmailResponse)
+async def check_email(request: CheckEmailRequest):
     """
-    Validates an invite code and returns the associated email.
-    """
-    from app.core.supabase_service import supabase
-
-    try:
-        # Query the invitations table to get the code and email
-        response = supabase.table("invitations").select("email, is_used").eq("code", request.invite_code).single().execute()
-
-        if response.data and not response.data.get("is_used"):
-            return ValidateInviteResponse(
-                valid=True,
-                message="Invite code is valid.",
-                email=response.data.get("email")
-            )
-        elif response.data and response.data.get("is_used"):
-            return ValidateInviteResponse(valid=False, message="Invite code has already been used.")
-        else:
-            return ValidateInviteResponse(valid=False, message="Invalid invite code.")
-    except Exception as e:
-        logger.error(f"Error validating invite: {e}")
-        return ValidateInviteResponse(valid=False, message="Invalid invite code.")
-
-
-class MarkInviteUsedRequest(BaseModel):
-    invite_code: str
-
-@router.post("/mark-invite-used")
-async def mark_invite_used(request: MarkInviteUsedRequest):
-    """
-    Marks an invite code as used after successful account creation.
+    Check whether an email has been invited (whitelist) and is eligible to sign up.
+    Returns eligible=True only if an unregistered, non-expired invitation exists.
     """
     from app.core.supabase_service import supabase
 
     try:
         response = (
             supabase.table("invitations")
-            .update({"is_used": True})
-            .eq("code", request.invite_code)
-            .eq("is_used", False)
+            .select("expires_at, is_registered")
+            .eq("email", request.email)
+            .eq("is_registered", False)
+            .order("created_at", desc=True)
+            .limit(1)
             .execute()
         )
-        if response.data:
-            return {"success": True, "message": "Invite marked as used."}
-        else:
-            return {"success": False, "message": "Invite code not found or already used."}
+
+        if not response.data:
+            return CheckEmailResponse(
+                eligible=False,
+                message="This email has not been invited. Please contact your administrator."
+            )
+
+        row = response.data[0]
+        expires_at = datetime.fromisoformat(row["expires_at"].replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+
+        if expires_at <= now:
+            return CheckEmailResponse(
+                eligible=False,
+                message="Your invitation has expired. Please contact your administrator for a new one."
+            )
+
+        return CheckEmailResponse(
+            eligible=True,
+            message="Email is eligible for registration."
+        )
+
     except Exception as e:
-        logger.error(f"Error marking invite as used: {e}")
-        raise HTTPException(status_code=500, detail="Failed to mark invite as used.")
+        logger.error(f"Error checking email eligibility: {e}")
+        return CheckEmailResponse(
+            eligible=False,
+            message="Unable to verify email. Please try again later."
+        )
