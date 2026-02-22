@@ -1,0 +1,31 @@
+services:
+  backend:
+    build: .
+    restart: unless-stopped
+
+    # Bind only to localhost so the port is NOT reachable from the internet.
+    # Nginx on the host proxies /api/* to this address.
+    ports:
+      - "127.0.0.1:8000:8000"
+
+    # Load production secrets and config from a .env file in this directory.
+    # Copy .env.example to .env and fill in real values before first deploy.
+    env_file:
+      - .env
+
+    # Mount the data directory so uploads, transcripts, and processed files
+    # survive container restarts and rebuilds.
+    # Mount the HuggingFace cache so downloaded models (sentence-transformers,
+    # whisper) are preserved across image rebuilds.
+    volumes:
+      - ./data:/app/data
+      - hf_cache:/root/.cache/huggingface
+
+    environment:
+      - PYTHONUNBUFFERED=1
+      # Tell HuggingFace libraries to use the mounted cache directory
+      - HF_HOME=/root/.cache/huggingface
+      - TRANSFORMERS_CACHE=/root/.cache/huggingface/hub
+
+volumes:
+  hf_cache:

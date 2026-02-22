@@ -46,20 +46,22 @@ app.mount(
 )
 
 # Add CORS middleware
+# Allowed origins are read from the CORS_ORIGINS environment variable
+# (comma-separated). Set it to your production domain(s) in .env.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO: Restrict to specific origins in production
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(health.router)
-app.include_router(ingest.router)
+# Include routers — all routes are served under /api
+app.include_router(health.router, prefix="/api")
+app.include_router(ingest.router, prefix="/api")          # /api/ingest/*
 app.include_router(chat.router, prefix="/api/chat")
-app.include_router(visibility.router)
-app.include_router(upload_router, prefix="/files", tags=["Files"])
+app.include_router(visibility.router, prefix="/api")      # /api/visibility/*
+app.include_router(upload_router, prefix="/api/files", tags=["Files"])
 app.include_router(videos.router)
 app.include_router(auth.router, prefix="/api/auth")
 app.include_router(sessions.router, prefix="/api/chat")

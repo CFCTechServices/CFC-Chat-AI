@@ -1,0 +1,61 @@
+# nginx.conf.example — Reference nginx configuration for the Azure VM
+#
+# Copy to /etc/nginx/sites-available/cfcchat, then:
+#   sudo ln -s /etc/nginx/sites-available/cfcchat /etc/nginx/sites-enabled/
+#   sudo nginx -t && sudo systemctl reload nginx
+#
+# Replace YOUR_DOMAIN with your actual domain (or server IP for testing).
+# For HTTPS, run: sudo certbot --nginx -d YOUR_DOMAIN
+
+server {
+    listen 80;
+    server_name YOUR_DOMAIN;
+
+    # ---------------------------------------------------------------------------
+    # Backend API — proxy all /api/* requests to the FastAPI container
+    # The container is only bound to 127.0.0.1:8000 (not internet-facing).
+    # ---------------------------------------------------------------------------
+    location /api/ {
+        proxy_pass         http://127.0.0.1:8000;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+
+        # Extend timeouts for long-running operations (e.g. whisper transcription)
+        proxy_read_timeout    300s;
+        proxy_connect_timeout 10s;
+        proxy_send_timeout    300s;
+
+        # Support large file uploads (documents, videos)
+        client_max_body_size 500M;
+    }
+
+    # ---------------------------------------------------------------------------
+    # Static assets under /ui/ — served directly by nginx
+    #
+    # The frontend index.html loads all JS/CSS from /ui/... paths.
+    # This alias maps /ui/ → /var/www/cfcchat/ so that:
+    #   /ui/styles.css            → /var/www/cfcchat/styles.css
+    #   /ui/state/user-context.jsx → /var/www/cfcchat/state/user-context.jsx
+    # ---------------------------------------------------------------------------
+    location /ui/ {
+        alias /var/www/cfcchat/;
+        expires 1h;
+        add_header Cache-Control "public, must-revalidate";
+    }
+
+    # ---------------------------------------------------------------------------
+    # SPA catch-all — serve index.html for all client-side routes
+    #
+    # Routes like /chat, /admin, /settings etc. are handled by React's
+    # client-side router. Nginx must return index.html for these so that
+    # page reloads work correctly.
+    # ---------------------------------------------------------------------------
+    location / {
+        root  /var/www/cfcchat;
+        index index.html;
+        try_files $uri /index.html;
+        expires -1;
+    }
+}

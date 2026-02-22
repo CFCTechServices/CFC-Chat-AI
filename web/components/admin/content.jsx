@@ -10,7 +10,7 @@
     useEffect(() => {
       const fetchStats = async () => {
         try {
-          const res = await fetch('/visibility/vector-store');
+          const res = await fetch('/api/visibility/vector-store');
           if (!res.ok) {
             const data = await res.json().catch(() => ({}));
             throw new Error(data.detail || `Failed to fetch stats (${res.status})`);

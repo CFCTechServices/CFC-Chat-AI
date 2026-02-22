@@ -1,82 +1,151 @@
 from pathlib import Path
-import os
-from typing import Optional
+from typing import Optional, List
 
-class Settings:
-    # Project paths
-    PROJECT_ROOT = Path(__file__).parent.parent
-    DATA_DIR = PROJECT_ROOT / "data"
-    DOCUMENTS_DIR = DATA_DIR / "documents"
-    VIDEOS_DIR = DATA_DIR / "videos"
-    PROCESSED_DIR = DATA_DIR / "processed"
-    
-    # API Settings
-    API_TITLE = "CFC Animal Feed Software Chatbot API"
-    API_VERSION = "1.0.0"
-    API_HOST = "0.0.0.0"
-    API_PORT = 8000
-    
-    # Model Settings
-    EMBED_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-    EMBED_DIMENSION = 384
-    
-    # Chunking Settings
-    CHUNK_SIZE = 600
-    CHUNK_OVERLAP = 120
-    
-    # Pinecone Settings
-    PINECONE_API_KEY: Optional[str] = os.getenv("PINECONE_API_KEY")
-    PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "cfc-animal-feed-chatbot")
-    PINECONE_CLOUD = os.getenv("PINECONE_CLOUD", "aws")
-    PINECONE_REGION = os.getenv("PINECONE_REGION", "us-east-1")
-    USE_PINECONE = bool(PINECONE_API_KEY)  # Fallback flag to disable Pinecone if no API key
-    PINECONE_VIDEO_INDEX_NAME = (
-        os.getenv("PINECONE_VIDEO_INDEX_NAME")
-        or os.getenv("PINECONE_INDEX_NAME_VIDEOS")
-        or os.getenv("PINECONE_INDEX")
-        or PINECONE_INDEX_NAME
+from pydantic import computed_field, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Project root is two levels up from this file (app/config.py → app/ → project root)
+_PROJECT_ROOT = Path(__file__).parent.parent
+
+
+class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
     )
-    PINECONE_NAMESPACE: Optional[str] = os.getenv("PINECONE_NAMESPACE")
-    
-    # Supabase / Content Storage Settings
-    # IMPORTANT: Two different keys for different purposes!
-    SUPABASE_URL: Optional[str] = os.getenv("SUPABASE_URL")
-    
-    # ANON KEY - Public key for client-side authentication
-    # - Safe to expose to frontend
-    # - Respects Row Level Security (RLS)
-    # - Used for: User authentication, client-facing operations
-    SUPABASE_ANON_KEY: Optional[str] = os.getenv("SUPABASE_ANON_KEY")
-    
-    # SERVICE ROLE KEY - Admin key for backend operations
-    # - NEVER expose to frontend/client
-    # - Bypasses Row Level Security (RLS)
-    # - Used for: Admin endpoints, server-side operations, bypassing RLS
-    SUPABASE_SERVICE_ROLE_KEY: Optional[str] = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-    
-    SUPABASE_BUCKET: Optional[str] = os.getenv("SUPABASE_BUCKET")
-    SUPABASE_BUCKET_VIDEOS: Optional[str] = os.getenv("SUPABASE_BUCKET_VIDEOS", SUPABASE_BUCKET)
-    LOCAL_CONTENT_ROOT = PROCESSED_DIR / "content_repository"
-    # OpenAI Settings (for future GPT integration)
-    OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
-    OPENAI_MODEL = "gpt-3.5-turbo"
 
-    # Gemini Settings (alternative to OpenAI)
-    GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY")
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
-    
-    # Resend API Configuration (for email invitations)
-    RESEND_API_KEY: Optional[str] = os.getenv("RESEND_API_KEY")
-    FRONTEND_BASE_URL: str = os.getenv("FRONTEND_BASE_URL", "http://localhost:8000/ui")
-    
-    # Email Configuration
-    # Set to False to create invitations without sending emails (useful when Resend domain is not verified)
-    ENABLE_EMAIL_INVITES: bool = os.getenv("ENABLE_EMAIL_INVITES", "true").lower() in ("true", "1", "yes")
-    
+    # ---------------------------------------------------------------------------
+    # API Settings
+    # ---------------------------------------------------------------------------
+    API_TITLE: str = "CFC Animal Feed Software Chatbot API"
+    API_VERSION: str = "1.0.0"
+    API_HOST: str = "0.0.0.0"
+    API_PORT: int = 8000
+
+    # ---------------------------------------------------------------------------
+    # CORS
+    # Comma-separated list of allowed origins.
+    # In production set to your domain(s), e.g. "https://example.com"
+    # For local dev the default allows the FastAPI server itself.
+    # ---------------------------------------------------------------------------
+    CORS_ORIGINS: str = "http://localhost:8000"
+
+    # ---------------------------------------------------------------------------
+    # Model / Embedding Settings
+    # ---------------------------------------------------------------------------
+    EMBED_MODEL_NAME: str = "sentence-transformers/all-MiniLM-L6-v2"
+    EMBED_DIMENSION: int = 384
+
+    # ---------------------------------------------------------------------------
+    # Chunking Settings
+    # ---------------------------------------------------------------------------
+    CHUNK_SIZE: int = 600
+    CHUNK_OVERLAP: int = 120
+
+    # ---------------------------------------------------------------------------
+    # Pinecone Settings
+    # ---------------------------------------------------------------------------
+    PINECONE_API_KEY: Optional[str] = None
+    PINECONE_INDEX_NAME: str = "cfc-animal-feed-chatbot"
+    PINECONE_CLOUD: str = "aws"
+    PINECONE_REGION: str = "us-east-1"
+    # Video index — resolved via fallback chain in model_validator below
+    PINECONE_VIDEO_INDEX_NAME: Optional[str] = None
+    PINECONE_INDEX_NAME_VIDEOS: Optional[str] = None
+    PINECONE_INDEX: Optional[str] = None
+    PINECONE_NAMESPACE: Optional[str] = None
+
+    # ---------------------------------------------------------------------------
+    # Supabase / Content Storage Settings
+    # ---------------------------------------------------------------------------
+    SUPABASE_URL: Optional[str] = None
+
+    # ANON KEY — safe to expose to the frontend; respects Row Level Security
+    SUPABASE_ANON_KEY: Optional[str] = None
+
+    # SERVICE ROLE KEY — backend only; bypasses Row Level Security; never expose
+    SUPABASE_SERVICE_ROLE_KEY: Optional[str] = None
+
+    SUPABASE_BUCKET: Optional[str] = None
+    # Defaults to SUPABASE_BUCKET when not explicitly set (resolved in validator)
+    SUPABASE_BUCKET_VIDEOS: Optional[str] = None
+
+    # ---------------------------------------------------------------------------
+    # OpenAI Settings
+    # ---------------------------------------------------------------------------
+    OPENAI_API_KEY: Optional[str] = None
+    OPENAI_MODEL: str = "gpt-3.5-turbo"
+
+    # ---------------------------------------------------------------------------
+    # Gemini Settings
+    # ---------------------------------------------------------------------------
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+
+    # ---------------------------------------------------------------------------
     # Search Settings
-    DEFAULT_TOP_K = 5
-    MAX_CONTEXT_LENGTH = 4000
+    # ---------------------------------------------------------------------------
+    DEFAULT_TOP_K: int = 5
+    MAX_CONTEXT_LENGTH: int = 4000
+
+    # ---------------------------------------------------------------------------
+    # Validators — resolve cross-field defaults
+    # ---------------------------------------------------------------------------
+    @model_validator(mode="after")
+    def _resolve_computed_defaults(self) -> "Settings":
+        # SUPABASE_BUCKET_VIDEOS defaults to SUPABASE_BUCKET when not set
+        if not self.SUPABASE_BUCKET_VIDEOS and self.SUPABASE_BUCKET:
+            self.SUPABASE_BUCKET_VIDEOS = self.SUPABASE_BUCKET
+
+        # PINECONE_VIDEO_INDEX_NAME fallback chain
+        if not self.PINECONE_VIDEO_INDEX_NAME:
+            self.PINECONE_VIDEO_INDEX_NAME = (
+                self.PINECONE_INDEX_NAME_VIDEOS
+                or self.PINECONE_INDEX
+                or self.PINECONE_INDEX_NAME
+            )
+
+        return self
+
+    # ---------------------------------------------------------------------------
+    # Computed fields (read-only, not loaded from env)
+    # ---------------------------------------------------------------------------
+    @computed_field
+    @property
+    def USE_PINECONE(self) -> bool:
+        return bool(self.PINECONE_API_KEY)
+
+    @computed_field
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """Parse the CORS_ORIGINS comma-separated string into a list."""
+        return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
+
+    @computed_field
+    @property
+    def DATA_DIR(self) -> Path:
+        return _PROJECT_ROOT / "data"
+
+    @computed_field
+    @property
+    def DOCUMENTS_DIR(self) -> Path:
+        return self.DATA_DIR / "documents"
+
+    @computed_field
+    @property
+    def VIDEOS_DIR(self) -> Path:
+        return self.DATA_DIR / "videos"
+
+    @computed_field
+    @property
+    def PROCESSED_DIR(self) -> Path:
+        return self.DATA_DIR / "processed"
+
+    @computed_field
+    @property
+    def LOCAL_CONTENT_ROOT(self) -> Path:
+        return self.PROCESSED_DIR / "content_repository"
+
 
 settings = Settings()
-
-

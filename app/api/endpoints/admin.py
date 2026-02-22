@@ -9,8 +9,6 @@ from pathlib import Path
 from app.core.auth import get_current_admin
 from app.core.supabase_service import supabase
 from app.config import settings
-from app.services.email_service import send_invite_email
-
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["admin"])
 
@@ -104,7 +102,7 @@ class ListUsersResponse(BaseModel):
 @router.post("/invite", response_model=InviteResponse)
 async def generate_invite(request: InviteRequest, admin: dict = Depends(get_current_admin)):
     """
-    Generate a new invitation code and send it via email.
+    Generate a new invitation code for the given email address.
     Only accessible by admin users.
 
     Handles the partial unique index on (email) WHERE is_used = false:
@@ -163,24 +161,10 @@ async def generate_invite(request: InviteRequest, admin: dict = Depends(get_curr
         new_code = new_invite["code"]
         new_expires_at = new_invite["expires_at"]
 
-        # Step 5: Generate invite URL and send email
-        invite_url = f"{settings.FRONTEND_BASE_URL}/register?code={new_code}&email={request.email}"
-
-        if settings.ENABLE_EMAIL_INVITES:
-            try:
-                email_sent = send_invite_email(request.email, new_code, invite_url)
-                if email_sent:
-                    logger.info(f"Email sent successfully to {request.email}. Response ID: {email_sent}")
-                else:
-                    logger.warning(f"Invitation created but email failed to send to {request.email}")
-            except Exception as email_error:
-                logger.error(f"Failed to send email to {request.email}: {email_error}")
-        else:
-            logger.info(f"Email sending disabled. Invitation created for {request.email} with code {new_code}")
-            logger.info(f"Share this invite URL manually: {invite_url}")
+        logger.info(f"Invitation created for {request.email} with code {new_code}")
 
         return InviteResponse(
-            message=f"Invite sent to {request.email}" if settings.ENABLE_EMAIL_INVITES else f"Invite created for {request.email} (email disabled)",
+            message=f"Invitation created for {request.email}",
             email=request.email,
             code=new_code,
             expires_at=new_expires_at

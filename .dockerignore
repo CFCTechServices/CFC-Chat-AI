@@ -1,0 +1,37 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Environment / secrets — never bake into the image
+.env
+.env.*
+
+# Git
+.git/
+.gitignore
+
+# Dev / editor
+.vscode/
+.idea/
+*.swp
+
+# Docs & deployment config (not needed at runtime)
+*.md
+docs/
+deployment/
+
+# Tests
+tests/
+
+# Data directory — mounted as a volume at runtime
+data/
+
+# Legacy / unused files
+web/app_legacy.js
+web/app_legacy.jsx

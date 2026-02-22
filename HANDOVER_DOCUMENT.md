@@ -15,21 +15,31 @@ This document provides a comprehensive technical handover for the CFC Chat-Talk 
 #### **Supported Endpoints**
 
 **Document Management:**
-- `POST /files/upload` - Single file upload with auto-ingestion
-- `POST /files/bulk` - Multiple file upload with batch processing
-- `POST /ingest/document` - Process document by filename
-- `POST /ingest/bulk` - Bulk process directory contents
+- `POST /api/files/upload` - Single file upload with auto-ingestion
+- `POST /api/ingest/document` - Process document by filename
+- `POST /api/ingest/bulk` - Bulk process directory contents
 
 **Search & Chat:**
-- `POST /search` - Semantic document search (returns chunks with metadata)
-- `POST /ask` - Q&A with AI-generated answers
-- `POST /ask/video` - Video transcript-specific Q&A
-- `POST /recommendations` - Content recommendations based on query
+- `POST /api/chat/search` - Semantic document search (returns chunks with metadata)
+- `POST /api/chat/ask` - Q&A with AI-generated answers
+- `POST /api/chat/ask/video` - Video transcript-specific Q&A
+- `POST /api/chat/recommendations` - Content recommendations based on query
+- `GET/POST /api/chat/sessions` - Chat session management
+
+**Auth & Profile:**
+- `GET /api/auth/config` - Supabase config for client initialisation
+- `POST /api/auth/forgot-password` - Password reset
+- `GET/PATCH /api/profile/me` - User profile
+
+**Admin:**
+- `GET /api/admin/users` - List all users
+- `POST /api/admin/invite` - Generate invitation code
+- `GET/PATCH /api/admin/settings` - Admin settings
+- `GET /api/admin/ingestion/stats` - Ingestion statistics
 
 **System:**
-- `GET /health` - Health check endpoint
-- `GET /visibility/vector-store` - Pinecone index statistics
-- `GET /content/images/{path:path}` - Image serving endpoint
+- `GET /api/health` - Health check endpoint
+- `GET /api/visibility/vector-store` - Pinecone index statistics
 
 **Video Processing:**
 - `POST /api/videos/upload` - Video upload with Whisper transcription
@@ -81,7 +91,7 @@ This document provides a comprehensive technical handover for the CFC Chat-Talk 
 ```mermaid
 graph TB
     subgraph "Frontend (React)"
-        UI[Web UI<br/>/ui]
+        UI[Web UI<br/>localhost:8000]
         Login[Login Page]
         Chat[Chat Interface]
         Admin[Admin Console]
@@ -90,9 +100,9 @@ graph TB
     subgraph "Backend (FastAPI)"
         API[API Routes<br/>main.py]
         Auth[Auth Middleware]
-        ChatEP[Chat Endpoints<br/>/ask, /search]
-        UploadEP[Upload Endpoints<br/>/files/upload]
-        IngestEP[Ingest Endpoints<br/>/ingest/*]
+        ChatEP[Chat Endpoints<br/>/api/chat/ask, /api/chat/search]
+        UploadEP[Upload Endpoints<br/>/api/files/upload]
+        IngestEP[Ingest Endpoints<br/>/api/ingest/*]
     end
     
     subgraph "Services Layer"
@@ -930,12 +940,12 @@ graph TB
    ```
 
 4. **Access UI**
-   - Frontend: http://localhost:8000/ui
+   - Frontend: http://localhost:8000
    - API Docs: http://localhost:8000/docs
 
 5. **Ingest Documents**
-   - Upload via `/files/upload` or place files in `data/documents/`
-   - Trigger ingestion via `/ingest/document` or `/ingest/bulk`
+   - Upload via `/api/files/upload` (or use the admin panel in the UI)
+   - Trigger ingestion via `/api/ingest/document` or `/api/ingest/bulk`
 
 ---
 
