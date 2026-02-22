@@ -4,7 +4,7 @@ WORKDIR /app
 
 # System dependencies:
 #   ffmpeg — required by openai-whisper for audio/video processing
-#   build-essential — needed to compile some Python C extensions
+#   build-essential — needed at build time to compile C extensions (removed after install)
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg \
         build-essential \
@@ -13,12 +13,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Python dependencies before copying application code so that
 # Docker can cache this layer when only source files change.
 #
-# Install CPU-only torch first so that sentence-transformers and openai-whisper
-# don't pull the full CUDA build (~2.5 GB). The CPU wheel is ~250 MB and works
-# fine on a VM without a GPU.
+# 1. Install CPU-only torch first (~250 MB) so sentence-transformers and
+#    openai-whisper don't pull the full CUDA build (~2.5 GB).
+# 2. Install the rest of requirements.
+# 3. Remove build-essential in the same layer so it doesn't bloat the image.
 COPY requirements.txt .
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
+    && pip install --no-cache-dir -r requirements.txt \
+    && apt-get purge -y --auto-remove build-essential
 
 # Copy application source
 COPY . .
