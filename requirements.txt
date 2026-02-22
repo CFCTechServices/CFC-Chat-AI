@@ -3,7 +3,6 @@ uvicorn[standard]
 gunicorn
 pydantic
 pydantic-settings
-openai-whisper
 pinecone
 sentence-transformers
 python-docx
