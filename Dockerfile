@@ -12,7 +12,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Python dependencies before copying application code so that
 # Docker can cache this layer when only source files change.
+#
+# Install CPU-only torch first so that sentence-transformers and openai-whisper
+# don't pull the full CUDA build (~2.5 GB). The CPU wheel is ~250 MB and works
+# fine on a VM without a GPU.
 COPY requirements.txt .
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application source
