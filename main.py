@@ -16,7 +16,8 @@ load_dotenv(BASE_DIR / ".env")
 
 # Import the organized modules
 from app.config import settings
-from app.api.endpoints import health, ingest, chat, visibility, videos, auth, sessions, profile
+from app.api.endpoints import health, ingest, chat, visibility, auth, sessions, profile
+# videos disabled — requires openai-whisper; re-enable when disk is expanded
 from app.api.endpoints.admin import router as admin_router
 
 from app.api.endpoints.upload import router as upload_router
@@ -62,7 +63,7 @@ app.include_router(ingest.router, prefix="/api")          # /api/ingest/*
 app.include_router(chat.router, prefix="/api/chat")
 app.include_router(visibility.router, prefix="/api")      # /api/visibility/*
 app.include_router(upload_router, prefix="/api/files", tags=["Files"])
-app.include_router(videos.router)
+# app.include_router(videos.router)  # disabled — requires openai-whisper
 app.include_router(auth.router, prefix="/api/auth")
 app.include_router(sessions.router, prefix="/api/chat")
 app.include_router(admin_router, prefix="/api/admin")
