@@ -9,9 +9,24 @@ from fastapi.responses import FileResponse
 import logging
 from pathlib import Path
 from dotenv import load_dotenv
+import os
+import shutil
+import certifi
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
+
+# If a custom CA bundle path is provided (for example when Supabase uses a
+# self-signed certificate), configure HTTP clients to use it by setting the
+# common env vars used by `requests`/`urllib`.
+ca_bundle = os.getenv("SUPABASE_CA_BUNDLE") or os.getenv("REQUESTS_CA_BUNDLE") or os.getenv("SSL_CERT_FILE")
+if ca_bundle:
+    os.environ.setdefault("REQUESTS_CA_BUNDLE", ca_bundle)
+    os.environ.setdefault("SSL_CERT_FILE", ca_bundle)
+else:
+    # Ensure a reliable CA bundle is available (helps HuggingFace/requests on macOS)
+    os.environ.setdefault("REQUESTS_CA_BUNDLE", certifi.where())
+    os.environ.setdefault("SSL_CERT_FILE", certifi.where())
 
 
 # Import the organized modules
@@ -74,6 +89,15 @@ app.include_router(profile.router, prefix="/api/profile")
 async def startup_event():
     """Initialize services on startup."""
     logger.info("Starting CFC Animal Feed Software Chatbot API")
+    # Ensure ffmpeg is available for Whisper transcription
+    if shutil.which("ffmpeg") is None:
+        msg = (
+            "ffmpeg binary not found. ffmpeg is required for video/audio transcription. "
+            "Install it (macOS): `brew install ffmpeg` — or on Linux: `sudo apt install ffmpeg` "
+            "or via conda: `conda install -c conda-forge ffmpeg`. After installation restart the server."
+        )
+        logger.error(msg)
+        raise RuntimeError(msg)
     
     # Create data directories if they don't exist
     settings.DATA_DIR.mkdir(exist_ok=True)

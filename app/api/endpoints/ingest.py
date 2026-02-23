@@ -13,6 +13,7 @@ from app.core.vector_store import VectorStore
 from app.services.document_processor import DocumentProcessor
 from app.services.content_repository import ContentRepository
 from app.services.supabase_content_repository import SupabaseContentRepository
+from app.core.supabase_service import supabase
 
 
 
@@ -44,7 +45,7 @@ async def ingest_document(request: IngestRequest) -> IngestResponse:
             raise HTTPException(status_code=400, detail=processed.get("error", "Unknown processing error"))
 
         updated = _persist_document_content(processed)
-        vectors, chunk_count = _prepare_vectors(updated["chunks"])
+        vectors, chunk_count = _prepare_vectors(updated)
 
         if vectors:
             _vector_store.upsert_vectors(vectors)
@@ -102,7 +103,7 @@ async def bulk_ingest(request: BulkIngestRequest) -> BulkIngestResponse:
         for result in results:
             if result.get("success"):
                 updated = _persist_document_content(result)
-                vectors, chunk_count = _prepare_vectors(updated["chunks"])
+                vectors, chunk_count = _prepare_vectors(updated)
                 if vectors:
                     _vector_store.upsert_vectors(vectors)
                 total_chunks += chunk_count
@@ -196,16 +197,66 @@ def _persist_document_content(processed: Dict[str, Any]) -> Dict[str, Any]:
     return processed
 
 
-def _prepare_vectors(chunks: List[Dict]) -> Tuple[List[Tuple[str, List[float], Dict]], int]:
+def _prepare_vectors(processed: Dict[str, Any]) -> Tuple[List[Tuple[str, List[float], Dict]], int]:
+    """Encode chunk texts, persist them to Supabase `document_chunks` table,
+    and return Pinecone-ready vectors with minimal metadata.
+    """
+    chunks: List[Dict] = processed.get("chunks", [])
     if not chunks:
         return [], 0
-    texts = [chunk["text"] for chunk in chunks]
+
+    doc_id = processed.get("doc_id")
+    source = processed.get("source")
+
+    # 1) Encode embeddings
+    texts = [chunk.get("text", "") for chunk in chunks]
     embeddings = _embedding_model.encode(texts)
+
+    # 2) Persist chunk rows to Supabase (upsert to avoid duplicates)
+    # Map section_id -> section_title when available
+    section_title_map = {}
+    for s in processed.get("sections", []):
+        sid = s.get("section_id")
+        if sid:
+            section_title_map[sid] = s.get("title") or s.get("section_title") or s.get("suggested_name")
+
+    rows = []
+    for chunk in chunks:
+        rows.append({
+            "chunk_id": chunk.get("chunk_id"),
+            "doc_id": doc_id,
+            "section_id": chunk.get("section_id"),
+            "section_title": section_title_map.get(chunk.get("section_id")),
+            "content": chunk.get("text"),
+            "image_paths": chunk.get("image_paths", []),
+            "source": source,
+            "source_type": chunk.get("source_type", "document"),
+            "start_seconds": chunk.get("start_seconds"),
+            "end_seconds": chunk.get("end_seconds"),
+            "video_url": chunk.get("video_url"),
+            "txt_url": chunk.get("txt_url"),
+            "srt_url": chunk.get("srt_url"),
+            "vtt_url": chunk.get("vtt_url"),
+        })
+
+    try:
+        # use upsert so re-ingestion won't error on duplicate PKs
+        supabase.table("document_chunks").upsert(rows).execute()
+    except Exception:
+        # best-effort: log is handled by caller; don't fail ingestion entirely here
+        pass
+
+    # 3) Build Pinecone vectors with minimal metadata (no full text)
     vectors: List[Tuple[str, List[float], Dict]] = []
     for index, chunk in enumerate(chunks):
-        metadata = {k: v for k, v in chunk.items() if k != "text"}
-        metadata["content"] = chunk.get("text")
-        vectors.append((chunk["chunk_id"], embeddings[index], metadata))
+        metadata = {
+            "doc_id": doc_id,
+            "section_id": chunk.get("section_id"),
+            "source": source,
+            "source_type": chunk.get("source_type", "document"),
+        }
+        vectors.append((chunk.get("chunk_id"), embeddings[index], metadata))
+
     return vectors, len(chunks)
 
 

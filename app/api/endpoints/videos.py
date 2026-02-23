@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from pathlib import Path
 from typing import Dict, Any, List
 from dotenv import load_dotenv
+import asyncio
 import tempfile
 import whisper
 import os
@@ -169,11 +170,13 @@ async def upload_and_transcribe(
             tmp_path = tmp.name
 
         # 1) upload original (single-level path)
+        # Run sync Supabase/httpx calls in a thread to avoid "client closed" errors
+        # that occur when sync httpx clients are used directly on the asyncio event loop.
         video_path = f"videos/original/{slug}{ext}"
-        video_url = _upload_bytes(bucket, video_path, raw, content_type="video/mp4")
+        video_url = await asyncio.to_thread(_upload_bytes, bucket, video_path, raw, "video/mp4")
 
-        # 2) whisper
-        segments = _transcribe_to_segments(tmp_path, model_name=model, language=language)
+        # 2) whisper (CPU-bound — also runs in thread so it doesn't block the loop)
+        segments = await asyncio.to_thread(_transcribe_to_segments, tmp_path, model, language)
 
         # 3) render formats
         txt_string = _render_txt(segments)
@@ -182,18 +185,19 @@ async def upload_and_transcribe(
         summary_md = _simple_summary(segments)
 
         # 4) upload outputs (with content types)
-        txt_url = _upload_bytes(bucket, f"videos/transcript/{slug}.txt", txt_string.encode("utf-8"), "text/plain")
-        srt_url = _upload_bytes(bucket, f"videos/transcript/{slug}.srt", srt_string.encode("utf-8"), "application/x-subrip")
-        vtt_url = _upload_bytes(bucket, f"videos/transcript/{slug}.vtt", vtt_string.encode("utf-8"), "text/vtt")
-        sum_url = _upload_bytes(bucket, f"videos/summaries/{slug}.md", summary_md.encode("utf-8"), "text/markdown")
+        txt_url = await asyncio.to_thread(_upload_bytes, bucket, f"videos/transcript/{slug}.txt", txt_string.encode("utf-8"), "text/plain")
+        srt_url = await asyncio.to_thread(_upload_bytes, bucket, f"videos/transcript/{slug}.srt", srt_string.encode("utf-8"), "application/x-subrip")
+        vtt_url = await asyncio.to_thread(_upload_bytes, bucket, f"videos/transcript/{slug}.vtt", vtt_string.encode("utf-8"), "text/vtt")
+        sum_url = await asyncio.to_thread(_upload_bytes, bucket, f"videos/summaries/{slug}.md", summary_md.encode("utf-8"), "text/markdown")
 
-        chunk_count = _index_transcript_chunks(
-            slug=slug,
-            segments=segments,
-            original_video_url=video_url,
-            txt_url=txt_url,
-            srt_url=srt_url,
-            vtt_url=vtt_url,
+        chunk_count = await asyncio.to_thread(
+            _index_transcript_chunks,
+            slug,
+            segments,
+            video_url,
+            txt_url,
+            srt_url,
+            vtt_url,
         )
 
 
@@ -276,10 +280,27 @@ def _build_chunks_from_segments(
 
 # ---------- Embeddings & Pinecone ----------
 
-def _embedder():
-    """Load the SentenceTransformer model used for chunk embeddings."""
-    model_name = os.getenv("EMBED_MODEL", "all-MiniLM-L6-v2")
-    return SentenceTransformer(model_name)
+# Cached at module level so the model is loaded (and HuggingFace Hub is
+# contacted) only once.  Re-loading on every upload triggers a Hub network
+# check that fails with an SSL error on macOS, which in turn leaves
+# huggingface_hub's internal httpx client closed and causes the
+# "Cannot send a request, as the client has been closed" error on retry.
+_st_model: SentenceTransformer | None = None
+
+def _embedder() -> SentenceTransformer:
+    global _st_model
+    if _st_model is None:
+        # local_files_only=True skips the HuggingFace Hub network check entirely.
+        # Without it, huggingface_hub makes a HEAD request to verify the cached
+        # model; on macOS the SSL cert store is incomplete, the request fails,
+        # huggingface_hub closes its httpx client during error handling, then
+        # tries to reuse that closed client for the retry → "client has been closed".
+        try:
+            _st_model = SentenceTransformer(settings.EMBED_MODEL_NAME, local_files_only=True)
+        except Exception:
+            # First-time use: model not yet in local cache, allow the download.
+            _st_model = SentenceTransformer(settings.EMBED_MODEL_NAME)
+    return _st_model
 
 def _pinecone():
     """Bootstrap the Pinecone client."""
@@ -291,8 +312,7 @@ def _pinecone():
 def _pinecone_index():
     """Return the configured Pinecone index handle."""
     pc = _pinecone()
-    index_name = getattr(settings, "PINECONE_VIDEO_INDEX_NAME", settings.PINECONE_INDEX_NAME)
-    return pc.Index(index_name)
+    return pc.Index(settings.PINECONE_INDEX_NAME)
 
 def _pinecone_namespace():
     """Return Pinecone namespace from settings or env; None for default namespace."""
@@ -322,27 +342,51 @@ def _index_transcript_chunks(
     index = _pinecone_index()
     namespace = _pinecone_namespace()
 
+    # Persist chunk rows to Supabase and build Pinecone upsert items with minimal metadata
+    rows = []
     items = []
     for c, vec in zip(chunks, vectors):
+        chunk_id = str(uuid.uuid4())
+        rows.append({
+            "chunk_id": chunk_id,
+            "doc_id": slug,
+            "section_id": None,
+            "section_title": None,
+            "content": c["text"],
+            "image_paths": [],
+            "source": slug,
+            "source_type": "video",
+            "start_seconds": float(c["start"]) if c.get("start") is not None else None,
+            "end_seconds": float(c["end"]) if c.get("end") is not None else None,
+            "video_url": original_video_url,
+            "txt_url": txt_url,
+            "srt_url": srt_url,
+            "vtt_url": vtt_url,
+        })
+
         items.append({
-            "id": str(uuid.uuid4()),
+            "id": chunk_id,
             "values": vec,
             "metadata": {
-                "source": slug,
+                "doc_id": slug,
                 "source_type": "video",
-                "slug": slug,
-                "text": c["text"],
-                "start_seconds": float(c["start"]) if c.get("start") is not None else None,
-                "end_seconds": float(c["end"]) if c.get("end") is not None else None,
-                "video_url": original_video_url,
-                "txt_url": txt_url,
-                "srt_url": srt_url,
-                "vtt_url": vtt_url,
             }
         })
 
     # upsert in batches (sane default)
     B = 100
+    # Create a fresh Supabase client here — reusing a module-level singleton from an
+    # async context can leave the underlying httpx.Client in a closed state.
+    try:
+        sb = create_client(
+            os.getenv("SUPABASE_URL", ""),
+            os.getenv("SUPABASE_SERVICE_ROLE_KEY", ""),
+        )
+        sb.table("document_chunks").upsert(rows).execute()
+    except Exception:
+        # don't fail the whole operation here — pinecone upsert will still run
+        pass
+
     for i in range(0, len(items), B):
         batch = items[i:i+B]
         if namespace:
