@@ -7,6 +7,7 @@ WORKDIR /app
 #   ffmpeg — add back here when openai-whisper is re-added to requirements.txt
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
+        ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies before copying application code so that
