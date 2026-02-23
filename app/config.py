@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:8000"
 
     # ---------------------------------------------------------------------------
+    # Frontend Base URL
+    # Used for password-reset redirect links sent via Supabase Auth.
+    # Set to your public domain in production, e.g. "https://example.com"
+    # ---------------------------------------------------------------------------
+    FRONTEND_BASE_URL: str = "http://localhost:8000"
+
+    # ---------------------------------------------------------------------------
     # Model / Embedding Settings
     # ---------------------------------------------------------------------------
     EMBED_MODEL_NAME: str = "sentence-transformers/all-MiniLM-L6-v2"
