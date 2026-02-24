@@ -3,8 +3,9 @@ CFC Animal Feed Software Chatbot API
 Main FastAPI application with organized structure
 """
 from fastapi.staticfiles import StaticFiles
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 import logging
 from pathlib import Path
 from dotenv import load_dotenv
@@ -15,7 +16,8 @@ load_dotenv(BASE_DIR / ".env")
 
 # Import the organized modules
 from app.config import settings
-from app.api.endpoints import health, ingest, chat, visibility, videos
+from app.api.endpoints import health, ingest, chat, visibility, videos, auth, sessions, profile
+from app.api.endpoints.admin import router as admin_router
 
 from app.api.endpoints.upload import router as upload_router
 
@@ -46,7 +48,7 @@ app.mount(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=["*"],  # TODO: Restrict to specific origins in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -55,10 +57,17 @@ app.add_middleware(
 # Include routers
 app.include_router(health.router)
 app.include_router(ingest.router)
-app.include_router(chat.router)
+app.include_router(chat.router, prefix="/api/chat")
 app.include_router(visibility.router)
 app.include_router(upload_router, prefix="/files", tags=["Files"])
 app.include_router(videos.router)
+app.include_router(auth.router, prefix="/api/auth")
+app.include_router(sessions.router, prefix="/api/chat")
+app.include_router(admin_router, prefix="/api/admin")
+app.include_router(profile.router, prefix="/api/profile")
+
+
+
 
 
 @app.on_event("startup")
@@ -80,6 +89,20 @@ async def startup_event():
     logger.info("Data directories initialized")
     logger.info(f"API running at http://{settings.API_HOST}:{settings.API_PORT}")
     logger.info(f"API documentation available at http://{settings.API_HOST}:{settings.API_PORT}/docs")
+
+# ---------- SPA catch-all (must be AFTER all API routes) ----------
+# Client-side routes like /chat, /admin, /settings etc. need to serve
+# index.html so the React SPA can boot and handle the route itself.
+_SPA_ROUTES = {"", "chat", "admin", "settings", "history", "docs", "login", "transition", "reset-password"}
+
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    """Serve index.html for client-side routes so page reloads work."""
+    first_segment = full_path.strip("/").split("/")[0]
+    if first_segment in _SPA_ROUTES:
+        return FileResponse(WEB_DIR / "index.html")
+    raise HTTPException(status_code=404, detail="Not Found")
+
 
 @app.on_event("shutdown")
 async def shutdown_event():

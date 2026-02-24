@@ -3,7 +3,7 @@
   const { ThemeProvider } = window.CFC.ThemeContext;
   const { UserProvider } = window.CFC.UserContext;
   const { RouterProvider, useRouter } = window.CFC.RouterContext;
-  const { LoginPage, DocsPage, AdminPage, ChatPage, TransitionPage, HistoryPage, SettingsPage, ResetPasswordPage } = window.CFC.Pages;
+  const { LoginPage, DocsPage, AdminPage, ChatPage, TransitionPage } = window.CFC.Pages;
 
   function App() {
     return (
@@ -24,9 +24,6 @@
     if (route === 'docs') return <DocsPage />;
     if (route === 'admin') return <AdminPage />;
     if (route === 'chat') return <ChatPage />;
-    if (route === 'settings') return <SettingsPage />;
-    if (route === 'history') return <HistoryPage />;
-    if (route === 'reset-password') return <ResetPasswordPage />;
     return <LoginPage />;
   }
 

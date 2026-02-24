@@ -16,7 +16,7 @@ export function initSearch({ searchFormId, searchQueryId, searchResultsId }) {
     searchResults.prepend(item);
 
     try {
-      const res = await fetch('/search', {
+      const res = await fetch('/api/chat/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: searchQuery.value, top_k: 5 }),

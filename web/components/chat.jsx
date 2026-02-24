@@ -1,227 +1,134 @@
-// Chat page and supporting components
+// Chat page – orchestrates sidebar, thread, and composer
 (() => {
   const { Layout } = window.CFC.Layout;
-  const { Card } = window.CFC.Primitives;
+  const { ChatSidebar } = window.CFC.ChatSidebar;
+  const { ChatMessage } = window.CFC.ChatMessage;
+  const { ChatComposer } = window.CFC.ChatComposer;
+  const { useModal, buildVideoSegmentsFromAnswer, buildImageSegmentsFromAnswer } = window.CFC.ChatUtils;
+  const { useUser } = window.CFC.UserContext;
 
-  function formatTimecode(seconds) {
-    if (seconds == null || Number.isNaN(seconds)) return null;
-    const total = Math.max(0, Math.floor(seconds));
-    const hrs = Math.floor(total / 3600);
-    const mins = Math.floor((total % 3600) / 60);
-    const secs = total % 60;
-    const base = [hrs, mins, secs]
-      .filter((v, idx) => v > 0 || idx > 0)
-      .map((v) => String(v).padStart(2, '0'));
-    return base.join(':');
-  }
-
-  function useModal() {
-    const [content, setContent] = React.useState(null);
-    const open = (c) => setContent(c);
-    const close = () => setContent(null);
-
-    const modal = content ? (
-      <div className="modal-backdrop" onClick={close}>
-        <div className="modal-body" onClick={(e) => e.stopPropagation()}>
-          <button className="modal-close" type="button" onClick={close}>
-            ×
-          </button>
-          {content}
-        </div>
-      </div>
-    ) : null;
-
-    return { open, close, modal };
-  }
-
-  function ChatMessage({ message, onImageClick, onVideoClick }) {
-    const isUser = message.role === 'user';
-
-    const escapeHtml = (text) =>
-      text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-
-    const renderMarkdown = React.useCallback((text) => {
-      if (!text) return '';
-      const escaped = escapeHtml(text);
-      const lines = escaped.split(/\r?\n/);
-      const blocks = [];
-      let list = [];
-
-      const flushList = () => {
-        if (list.length) {
-          blocks.push(`<ul>${list.map((item) => `<li>${item}</li>`).join('')}</ul>`);
-          list = [];
-        }
-      };
-
-      const formatInline = (value) =>
-        value
-          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-          .replace(/\*(.+?)\*/g, '<em>$1</em>');
-
-      lines.forEach((raw) => {
-        const line = raw.trim();
-        if (!line) {
-          flushList();
-          return;
-        }
-        const bullet = line.match(/^[-*]\s+(.*)/);
-        if (bullet) {
-          list.push(formatInline(bullet[1]));
-          return;
-        }
-        flushList();
-        blocks.push(`<p>${formatInline(line)}</p>`);
-      });
-      flushList();
-      return blocks.join('\n');
-    }, []);
-
-    const MarkdownText = ({ text }) => {
-      const html = React.useMemo(() => renderMarkdown(text), [text, renderMarkdown]);
-      return <div className="chat-text markdown" dangerouslySetInnerHTML={{ __html: html }} />;
+  // Helper: build auth headers
+  function authHeaders(token) {
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
     };
-
-    if (message.typing) {
-      return (
-        <div className="chat-message bot">
-          <div className="chat-bubble typing-bubble">
-            <div className="typing-dots-container">
-              <span className="typing-dot" />
-              <span className="typing-dot" />
-              <span className="typing-dot" />
-            </div>
-            {message.showThinking && <span className="typing-message">Assistant is thinking</span>}
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className={`chat-message ${isUser ? 'user' : 'bot'}`}>
-        <div className="chat-bubble">
-          {message.segments && message.segments.length ? (
-            message.segments.map((seg, idx) => {
-              if (seg.type === 'text') {
-                return <MarkdownText key={idx} text={seg.text} />;
-              }
-              if (seg.type === 'image') {
-                return (
-                  <img
-                    key={idx}
-                    src={seg.url}
-                    alt={seg.alt || 'Image'}
-                    className="chat-image"
-                    onClick={() => onImageClick && onImageClick(seg.url)}
-                  />
-                );
-              }
-              if (seg.type === 'video') {
-                return <VideoBubble key={idx} segment={seg} onVideoClick={onVideoClick} />;
-              }
-              return null;
-            })
-          ) : (
-            <MarkdownText text={message.text} />
-          )}
-        </div>
-      </div>
-    );
   }
 
-  function VideoBubble({ segment, onVideoClick }) {
-    const videoRef = React.useRef(null);
-
-    const handleSeek = (sec) => {
-      if (videoRef.current) {
-        videoRef.current.currentTime = sec;
-        videoRef.current.play();
-      }
+  // Convert DB message rows into the UI message shape
+  function dbMsgToUI(msg) {
+    return {
+      id: msg.id,
+      role: msg.role,
+      text: msg.content,
+      segments: [{ type: 'text', text: msg.content }],
     };
-
-    const timestamps = segment.timestamps || [];
-
-    return (
-      <div className="video-bubble">
-        <video
-          ref={videoRef}
-          className="chat-video"
-          controls
-          onClick={() => onVideoClick && onVideoClick({ url: segment.url, timestamps })}
-        >
-          <source src={segment.url} type="video/mp4" />
-        </video>
-        {timestamps.length > 0 && (
-          <div className="video-timestamps">
-            {timestamps.map((ts, idx) => (
-              <button
-                key={idx}
-                type="button"
-                className="timestamp-chip"
-                onClick={() => handleSeek(ts.seconds)}
-              >
-                {ts.label}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  function buildVideoSegmentsFromAnswer(data) {
-    const url = data.answer_video_url || (Array.isArray(data.video_context) && data.video_context[0]?.video_url);
-    if (!url) return [];
-
-    const timestamps = [];
-    const start = data.answer_start_seconds ?? data.video_context?.[0]?.start_seconds;
-    const end = data.answer_end_seconds ?? data.video_context?.[0]?.end_seconds;
-
-    if (start != null && end != null && end > start) {
-      const span = end - start;
-      const step = span / 3;
-      const points = [start, start + step, start + 2 * step, end];
-      points.slice(0, 4).forEach((sec) => {
-        const label = formatTimecode(sec);
-        if (label) timestamps.push({ seconds: sec, label });
-      });
-    } else if (Array.isArray(data.video_context)) {
-      data.video_context.slice(0, 4).forEach((clip) => {
-        const sec = clip.start_seconds ?? 0;
-        const label = clip.timestamp || formatTimecode(sec) || 'Clip';
-        timestamps.push({ seconds: sec, label });
-      });
-    }
-
-    return [{ type: 'video', url, timestamps }];
-  }
-
-  function buildImageSegmentsFromAnswer(data) {
-    if (data.relevant_images && Array.isArray(data.relevant_images) && data.relevant_images.length > 0) {
-      return data.relevant_images.map((img) => {
-        const path = img.path || '';
-        const url = path.startsWith('http://') || path.startsWith('https://') ? path : `/content/images/${path}`;
-        return { type: 'image', url, alt: img.alt_text || 'Document image', position: img.position, path };
-      });
-    }
-    return [];
   }
 
   function ChatPage() {
+    const { session } = useUser();
+    const { routeParams } = window.CFC.RouterContext.useRouter();
+    const token = session?.access_token;
+
     const [messages, setMessages] = React.useState([]);
     const [input, setInput] = React.useState('');
     const [sending, setSending] = React.useState(false);
     const [attachedImages, setAttachedImages] = React.useState([]);
+    const [chatHistory, setChatHistory] = React.useState([]);
+    const [activeChatId, setActiveChatId] = React.useState(null);
+    const [loadingSessions, setLoadingSessions] = React.useState(true);
     const chatThreadRef = React.useRef(null);
     const thinkingTimeoutsRef = React.useRef({});
+    const messagesRef = React.useRef(messages);
+    messagesRef.current = messages;
 
     const { open: openModal, modal } = useModal();
 
+    // ---- Random welcome phrase for empty chat ----
+    const welcomePhrases = [
+      'Chat with CFC AI',
+      'What can CFC AI help with today?',
+      'Ready when you are',
+      'Ask anything about CFC software\u2026',
+      'How can I help you today?',
+    ];
+    const welcomePhrase = React.useMemo(
+      () => welcomePhrases[Math.floor(Math.random() * welcomePhrases.length)],
+      [activeChatId],
+    );
+
+    // ---- Load sessions from DB on mount ----
+    React.useEffect(() => {
+      if (!token) return;
+      setLoadingSessions(true);
+      fetch('/api/chat/sessions', { headers: authHeaders(token) })
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data) => {
+          const mapped = data.map((s) => ({
+            id: s.id,
+            title: s.title || 'Untitled Chat',
+            messages: [], // loaded on select
+          }));
+          setChatHistory(mapped);
+
+          // If navigated from history with a specific sessionId, open that one
+          const targetId = routeParams?.sessionId;
+          const targetExists = targetId && mapped.some((s) => s.id === targetId);
+          const selected = targetExists ? targetId : (mapped.length > 0 ? mapped[0].id : null);
+
+          if (selected) {
+            setActiveChatId(selected);
+            loadSessionMessages(selected);
+          }
+        })
+        .catch(() => setChatHistory([]))
+        .finally(() => setLoadingSessions(false));
+    }, [token]);
+
+    // ---- Load messages for a session from DB ----
+    const loadSessionMessages = async (sessionId) => {
+      if (!token) return;
+      try {
+        // Fetch messages and feedback in parallel
+        const [messagesRes, feedbackRes] = await Promise.all([
+          fetch(`/api/chat/sessions/${sessionId}`, {
+            headers: authHeaders(token),
+          }),
+          fetch(`/api/chat/feedback?session_id=${sessionId}`, {
+            headers: authHeaders(token),
+          }),
+        ]);
+
+        if (!messagesRes.ok) return;
+        const data = await messagesRes.json();
+
+        // Parse feedback map: { message_id: score }
+        let feedbackMap = {};
+        if (feedbackRes.ok) {
+          const fbData = await feedbackRes.json();
+          feedbackMap = fbData.feedback || {};
+        }
+
+        // Merge feedback into UI messages
+        const uiMsgs = data.map((msg) => {
+          const ui = dbMsgToUI(msg);
+          const score = feedbackMap[msg.id];
+          if (score === 1) ui.feedback = 'up';
+          else if (score === -1) ui.feedback = 'down';
+          return ui;
+        });
+
+        setMessages(uiMsgs);
+        // Update cached messages in sidebar history
+        setChatHistory((prev) =>
+          prev.map((c) => (c.id === sessionId ? { ...c, messages: uiMsgs } : c)),
+        );
+      } catch {
+        // ignore
+      }
+    };
+
+    // ---- Conversation history for API context ----
     const prepareConversationHistory = (msgs, maxMessages = 8) => {
       const filtered = msgs.filter((m) => m.role === 'user' || m.role === 'assistant');
       if (filtered.length <= maxMessages) return filtered;
@@ -237,12 +144,36 @@
       return combined;
     };
 
+    // ---- Auto-scroll on new messages ----
     React.useEffect(() => {
       if (chatThreadRef.current) {
         chatThreadRef.current.scrollTop = chatThreadRef.current.scrollHeight;
       }
     }, [messages]);
 
+    // ---- Update sidebar title once per session (first user message) ----
+    const patchedSessionsRef = React.useRef(new Set());
+    React.useEffect(() => {
+      if (!activeChatId || patchedSessionsRef.current.has(activeChatId)) return;
+      const firstUserMsg = messages.find((m) => m.role === 'user' && !m.typing);
+      if (!firstUserMsg) return;
+
+      const title = firstUserMsg.text.slice(0, 40);
+      patchedSessionsRef.current.add(activeChatId);
+
+      setChatHistory((prev) =>
+        prev.map((c) => (c.id === activeChatId ? { ...c, title } : c)),
+      );
+      if (token) {
+        fetch(`/api/chat/sessions/${activeChatId}`, {
+          method: 'PATCH',
+          headers: authHeaders(token),
+          body: JSON.stringify({ title }),
+        }).catch(() => {});
+      }
+    }, [messages, activeChatId]);
+
+    // ---- "Thinking" indicator after 7s ----
     React.useEffect(() => {
       messages.forEach((msg) => {
         if (msg.typing && !msg.showThinking) {
@@ -262,28 +193,42 @@
             clearTimeout(thinkingTimeoutsRef.current[msg.id]);
             delete thinkingTimeoutsRef.current[msg.id];
           }
-          if (msg.showThinking) {
-            setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, showThinking: false } : m)));
-          }
         }
       });
-
       return () => {
-        Object.values(thinkingTimeoutsRef.current).forEach((timeout) => { if (timeout) clearTimeout(timeout); });
+        Object.values(thinkingTimeoutsRef.current).forEach((t) => { if (t) clearTimeout(t); });
         thinkingTimeoutsRef.current = {};
       };
     }, [messages]);
 
+    // ---- Helpers ----
+    const appendMessage = (msg) => setMessages((prev) => [...prev, msg]);
+
+    // ---- Sync feedback to messages + sidebar cache ----
+    const handleFeedbackUpdate = (messageId, feedbackValue) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, feedback: feedbackValue } : m)),
+      );
+      setChatHistory((prev) =>
+        prev.map((c) =>
+          c.id === activeChatId
+            ? { ...c, messages: (c.messages || []).map((m) => (m.id === messageId ? { ...m, feedback: feedbackValue } : m)) }
+            : c,
+        ),
+      );
+    };
+
     const handleImageChange = (e) => {
       const files = Array.from(e.target.files || []);
-      const previews = files.map((file) => ({ file, url: URL.createObjectURL(file), id: `${file.name}-${Math.random().toString(36).slice(2)}` }));
+      const previews = files.map((file) => ({
+        file,
+        url: URL.createObjectURL(file),
+        id: `${file.name}-${Math.random().toString(36).slice(2)}`,
+      }));
       setAttachedImages((prev) => [...prev, ...previews]);
     };
 
-    const appendMessage = (msg) => {
-      setMessages((prev) => [...prev, msg]);
-    };
-
+    // ---- Streaming simulation ----
     const simulateStreaming = (fullText, baseMessageId, extraSegments = []) => {
       const chars = Array.from(fullText);
       let idx = 0;
@@ -303,7 +248,6 @@
         const segments = [];
         let textStart = 0;
         const insertedImages = new Set();
-
         for (const img of sortedImages) {
           const imgPos = img.position ?? -1;
           if (imgPos === -1 || imgPos >= textLength) continue;
@@ -315,16 +259,13 @@
           insertedImages.add(img.path || img.url);
           textStart = imgPos;
         }
-
         if (textStart < textLength) {
           const remainingText = fullText.slice(textStart, textLength);
           if (remainingText.trim()) segments.push({ type: 'text', text: remainingText });
         }
-
         for (const img of sortedImages) {
           if (!insertedImages.has(img.path || img.url)) segments.push(img);
         }
-
         segments.push(...otherSegments);
         return segments;
       };
@@ -333,7 +274,6 @@
         idx += 3;
         const currentLength = Math.min(idx, chars.length);
         const segments = buildSegments(currentLength);
-
         setMessages((prev) =>
           prev.map((m) =>
             m.id === baseMessageId
@@ -344,28 +284,39 @@
         if (chatThreadRef.current) {
           chatThreadRef.current.scrollTop = chatThreadRef.current.scrollHeight;
         }
-        if (idx >= chars.length) {
-          clearInterval(interval);
-        }
+        if (idx >= chars.length) clearInterval(interval);
       }, speed);
     };
 
+    // ---- Ensure we have an active DB session, creating one if needed ----
+    const ensureSession = async () => {
+      if (activeChatId) return activeChatId;
+      // Create a new session in DB
+      const res = await fetch('/api/chat/sessions', {
+        method: 'POST',
+        headers: authHeaders(token),
+        body: JSON.stringify({ title: 'New Chat' }),
+      });
+      if (!res.ok) throw new Error('Failed to create chat session');
+      const sess = await res.json();
+      setChatHistory((prev) => [{ id: sess.id, title: sess.title || 'New Chat', messages: [] }, ...prev]);
+      setActiveChatId(sess.id);
+      return sess.id;
+    };
+
+    // ---- Submit question ----
     const handleSubmit = async (e) => {
       e.preventDefault();
       const q = input.trim();
-      if (!q || sending) return;
+      if (!q || sending || !token) return;
 
-      const imageSegments = attachedImages.map((img) => ({ type: 'image', url: img.url, alt: 'Attached image' }));
-
-      const userMessage = {
+      const imageSegs = attachedImages.map((img) => ({ type: 'image', url: img.url, alt: 'Attached image' }));
+      appendMessage({
         id: `u-${Date.now()}`,
         role: 'user',
         text: q,
-        segments: [{ type: 'text', text: q }, ...imageSegments],
-      };
-      appendMessage(userMessage);
-
-      const imagesForBackend = attachedImages.map((img) => img.url);
+        segments: [{ type: 'text', text: q }, ...imageSegs],
+      });
 
       setInput('');
       setAttachedImages([]);
@@ -375,39 +326,37 @@
       appendMessage({ id: botId, role: 'assistant', text: '', segments: [], typing: true });
 
       try {
-        const conversationHistory = prepareConversationHistory(
-          messages.filter((m) => m.role === 'user' || m.role === 'assistant'),
-        ).map((m) => ({ role: m.role, content: m.text }));
+        const sessionId = await ensureSession();
 
-        const res = await fetch('/ask', {
+        const res = await fetch('/api/chat/message', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders(token),
           body: JSON.stringify({
-            question: q + (imagesForBackend.length ? ` (images: ${imagesForBackend.join(', ')})` : ''),
-            top_k: 4,
-            conversation_history: conversationHistory.length > 0 ? conversationHistory : undefined,
+            session_id: sessionId,
+            content: q,
           }),
         });
         const data = await res.json();
-        if (!data.success) {
-          throw new Error(data.detail || 'Error from assistant');
-        }
+        if (!res.ok) throw new Error(data.detail || 'Error from assistant');
 
-        const answer = data.answer || 'No answer available.';
-        const videoSegments = buildVideoSegmentsFromAnswer(data);
-        const answerImages = buildImageSegmentsFromAnswer(data);
-        const allSegments = [...answerImages, ...videoSegments];
-        simulateStreaming(answer, botId, allSegments);
+        const answer = data.content || 'No answer available.';
+        const citations = data.citations || [];
+        const realMsgId = data.id || botId;
+
+        // Replace temp ID with real DB ID so feedback works
+        setMessages((prev) =>
+          prev.map((m) => (m.id === botId ? { ...m, id: realMsgId } : m)),
+        );
+
+        // Build image/video segments from citations metadata if available
+        const videoSegments = buildVideoSegmentsFromAnswer({ context_used: citations });
+        const answerImages = buildImageSegmentsFromAnswer({ relevant_images: citations.flatMap(c => c.image_paths || []).map(p => ({ path: p })) });
+        simulateStreaming(answer, realMsgId, [...answerImages, ...videoSegments]);
       } catch (err) {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === botId
-              ? {
-                  ...m,
-                  typing: false,
-                  text: err.message || String(err),
-                  segments: [{ type: 'text', text: err.message || String(err) }],
-                }
+              ? { ...m, typing: false, text: err.message || String(err), segments: [{ type: 'text', text: err.message || String(err) }] }
               : m,
           ),
         );
@@ -416,6 +365,7 @@
       }
     };
 
+    // ---- Modal openers ----
     const handleImageClick = (url) => {
       openModal(<img src={url} alt="Preview" className="modal-image" />);
     };
@@ -435,77 +385,130 @@
       );
     };
 
-    return (
-      <Layout>
-        <div className="page chat-page">
-          <div className="page-header-row">
-            <div>
-              <h1>Chat with CFC AI</h1>
-              <p>Ask questions about your software and get quick, informed answers.</p>
-            </div>
-          </div>
+    const handleLongConvoInfo = () => {
+      openModal(
+        <div className="conversation-info-modal">
+          <h3>Long Conversation Notice</h3>
+          <p>This conversation is getting long. CFC AI may begin to lose sight of the original goal in very long conversations.</p>
+          <p>For separate questions or new topics, consider refreshing the page to start a new conversation. This ensures the most reliable and focused responses.</p>
+        </div>,
+      );
+    };
 
-          <Card className="chat-card">
+    // ---- Sidebar handlers ----
+    const handleNewChat = async () => {
+      if (!token) return;
+      try {
+        const res = await fetch('/api/chat/sessions', {
+          method: 'POST',
+          headers: authHeaders(token),
+          body: JSON.stringify({ title: 'New Chat' }),
+        });
+        if (!res.ok) return;
+        const sess = await res.json();
+        const newEntry = { id: sess.id, title: sess.title || 'New Chat', messages: [] };
+        setChatHistory((prev) => [newEntry, ...prev]);
+        setActiveChatId(sess.id);
+        setMessages([]);
+        setInput('');
+        setAttachedImages([]);
+      } catch {
+        // ignore
+      }
+    };
+
+    const handleSelectChat = async (chatId) => {
+      if (chatId === activeChatId) return;
+
+      // Save current messages to cache before switching away
+      if (activeChatId) {
+        const currentMessages = messagesRef.current;
+        const currentChatId = activeChatId;
+        setChatHistory((prev) =>
+          prev.map((c) => (c.id === currentChatId ? { ...c, messages: currentMessages } : c)),
+        );
+      }
+
+      setActiveChatId(chatId);
+      setInput('');
+      setAttachedImages([]);
+      // Always load fresh from DB to ensure we have full history
+      setMessages([]);
+      await loadSessionMessages(chatId);
+    };
+
+    const handleDeleteChat = async (chatId) => {
+      if (!token) return;
+      // Delete from DB
+      try {
+        await fetch(`/api/chat/sessions/${chatId}`, {
+          method: 'DELETE',
+          headers: authHeaders(token),
+        });
+      } catch {
+        // continue with local removal even if API fails
+      }
+
+      const remaining = chatHistory.filter((c) => c.id !== chatId);
+      if (remaining.length === 0) {
+        setChatHistory([]);
+        setActiveChatId(null);
+        setMessages([]);
+      } else if (chatId === activeChatId) {
+        setChatHistory(remaining);
+        setActiveChatId(remaining[0].id);
+        // Load messages for the new active chat
+        const cached = remaining[0];
+        if (cached.messages && cached.messages.length > 0) {
+          setMessages(cached.messages);
+        } else {
+          setMessages([]);
+          loadSessionMessages(remaining[0].id);
+        }
+      } else {
+        setChatHistory(remaining);
+      }
+      setInput('');
+      setAttachedImages([]);
+    };
+
+    // ---- Render ----
+    return (
+      <Layout fullWidth>
+        <div className="chat-layout">
+          <ChatSidebar
+            chatHistory={chatHistory}
+            activeChatId={activeChatId}
+            onNewChat={handleNewChat}
+            onSelectChat={handleSelectChat}
+            onDeleteChat={handleDeleteChat}
+          />
+
+          <section className="chat-main">
             <div className="chat-thread" id="chatThread" ref={chatThreadRef}>
-              {messages.map((m) => (
-                <ChatMessage key={m.id} message={m} onImageClick={handleImageClick} onVideoClick={handleVideoClick} />
-              ))}
-            </div>
-            <form className="chat-composer" onSubmit={handleSubmit}>
-              <div className="composer-row">
-                <button
-                  type="button"
-                  className={`composer-info-icon ${messages.length > 12 ? 'visible' : ''}`}
-                  onClick={() => openModal(
-                    <div className="conversation-info-modal">
-                      <h3>Long Conversation Notice</h3>
-                      <p>
-                        This conversation is getting long. CFC AI may begin to lose sight of the original goal in very long conversations.
-                      </p>
-                      <p>
-                        For separate questions or new topics, consider refreshing the page to start a new conversation. This ensures the most reliable and focused responses.
-                      </p>
-                    </div>,
-                  )}
-                  title="Conversation length info"
-                  aria-label="Conversation length information"
-                >
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="10" cy="10" r="9" stroke="currentColor" strokeWidth="1.5" fill="none" />
-                    <path d="M10 7V10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                    <circle cx="10" cy="13" r="1" fill="currentColor" />
-                  </svg>
-                </button>
-                <input
-                  type="text"
-                  className="composer-input"
-                  placeholder="Ask anything about CFC software…"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                />
-                <label className="btn-primary composer-button" title="Attach images">
-                  <span>Attach</span>
-                  <input type="file" accept="image/*" multiple onChange={handleImageChange} />
-                </label>
-                <button type="submit" className="btn-primary composer-button" disabled={sending}>
-                  {sending ? 'Sending…' : 'Send'}
-                </button>
-              </div>
-              {attachedImages.length > 0 && (
-                <div className="attached-images">
-                  {attachedImages.map((img) => (
-                    <img
-                      key={img.id}
-                      src={img.url}
-                      alt="Attachment"
-                      className="attached-thumb"
-                      onClick={() => handleImageClick(img.url)}
-                    />
-                  ))}
+              {messages.length === 0 && (
+                <div className="chat-empty-state">
+                  <h1>{welcomePhrase}</h1>
+                  <p>Ask questions about your software and get quick, informed answers.</p>
                 </div>
               )}
-            </form>
-          </Card>
+              {messages.map((m) => (
+                <ChatMessage key={m.id} message={m} onImageClick={handleImageClick} onVideoClick={handleVideoClick} token={token} sessionId={activeChatId} onFeedback={handleFeedbackUpdate} />
+              ))}
+            </div>
+
+            <ChatComposer
+              input={input}
+              onInputChange={setInput}
+              onSubmit={handleSubmit}
+              sending={sending}
+              attachedImages={attachedImages}
+              onImageChange={handleImageChange}
+              onImageClick={handleImageClick}
+              onLongConvoInfo={handleLongConvoInfo}
+              showLongConvoWarning={messages.length > 12}
+            />
+          </section>
         </div>
         {modal}
       </Layout>
