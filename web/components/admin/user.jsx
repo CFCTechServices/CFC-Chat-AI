@@ -289,11 +289,13 @@
                   </div>
                 </div>
                 <div className="user-actions">
-                  <Toggle
-                    checked={u.status === 'inactive'}
-                    onChange={() => handleToggleSuspend(u)}
-                  />
-                  <button className="btn-delete" onClick={() => setDeleteTarget(u)} aria-label={`Delete ${u.email}`}>
+                  <span title={u.status === 'active' ? 'Deactivate user' : 'Activate user'}>
+                    <Toggle
+                      checked={u.status === 'active'}
+                      onChange={() => handleToggleSuspend(u)}
+                    />
+                  </span>
+                  <button className="btn-delete" title="Delete user" onClick={() => setDeleteTarget(u)} aria-label={`Delete ${u.email}`}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>

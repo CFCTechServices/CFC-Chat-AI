@@ -93,3 +93,21 @@ class SupabaseContentRepository:
 
     def store_images(self, doc_id: str, images: List[Dict]) -> Dict[str, StoredImage]:
         return {img["image_id"]: self.store_image(doc_id, img) for img in images}
+
+    def delete_document_content(self, doc_id: str) -> None:
+        """Delete all storage files and DB rows associated with a doc_id."""
+        for subfolder in ["sections", "images"]:
+            try:
+                prefix = f"docs/{doc_id}/{subfolder}"
+                items = self.client.storage.from_(self.bucket).list(prefix)
+                if items:
+                    paths = [f"{prefix}/{item['name']}" for item in items if item.get("name")]
+                    if paths:
+                        self.client.storage.from_(self.bucket).remove(paths)
+            except Exception:
+                pass
+
+        try:
+            self.client.table("document_chunks").delete().eq("doc_id", doc_id).execute()
+        except Exception:
+            pass

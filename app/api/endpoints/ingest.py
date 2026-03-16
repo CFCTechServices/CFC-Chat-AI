@@ -206,7 +206,7 @@ def _prepare_vectors(processed: Dict[str, Any]) -> Tuple[List[Tuple[str, List[fl
         return [], 0
 
     doc_id = processed.get("doc_id")
-    source = processed.get("source")
+    source = Path(processed.get("source", "")).name if processed.get("source") else processed.get("source")
 
     # 1) Encode embeddings
     texts = [chunk.get("text", "") for chunk in chunks]
