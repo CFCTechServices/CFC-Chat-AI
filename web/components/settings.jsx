@@ -5,7 +5,7 @@
   const { useUser } = window.CFC.UserContext;
 
   function SettingsPage() {
-    const { user, session, profile, setProfile, supabase } = useUser();
+    const { user, session, profile, setProfile, setUser, supabase } = useUser();
 
     const [activeTab, setActiveTab] = React.useState('profile'); // 'profile' | 'preferences'
     const [saving, setSaving] = React.useState(false);
@@ -61,6 +61,9 @@
         }
         const updated = await res.json();
         setProfile(updated);
+        if (updated.full_name) {
+          setUser(prev => ({ ...prev, name: updated.full_name }));
+        }
         setSaveMsg('Profile saved successfully.');
       } catch (err) {
         setSaveMsg(err.message || 'Failed to save profile.');

@@ -4,6 +4,7 @@ import logging
 from app.config import settings
 from app.core.embeddings import EmbeddingModel
 from app.core.vector_store import VectorStore
+from app.core.supabase_service import supabase
 
 logger = logging.getLogger(__name__)
 
@@ -48,28 +49,47 @@ class RAGPipeline:
                 metadata_filter=metadata_filter,
             )
 
+            matches = results.get("matches", [])
+
+            # Collect chunk IDs from Pinecone results and fetch the actual text rows from Supabase
+            chunk_ids = [m.get("id") for m in matches if m.get("id")]
+            db_rows = {}
+            try:
+                if chunk_ids:
+                    resp = supabase.table("document_chunks").select("*").in_("chunk_id", chunk_ids).execute()
+                    rows = getattr(resp, "data", []) or []
+                    db_rows = {r.get("chunk_id"): r for r in rows}
+            except Exception:
+                db_rows = {}
+
             context_chunks: List[Dict[str, Any]] = []
-            for index, match in enumerate(results.get("matches", []), start=1):
-                metadata = match.get("metadata", {})
+            for index, match in enumerate(matches, start=1):
+                metadata = match.get("metadata", {}) or {}
+                cid = match.get("id")
+                db_row = db_rows.get(cid, {}) if cid else {}
+
+                # Prefer text from Supabase row; fall back to Pinecone metadata if missing
+                text = db_row.get("content") or metadata.get("content") or metadata.get("text", "")
+
                 context_chunks.append({
                     "rank": index,
                     "score": match.get("score"),
-                    "text": metadata.get("content") or metadata.get("text", ""),
-                    "source": metadata.get("source", ""),
-                    "source_type": metadata.get("source_type", "document"),
-                    "chunk_id": match.get("id"),
-                    "doc_id": metadata.get("doc_id"),
-                    "section_id": metadata.get("section_id"),
-                    "section_title": metadata.get("section_title"),
-                    "section_path": metadata.get("section_path"),
-                    "image_paths": metadata.get("image_paths", []),
+                    "text": text,
+                    "source": db_row.get("source") or metadata.get("source", ""),
+                    "source_type": db_row.get("source_type") or metadata.get("source_type", "document"),
+                    "chunk_id": cid,
+                    "doc_id": db_row.get("doc_id") or metadata.get("doc_id"),
+                    "section_id": db_row.get("section_id") or metadata.get("section_id"),
+                    "section_title": db_row.get("section_title") or metadata.get("section_title"),
+                    "section_path": db_row.get("section_path") or metadata.get("section_path"),
+                    "image_paths": db_row.get("image_paths") or metadata.get("image_paths", []),
                     "block_ids": metadata.get("block_ids", []),
-                    "start_seconds": _to_float(metadata.get("start_seconds")),
-                    "end_seconds": _to_float(metadata.get("end_seconds")),
-                    "video_url": metadata.get("video_url"),
-                    "txt_url": metadata.get("txt_url"),
-                    "srt_url": metadata.get("srt_url"),
-                    "vtt_url": metadata.get("vtt_url"),
+                    "start_seconds": _to_float(db_row.get("start_seconds") or metadata.get("start_seconds")),
+                    "end_seconds": _to_float(db_row.get("end_seconds") or metadata.get("end_seconds")),
+                    "video_url": db_row.get("video_url") or metadata.get("video_url"),
+                    "txt_url": db_row.get("txt_url") or metadata.get("txt_url"),
+                    "srt_url": db_row.get("srt_url") or metadata.get("srt_url"),
+                    "vtt_url": db_row.get("vtt_url") or metadata.get("vtt_url"),
                 })
 
             return context_chunks

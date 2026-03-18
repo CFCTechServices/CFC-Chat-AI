@@ -2,10 +2,15 @@ import os
 from pathlib import Path
 from supabase import create_client
 from dotenv import load_dotenv
+import certifi
 
 # Load environment variables
 BASE_DIR = Path(__file__).resolve().parents[2]
 load_dotenv(BASE_DIR / ".env")
+
+# Ensure SSL_CERT_FILE is set to a valid CA bundle (required for HTTPS on macOS with Python 3.14)
+if "SSL_CERT_FILE" not in os.environ or not os.path.exists(os.environ.get("SSL_CERT_FILE", "")):
+    os.environ["SSL_CERT_FILE"] = certifi.where()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 
