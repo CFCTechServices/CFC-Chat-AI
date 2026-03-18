@@ -29,6 +29,7 @@ class RAGPipeline:
     ) -> None:
         self.vector_store = vector_store or VectorStore()
         self.embedding_model = embedding_model or EmbeddingModel()
+        self.feedback_service = FeedbackService()
 
     def retrieve_context(
         self,
@@ -91,6 +92,16 @@ class RAGPipeline:
                     "srt_url": db_row.get("srt_url") or metadata.get("srt_url"),
                     "vtt_url": db_row.get("vtt_url") or metadata.get("vtt_url"),
                 })
+
+            # ── Feedback-driven re-ranking (Phase 1) ──
+            if settings.FEEDBACK_ENABLED:
+                ranked_chunk_ids = [c["chunk_id"] for c in context_chunks if c.get("chunk_id")]
+                if ranked_chunk_ids:
+                    feedback_scores = self.feedback_service.get_chunk_scores(ranked_chunk_ids)
+                    if feedback_scores:
+                        context_chunks = self.feedback_service.rerank(
+                            context_chunks, feedback_scores,
+                        )
 
             return context_chunks
 

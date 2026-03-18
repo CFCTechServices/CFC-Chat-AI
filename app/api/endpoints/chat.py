@@ -11,8 +11,10 @@ from app.config import settings
 from app.services.content_repository import ContentRepository
 from app.services.supabase_content_repository import SupabaseContentRepository
 from app.core.auth import get_current_user, supabase
+from app.core.feedback_service import FeedbackService
 
 logger = logging.getLogger(__name__)
+_feedback_service = FeedbackService()
 router = APIRouter(tags=["chat"])
 
 # Initialize chat service
@@ -152,17 +154,49 @@ async def submit_feedback(request: FeedbackRequest, user: Any = Depends(get_curr
         if request.rating is not None and request.rating not in (-1, 1):
             raise HTTPException(status_code=400, detail="Rating must be -1, 1, or null")
 
+        # ── Fetch old rating so we can compute the delta ──
+        old_rating = None
+        try:
+            old_fb = supabase.table("feedback")\
+                .select("score")\
+                .eq("message_id", request.message_id)\
+                .eq("user_id", user.id)\
+                .execute()
+            if old_fb.data:
+                old_rating = old_fb.data[0].get("score")
+        except Exception:
+            pass  # If we can't read the old rating, treat as None (first vote)
+
         data = {
             "message_id": request.message_id,
             "user_id": user.id,
             "score": request.rating,  # -1, 1, or None (cleared)
         }
-        
+
         # UPSERT keyed on (message_id, user_id) unique constraint
         supabase.table("feedback")\
             .upsert(data, on_conflict="message_id,user_id")\
             .execute()
-        
+
+        # ── Update chunk feedback scores (Phase 1) ──
+        if old_rating != request.rating:
+            try:
+                msg_res = supabase.table("chat_messages")\
+                    .select("metadata")\
+                    .eq("id", request.message_id)\
+                    .execute()
+
+                if msg_res.data:
+                    citations = (msg_res.data[0].get("metadata") or {}).get("citations", [])
+                    chunk_ids = [c["chunk_id"] for c in citations if c.get("chunk_id")]
+                    if chunk_ids:
+                        _feedback_service.update_chunk_scores(
+                            chunk_ids, old_rating, request.rating,
+                        )
+            except Exception as exc:
+                logger.warning("Failed to update chunk feedback scores: %s", exc)
+                # Non-critical: feedback was saved, chunk scores will catch up
+
         return {"success": True, "score": request.rating}
     except HTTPException:
         raise
