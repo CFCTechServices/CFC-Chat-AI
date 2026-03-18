@@ -5,7 +5,6 @@ from app.config import settings
 from app.core.embeddings import EmbeddingModel
 from app.core.vector_store import VectorStore
 from app.core.supabase_service import supabase
-from app.core.feedback_service import FeedbackService
 
 logger = logging.getLogger(__name__)
 

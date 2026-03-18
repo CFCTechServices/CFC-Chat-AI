@@ -66,6 +66,56 @@ async def list_documents(admin: dict = Depends(get_current_admin)):
 
 
 # ---------------------------------------------------------------------------
+# GET /api/admin/documents/{doc_id}/download  — signed URL for original file
+# ---------------------------------------------------------------------------
+
+@router.get("/documents/{doc_id}/download")
+async def download_document(doc_id: str, admin: dict = Depends(get_current_admin)):
+    # Look up source and source_type from Supabase
+    try:
+        resp = (
+            supabase.table("document_chunks")
+            .select("source, source_type")
+            .eq("doc_id", doc_id)
+            .limit(1)
+            .execute()
+        )
+        rows = getattr(resp, "data", []) or []
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to look up document: {exc}")
+
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"Document '{doc_id}' not found.")
+
+    source_type = rows[0].get("source_type", "document")
+    raw_source = rows[0].get("source", "")
+
+    if source_type == "video":
+        # List files in videos/{slug}/original/ to find the actual filename+ext
+        prefix = f"videos/{doc_id}/original"
+        try:
+            items = _content_repository.list_storage(prefix, source_type="video")
+            if not items:
+                raise ValueError("No original video found")
+            filename = items[0]["name"]
+            storage_path = f"{prefix}/{filename}"
+        except Exception:
+            raise HTTPException(status_code=404, detail="Original video not found in storage. Re-upload to enable downloads.")
+    else:
+        filename = Path(raw_source).name if raw_source else ""
+        if not filename:
+            raise HTTPException(status_code=404, detail="Could not determine filename for this document.")
+        storage_path = f"docs/{doc_id}/original/{filename}"
+
+    try:
+        signed_url = _content_repository.create_signed_url(storage_path, source_type=source_type, expires_in=300)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Original file not found in storage. Re-upload to enable downloads.")
+
+    return {"url": signed_url, "filename": filename}
+
+
+# ---------------------------------------------------------------------------
 # DELETE /api/admin/documents/{doc_id}  — remove from all stores
 # ---------------------------------------------------------------------------
 
@@ -145,17 +195,20 @@ async def replace_document(
 
 async def _purge_document(doc_id: str) -> None:
     """Remove a document from Pinecone, Supabase DB, and Supabase Storage."""
-    # 1) Fetch chunk IDs before deleting from DB
+    # 1) Fetch chunk IDs and source_type before deleting from DB
     chunk_ids: List[str] = []
+    source_type = "document"
     try:
         resp = (
             supabase.table("document_chunks")
-            .select("chunk_id")
+            .select("chunk_id, source_type")
             .eq("doc_id", doc_id)
             .execute()
         )
         rows = getattr(resp, "data", []) or []
         chunk_ids = [r["chunk_id"] for r in rows if r.get("chunk_id")]
+        if rows:
+            source_type = rows[0].get("source_type") or "document"
     except Exception as exc:
         logger.warning("Could not fetch chunk IDs for %s: %s", doc_id, exc)
 
@@ -168,6 +221,9 @@ async def _purge_document(doc_id: str) -> None:
 
     # 3) Delete from Supabase Storage + DB
     try:
-        _content_repository.delete_document_content(doc_id)
+        if source_type == "video":
+            _content_repository.delete_video_content(doc_id)
+        else:
+            _content_repository.delete_document_content(doc_id)
     except Exception as exc:
         logger.warning("Supabase content delete failed for %s: %s", doc_id, exc)

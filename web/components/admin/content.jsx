@@ -60,6 +60,24 @@
       }
     };
 
+    // --- Download ---
+    const handleDownload = async (docId) => {
+      try {
+        const res = await fetch(`/api/admin/documents/${encodeURIComponent(docId)}/download`, {
+          headers: authHeaders(),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || `Download failed (${res.status})`);
+        const a = document.createElement('a');
+        a.href = data.url;
+        a.download = data.filename || docId;
+        a.target = '_blank';
+        a.click();
+      } catch (err) {
+        setDocAction(docId, { error: err.message });
+      }
+    };
+
     // --- Replace ---
     const triggerReplace = (docId) => {
       replaceTargetRef.current = docId;
@@ -218,6 +236,19 @@
                       <span style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)' }}>Working…</span>
                     ) : (
                       <>
+                        {/* Download button */}
+                        <button
+                          className="btn-delete"
+                          title="Download original file"
+                          onClick={() => handleDownload(doc.doc_id)}
+                          aria-label={`Download ${basename(doc.source)}`}
+                        >
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                          </svg>
+                        </button>
                         {/* Replace button — pencil icon, same style as btn-delete */}
                         <button
                           className="btn-delete"
