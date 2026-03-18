@@ -26,7 +26,7 @@ class Settings:
     
     # Pinecone Settings
     PINECONE_API_KEY: Optional[str] = os.getenv("PINECONE_API_KEY")
-    PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "cfc-animal-feed-chatbot")
+    PINECONE_INDEX_NAME = os.getenv("PINECONE_INDEX_NAME", "cfc-rag-chatbot")
     PINECONE_CLOUD = os.getenv("PINECONE_CLOUD", "aws")
     PINECONE_REGION = os.getenv("PINECONE_REGION", "us-east-1")
     USE_PINECONE = bool(PINECONE_API_KEY)  # Fallback flag to disable Pinecone if no API key
@@ -76,6 +76,16 @@ class Settings:
     # Search Settings
     DEFAULT_TOP_K = 5
     MAX_CONTEXT_LENGTH = 4000
+
+    # Feedback Re-Ranking Settings
+    # FEEDBACK_ENABLED: set to "false" to disable re-ranking entirely.
+    FEEDBACK_ENABLED: bool = os.getenv("FEEDBACK_ENABLED", "true").lower() in ("true", "1", "yes")
+    # FEEDBACK_ALPHA: max boost/penalty fraction. With tanh, the multiplier
+    #   is bounded to (1 - alpha, 1 + alpha). Default 0.3 → ±30% max.
+    FEEDBACK_ALPHA: float = float(os.getenv("FEEDBACK_ALPHA", "0.3"))
+    # FEEDBACK_SCALE: controls how quickly tanh saturates.
+    #   Lower = saturates faster (fewer votes needed to hit the ceiling).
+    FEEDBACK_SCALE: float = float(os.getenv("FEEDBACK_SCALE", "5.0"))
 
 settings = Settings()
 
