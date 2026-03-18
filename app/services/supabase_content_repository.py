@@ -28,14 +28,17 @@ class SupabaseContentRepository:
         self.url = os.getenv("SUPABASE_URL")
         # Backend content repository uses SERVICE_ROLE_KEY for storage operations
         self.key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-        self.bucket = os.getenv("SUPABASE_BUCKET", "cfc-videos")
-        
+        # Separate buckets for documents and videos
+        self.doc_bucket = os.getenv("SUPABASE_BUCKET_DOCS") or os.getenv("SUPABASE_BUCKET", "cfc-docs")
+        self.video_bucket = os.getenv("SUPABASE_BUCKET_VIDEOS") or os.getenv("SUPABASE_BUCKET", "cfc-videos")
+        self.bucket = self.doc_bucket  # backward-compat alias
+
         if not self.url or not self.key:
             raise RuntimeError(
                 "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY. "
                 "SERVICE_ROLE_KEY is required for backend storage operations."
             )
-        
+
         self.client = create_client(self.url, self.key)
 
     # ----- generic helpers -----
@@ -94,20 +97,52 @@ class SupabaseContentRepository:
     def store_images(self, doc_id: str, images: List[Dict]) -> Dict[str, StoredImage]:
         return {img["image_id"]: self.store_image(doc_id, img) for img in images}
 
+    def create_signed_url(self, storage_path: str, source_type: str = "document", expires_in: int = 300) -> str:
+        """Return a signed URL for a file; picks the correct bucket by source_type."""
+        bucket = self.video_bucket if source_type == "video" else self.doc_bucket
+        result = self.client.storage.from_(bucket).create_signed_url(storage_path, expires_in)
+        url = result.get("signedURL") or result.get("signedUrl") or result.get("signed_url") or ""
+        if not url:
+            raise ValueError("No signed URL returned")
+        return url
+
+    def list_storage(self, prefix: str, source_type: str = "document") -> list:
+        """List files at a storage prefix; picks the correct bucket by source_type."""
+        bucket = self.video_bucket if source_type == "video" else self.doc_bucket
+        return self.client.storage.from_(bucket).list(prefix) or []
+
     def delete_document_content(self, doc_id: str) -> None:
         """Delete all storage files and DB rows associated with a doc_id."""
-        for subfolder in ["sections", "images"]:
+        for subfolder in ["sections", "images", "original"]:
             try:
                 prefix = f"docs/{doc_id}/{subfolder}"
-                items = self.client.storage.from_(self.bucket).list(prefix)
+                items = self.client.storage.from_(self.doc_bucket).list(prefix)
                 if items:
                     paths = [f"{prefix}/{item['name']}" for item in items if item.get("name")]
                     if paths:
-                        self.client.storage.from_(self.bucket).remove(paths)
+                        self.client.storage.from_(self.doc_bucket).remove(paths)
             except Exception:
                 pass
 
         try:
             self.client.table("document_chunks").delete().eq("doc_id", doc_id).execute()
+        except Exception:
+            pass
+
+    def delete_video_content(self, slug: str) -> None:
+        """Delete all storage files and DB rows associated with a video slug."""
+        for subfolder in ["original", "transcripts", "summary"]:
+            try:
+                prefix = f"videos/{slug}/{subfolder}"
+                items = self.client.storage.from_(self.video_bucket).list(prefix)
+                if items:
+                    paths = [f"{prefix}/{item['name']}" for item in items if item.get("name")]
+                    if paths:
+                        self.client.storage.from_(self.video_bucket).remove(paths)
+            except Exception:
+                pass
+
+        try:
+            self.client.table("document_chunks").delete().eq("doc_id", slug).execute()
         except Exception:
             pass

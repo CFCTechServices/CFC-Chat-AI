@@ -169,10 +169,10 @@ async def upload_and_transcribe(
             tmp.write(raw)
             tmp_path = tmp.name
 
-        # 1) upload original (single-level path)
+        # 1) upload original under videos/{slug}/original/
         # Run sync Supabase/httpx calls in a thread to avoid "client closed" errors
         # that occur when sync httpx clients are used directly on the asyncio event loop.
-        video_path = f"videos/original/{slug}{ext}"
+        video_path = f"videos/{slug}/original/{slug}{ext}"
         video_url = await asyncio.to_thread(_upload_bytes, bucket, video_path, raw, "video/mp4")
 
         # 2) whisper (CPU-bound — also runs in thread so it doesn't block the loop)
@@ -184,11 +184,11 @@ async def upload_and_transcribe(
         vtt_string = _render_vtt(segments)
         summary_md = _simple_summary(segments)
 
-        # 4) upload outputs (with content types)
-        txt_url = await asyncio.to_thread(_upload_bytes, bucket, f"videos/transcript/{slug}.txt", txt_string.encode("utf-8"), "text/plain")
-        srt_url = await asyncio.to_thread(_upload_bytes, bucket, f"videos/transcript/{slug}.srt", srt_string.encode("utf-8"), "application/x-subrip")
-        vtt_url = await asyncio.to_thread(_upload_bytes, bucket, f"videos/transcript/{slug}.vtt", vtt_string.encode("utf-8"), "text/vtt")
-        sum_url = await asyncio.to_thread(_upload_bytes, bucket, f"videos/summaries/{slug}.md", summary_md.encode("utf-8"), "text/markdown")
+        # 4) upload outputs under videos/{slug}/transcripts/ and videos/{slug}/summary/
+        txt_url = await asyncio.to_thread(_upload_bytes, bucket, f"videos/{slug}/transcripts/{slug}.txt", txt_string.encode("utf-8"), "text/plain")
+        srt_url = await asyncio.to_thread(_upload_bytes, bucket, f"videos/{slug}/transcripts/{slug}.srt", srt_string.encode("utf-8"), "application/x-subrip")
+        vtt_url = await asyncio.to_thread(_upload_bytes, bucket, f"videos/{slug}/transcripts/{slug}.vtt", vtt_string.encode("utf-8"), "text/vtt")
+        sum_url = await asyncio.to_thread(_upload_bytes, bucket, f"videos/{slug}/summary/{slug}.md", summary_md.encode("utf-8"), "text/markdown")
 
         chunk_count = await asyncio.to_thread(
             _index_transcript_chunks,
