@@ -41,7 +41,7 @@ ADMIN_PASSWORD: Optional[str] = os.getenv("TEST_ADMIN_PASSWORD")
 # Use a unique test email so we don't collide with real invitations
 TARGET_EMAIL = os.getenv("TEST_INVITE_TARGET_EMAIL", "test-invite-flow@example.com")
 
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")

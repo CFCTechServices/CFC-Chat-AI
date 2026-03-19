@@ -26,7 +26,7 @@ TARGET_USER_ID: str = os.getenv("TEST_TARGET_USER_ID")
 DEACTIVATE_REASON: str = "Account suspended"  # Optional reason
 
 # API base URL
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 # Supabase credentials (loaded from .env)
 SUPABASE_URL = os.getenv("SUPABASE_URL")
