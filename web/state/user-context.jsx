@@ -41,6 +41,16 @@
           if (data) {
             if (data.role) setRole(data.role);
             setProfile(data);
+            // If we fetched a full_name for the profile, prefer it for the
+            // user display name so header greetings show a real name
+            // instead of the email address.
+            if (data.full_name) {
+              // Merge the profile full_name into the user state. Use a
+              // fallback empty object so this works even if the initial
+              // session-driven setUser hasn't flushed yet (avoids a race
+              // where `prev` is null and the name would not be applied).
+              setUser(prev => ({ ...(prev || {}), name: data.full_name }));
+            }
           }
         } catch (e) {
           console.error('Error fetching role:', e);

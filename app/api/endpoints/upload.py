@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from typing import List, Dict, Any
 from supabase import create_client
 import os
+import re
 import uuid
 import logging
 from pathlib import Path
@@ -25,6 +26,14 @@ SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET", "cfc-docs")
 # Local storage fallback
 UPLOAD_DIR = Path(__file__).parent.parent.parent / "data" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _doc_id_from_filename(filename: str) -> str:
+    """Derive the same doc_id that DocumentProcessor assigns from a filename."""
+    name = Path(filename).stem.strip().lower()
+    name = re.sub(r"[^\w\-]+", "-", name)
+    name = re.sub(r"-{2,}", "-", name).strip("-")
+    return name or "document"
 
 
 @router.post("/upload")
@@ -57,8 +66,10 @@ async def upload_file(file: UploadFile = File(...)):
     supabase_info = None
     if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY and SUPABASE_BUCKET:
         try:
+            doc_id = _doc_id_from_filename(file.filename)
+            storage_path = f"docs/{doc_id}/original/{file.filename}"
             sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-            res = sb.storage.from_(SUPABASE_BUCKET).upload(file.filename, contents)
+            res = sb.storage.from_(SUPABASE_BUCKET).upload(storage_path, contents, {"upsert": "true"})
             sup_path = getattr(res, "path", None) if res is not None else None
             supabase_info = {"path": sup_path}
         except Exception as sb_exc:
@@ -130,7 +141,9 @@ async def bulk_upload(files: List[UploadFile] = File(...)) -> Dict[str, Any]:
             # Optional Supabase mirror
             if sb is not None:
                 try:
-                    res = sb.storage.from_(SUPABASE_BUCKET).upload(file.filename, contents)
+                    doc_id = _doc_id_from_filename(original_filename)
+                    storage_path = f"docs/{doc_id}/original/{original_filename}"
+                    res = sb.storage.from_(SUPABASE_BUCKET).upload(storage_path, contents, {"upsert": "true"})
                     item["supabase"] = {"path": getattr(res, "path", None) if res is not None else None}
                 except Exception as sb_exc:
                     item["supabase"] = {"error": str(sb_exc)}

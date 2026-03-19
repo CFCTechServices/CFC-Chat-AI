@@ -44,18 +44,7 @@
     );
   };
 
-  const IngestionTab = AdminNS.IngestionTab || function IngestionFallback() {
-    return (
-      <div className="tab-content">
-        <Card className="admin-card">
-          <h2>Ingestion</h2>
-          <p className="muted">Ingestion tab component not found. Ensure /ui/components/admin/ingestion.jsx is loaded.</p>
-        </Card>
-      </div>
-    );
-  };
-
-  const SettingsTab = AdminNS.SettingsTab || function SettingsFallback() {
+const SettingsTab = AdminNS.SettingsTab || function SettingsFallback() {
     return (
       <div className="tab-content">
         <Card className="admin-card">
@@ -83,14 +72,12 @@
             <TabButton active={activeTab === 'users'} onClick={() => setActiveTab('users')} icon="👥" label="Users" />
             <TabButton active={activeTab === 'upload'} onClick={() => setActiveTab('upload')} icon="📤" label="Upload" />
             <TabButton active={activeTab === 'content'} onClick={() => setActiveTab('content')} icon="📄" label="Content" />
-            <TabButton active={activeTab === 'ingestion'} onClick={() => setActiveTab('ingestion')} icon="🗄️" label="Ingestion" />
             <TabButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon="⚙️" label="Settings" />
           </div>
 
           {activeTab === 'upload' && <UploadTab />}
           {activeTab === 'users' && <UsersTab />}
           {activeTab === 'content' && <ContentTab />}
-          {activeTab === 'ingestion' && <IngestionTab />}
           {activeTab === 'settings' && <SettingsTab />}
         </div>
       </Layout>
