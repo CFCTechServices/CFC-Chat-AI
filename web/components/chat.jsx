@@ -39,6 +39,8 @@
     const [loadingSessions, setLoadingSessions] = React.useState(true);
     const chatThreadRef = React.useRef(null);
     const thinkingTimeoutsRef = React.useRef({});
+    const messagesRef = React.useRef(messages);
+    messagesRef.current = messages;
 
     const { open: openModal, modal } = useModal();
 
@@ -87,12 +89,35 @@
     const loadSessionMessages = async (sessionId) => {
       if (!token) return;
       try {
-        const res = await fetch(`/api/chat/sessions/${sessionId}`, {
-          headers: authHeaders(token),
+        // Fetch messages and feedback in parallel
+        const [messagesRes, feedbackRes] = await Promise.all([
+          fetch(`/api/chat/sessions/${sessionId}`, {
+            headers: authHeaders(token),
+          }),
+          fetch(`/api/chat/feedback?session_id=${sessionId}`, {
+            headers: authHeaders(token),
+          }),
+        ]);
+
+        if (!messagesRes.ok) return;
+        const data = await messagesRes.json();
+
+        // Parse feedback map: { message_id: score }
+        let feedbackMap = {};
+        if (feedbackRes.ok) {
+          const fbData = await feedbackRes.json();
+          feedbackMap = fbData.feedback || {};
+        }
+
+        // Merge feedback into UI messages
+        const uiMsgs = data.map((msg) => {
+          const ui = dbMsgToUI(msg);
+          const score = feedbackMap[msg.id];
+          if (score === 1) ui.feedback = 'up';
+          else if (score === -1) ui.feedback = 'down';
+          return ui;
         });
-        if (!res.ok) return;
-        const data = await res.json();
-        const uiMsgs = data.map(dbMsgToUI);
+
         setMessages(uiMsgs);
         // Update cached messages in sidebar history
         setChatHistory((prev) =>
@@ -126,17 +151,20 @@
       }
     }, [messages]);
 
-    // ---- Update sidebar title when messages change ----
+    // ---- Update sidebar title once per session (first user message) ----
+    const patchedSessionsRef = React.useRef(new Set());
     React.useEffect(() => {
-      const nonTyping = messages.filter((m) => !m.typing);
-      if (nonTyping.length === 0) return;
-      const firstUserMsg = nonTyping.find((m) => m.role === 'user');
-      const title = firstUserMsg ? firstUserMsg.text.slice(0, 40) : 'New Chat';
+      if (!activeChatId || patchedSessionsRef.current.has(activeChatId)) return;
+      const firstUserMsg = messages.find((m) => m.role === 'user' && !m.typing);
+      if (!firstUserMsg) return;
+
+      const title = firstUserMsg.text.slice(0, 40);
+      patchedSessionsRef.current.add(activeChatId);
+
       setChatHistory((prev) =>
-        prev.map((c) => (c.id === activeChatId ? { ...c, title, messages: nonTyping } : c)),
+        prev.map((c) => (c.id === activeChatId ? { ...c, title } : c)),
       );
-      // Persist title to DB (fire-and-forget)
-      if (token && activeChatId && firstUserMsg) {
+      if (token) {
         fetch(`/api/chat/sessions/${activeChatId}`, {
           method: 'PATCH',
           headers: authHeaders(token),
@@ -165,9 +193,6 @@
             clearTimeout(thinkingTimeoutsRef.current[msg.id]);
             delete thinkingTimeoutsRef.current[msg.id];
           }
-          if (msg.showThinking) {
-            setMessages((prev) => prev.map((m) => (m.id === msg.id ? { ...m, showThinking: false } : m)));
-          }
         }
       });
       return () => {
@@ -178,6 +203,20 @@
 
     // ---- Helpers ----
     const appendMessage = (msg) => setMessages((prev) => [...prev, msg]);
+
+    // ---- Sync feedback to messages + sidebar cache ----
+    const handleFeedbackUpdate = (messageId, feedbackValue) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, feedback: feedbackValue } : m)),
+      );
+      setChatHistory((prev) =>
+        prev.map((c) =>
+          c.id === activeChatId
+            ? { ...c, messages: (c.messages || []).map((m) => (m.id === messageId ? { ...m, feedback: feedbackValue } : m)) }
+            : c,
+        ),
+      );
+    };
 
     const handleImageChange = (e) => {
       const files = Array.from(e.target.files || []);
@@ -302,10 +341,17 @@
 
         const answer = data.content || 'No answer available.';
         const citations = data.citations || [];
+        const realMsgId = data.id || botId;
+
+        // Replace temp ID with real DB ID so feedback works
+        setMessages((prev) =>
+          prev.map((m) => (m.id === botId ? { ...m, id: realMsgId } : m)),
+        );
+
         // Build image/video segments from citations metadata if available
         const videoSegments = buildVideoSegmentsFromAnswer({ context_used: citations });
         const answerImages = buildImageSegmentsFromAnswer({ relevant_images: citations.flatMap(c => c.image_paths || []).map(p => ({ path: p })) });
-        simulateStreaming(answer, botId, [...answerImages, ...videoSegments]);
+        simulateStreaming(answer, realMsgId, [...answerImages, ...videoSegments]);
       } catch (err) {
         setMessages((prev) =>
           prev.map((m) =>
@@ -373,17 +419,22 @@
 
     const handleSelectChat = async (chatId) => {
       if (chatId === activeChatId) return;
+
+      // Save current messages to cache before switching away
+      if (activeChatId) {
+        const currentMessages = messagesRef.current;
+        const currentChatId = activeChatId;
+        setChatHistory((prev) =>
+          prev.map((c) => (c.id === currentChatId ? { ...c, messages: currentMessages } : c)),
+        );
+      }
+
       setActiveChatId(chatId);
       setInput('');
       setAttachedImages([]);
-      // Check if we already have messages cached
-      const cached = chatHistory.find((c) => c.id === chatId);
-      if (cached && cached.messages && cached.messages.length > 0) {
-        setMessages(cached.messages);
-      } else {
-        setMessages([]);
-        await loadSessionMessages(chatId);
-      }
+      // Always load fresh from DB to ensure we have full history
+      setMessages([]);
+      await loadSessionMessages(chatId);
     };
 
     const handleDeleteChat = async (chatId) => {
@@ -442,7 +493,7 @@
                 </div>
               )}
               {messages.map((m) => (
-                <ChatMessage key={m.id} message={m} onImageClick={handleImageClick} onVideoClick={handleVideoClick} />
+                <ChatMessage key={m.id} message={m} onImageClick={handleImageClick} onVideoClick={handleVideoClick} token={token} sessionId={activeChatId} onFeedback={handleFeedbackUpdate} />
               ))}
             </div>
 

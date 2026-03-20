@@ -8,13 +8,11 @@ class InviteRequest(BaseModel):
 class InviteResponse(BaseModel):
     message: str
     email: str
-    code: str
     expires_at: str
 
 class InvitationStatusResponse(BaseModel):
     email: str
-    status: str  # "active", "expired", "used", "none"
-    code: Optional[str] = None
+    status: str  # "active", "expired", "registered", "none"
     expires_at: Optional[str] = None
 
 class ChangeRoleRequest(BaseModel):

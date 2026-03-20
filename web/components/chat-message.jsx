@@ -1,6 +1,6 @@
 // Chat message bubble, typing indicator, video bubble, and feedback actions
 (() => {
-  function ChatMessage({ message, onImageClick, onVideoClick }) {
+  function ChatMessage({ message, onImageClick, onVideoClick, token, sessionId, onFeedback }) {
     const isUser = message.role === 'user';
 
     const escapeHtml = (text) =>
@@ -91,16 +91,23 @@
             <div className="chat-bubble">
               {renderSegments(message.segments, message.text)}
             </div>
-            {!message.typing && message.text && <MessageActions message={message} />}
+            {!message.typing && message.text && <MessageActions message={message} token={token} sessionId={sessionId} onFeedback={onFeedback} />}
           </div>
         )}
       </div>
     );
   }
 
-  function MessageActions({ message }) {
-    const [feedback, setFeedback] = React.useState(null);
+  function MessageActions({ message, token, sessionId, onFeedback }) {
+    const [feedback, setFeedback] = React.useState(message.feedback || null);
     const [copied, setCopied] = React.useState(false);
+
+    // Sync if parent updates (e.g., feedback hydrated after load)
+    React.useEffect(() => {
+      if (message.feedback !== undefined) {
+        setFeedback(message.feedback);
+      }
+    }, [message.feedback]);
 
     const handleCopy = () => {
       const text = message.text || '';
@@ -111,8 +118,35 @@
     };
 
     const handleFeedback = (type) => {
-      setFeedback((prev) => (prev === type ? null : type));
-      // TODO: send feedback to backend
+      // Determine new score: toggle off if same, otherwise set
+      const newFeedback = feedback === type ? null : type;
+      const score = newFeedback === 'up' ? 1 : newFeedback === 'down' ? -1 : null;
+
+      // Optimistic update
+      const prevFeedback = feedback;
+      setFeedback(newFeedback);
+      if (onFeedback) onFeedback(message.id, newFeedback);
+
+      // Fire API call (don't block UI)
+      if (token && message.id) {
+        fetch('/api/chat/feedback', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            message_id: message.id,
+            session_id: sessionId,
+            rating: score,
+          }),
+        }).catch((err) => {
+          // Revert on failure
+          console.error('Failed to save feedback:', err);
+          setFeedback(prevFeedback);
+          if (onFeedback) onFeedback(message.id, prevFeedback);
+        });
+      }
     };
 
     return (

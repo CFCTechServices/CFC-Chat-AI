@@ -144,19 +144,3 @@ async def get_current_admin(user=Security(get_current_user)):
     except Exception as e:
         logger.error(f"Authorization check failed for user {user.id}: {e}")
         raise HTTPException(status_code=403, detail="Authorization failed")
-
-def check_invite_code(invite_code: str) -> bool:
-    """
-    Calls Supabase RPC to validate an invite code.
-    Assumes a postgres function `check_invite_code` exists.
-    """
-    if not supabase:
-        logger.error("Supabase client not initialized")
-        return False
-
-    try:
-        response = supabase.rpc("check_invite_code", {"lookup_code": invite_code}).execute()
-        return bool(response.data)
-    except Exception as e:
-        logger.error(f"RPC check_invite_code failed: {e}")
-        return False

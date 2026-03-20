@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 from app.core.auth import get_current_admin
 from app.core.supabase_service import supabase
 from app.config import settings
-from app.services.email_service import send_invite_email
 from .models import InviteRequest, InviteResponse, InvitationStatusResponse
 
 logger = logging.getLogger(__name__)
@@ -14,20 +13,33 @@ router = APIRouter()
 @router.post("/invite", response_model=InviteResponse)
 async def generate_invite(request: InviteRequest, admin: dict = Depends(get_current_admin)):
     """
-    Generate a new invitation code and send it via email.
+    Add an email to the invitation whitelist.
     Only accessible by admin users.
 
-    Handles the partial unique index on (email) WHERE is_used = false:
-    - If an active (non-expired) unused invite exists, reject.
-    - If an expired unused invite exists, mark it used first, then create a new one.
+    Handles the partial unique index on (email) WHERE is_registered = false:
+    - If an active (non-expired) unregistered invite exists, reject.
+    - If an expired unregistered invite exists, mark it registered first, then create a new one.
     - Wraps insert in try/except to handle race conditions on the unique index.
     """
     try:
-        # Step 1: Check for existing unused invitation for this email
-        existing = supabase.table("invitations")\
-            .select("id, code, expires_at")\
+        # Step 1: Check if user already exists in the system
+        existing_profile = supabase.table("profiles")\
+            .select("id")\
             .eq("email", request.email)\
-            .eq("is_used", False)\
+            .limit(1)\
+            .execute()
+
+        if existing_profile.data:
+            raise HTTPException(
+                status_code=409,
+                detail="This user already exists in the system."
+            )
+
+        # Step 2: Check for existing unregistered invitation for this email
+        existing = supabase.table("invitations")\
+            .select("id, expires_at")\
+            .eq("email", request.email)\
+            .eq("is_registered", False)\
             .execute()
 
         if existing.data:
@@ -36,20 +48,20 @@ async def generate_invite(request: InviteRequest, admin: dict = Depends(get_curr
             now = datetime.now(timezone.utc)
 
             if expires_at > now:
-                # Step 2: Active invite exists — reject
+                # Active invite exists — reject
                 raise HTTPException(
                     status_code=409,
-                    detail="An active invitation already exists for this email."
+                    detail="There is already a pending invitation for this email."
                 )
             else:
-                # Step 3: Expired invite — mark as used to clear the unique index
+                # Expired invite — delete it so a fresh one can be created
                 supabase.table("invitations")\
-                    .update({"is_used": True})\
+                    .delete()\
                     .eq("id", row["id"])\
                     .execute()
-                logger.info(f"Marked expired invitation {row['id']} as used for {request.email}")
+                logger.info(f"Deleted expired invitation {row['id']} for {request.email}")
 
-        # Step 4: Insert new invitation (code and expires_at are DB defaults)
+        # Step 2: Insert new invitation (expires_at is a DB default)
         invitation_data = {
             "email": request.email,
             "created_by": admin.id
@@ -70,29 +82,13 @@ async def generate_invite(request: InviteRequest, admin: dict = Depends(get_curr
             raise HTTPException(status_code=500, detail="Failed to create invitation")
 
         new_invite = insert_response.data[0]
-        new_code = new_invite["code"]
         new_expires_at = new_invite["expires_at"]
 
-        # Step 5: Generate invite URL and send email
-        invite_url = f"{settings.FRONTEND_BASE_URL}/register?code={new_code}&email={request.email}"
-
-        if settings.ENABLE_EMAIL_INVITES:
-            try:
-                email_sent = send_invite_email(request.email, new_code, invite_url)
-                if email_sent:
-                    logger.info(f"Email sent successfully to {request.email}. Response ID: {email_sent}")
-                else:
-                    logger.warning(f"Invitation created but email failed to send to {request.email}")
-            except Exception as email_error:
-                logger.error(f"Failed to send email to {request.email}: {email_error}")
-        else:
-            logger.info(f"Email sending disabled. Invitation created for {request.email} with code {new_code}")
-            logger.info(f"Share this invite URL manually: {invite_url}")
+        logger.info(f"Invitation created for {request.email}, expires at {new_expires_at}")
 
         return InviteResponse(
-            message=f"Invite sent to {request.email}" if settings.ENABLE_EMAIL_INVITES else f"Invite created for {request.email} (email disabled)",
+            message=f"Invitation created for {request.email}",
             email=request.email,
-            code=new_code,
             expires_at=new_expires_at
         )
 
@@ -107,12 +103,12 @@ async def generate_invite(request: InviteRequest, admin: dict = Depends(get_curr
 async def get_invitation_status(email: str, admin: dict = Depends(get_current_admin)):
     """
     Return the current invitation state for an email address.
-    Possible statuses: active, expired, used, none.
+    Possible statuses: active, expired, registered, none.
     """
     try:
         # Get the most recent invitation for this email
         response = supabase.table("invitations")\
-            .select("code, is_used, expires_at")\
+            .select("is_registered, expires_at")\
             .eq("email", email)\
             .order("created_at", desc=True)\
             .limit(1)\
@@ -123,11 +119,10 @@ async def get_invitation_status(email: str, admin: dict = Depends(get_current_ad
 
         row = response.data[0]
 
-        if row["is_used"]:
+        if row["is_registered"]:
             return InvitationStatusResponse(
                 email=email,
-                status="used",
-                code=row["code"],
+                status="registered",
                 expires_at=row["expires_at"]
             )
 
@@ -138,14 +133,12 @@ async def get_invitation_status(email: str, admin: dict = Depends(get_current_ad
             return InvitationStatusResponse(
                 email=email,
                 status="active",
-                code=row["code"],
                 expires_at=row["expires_at"]
             )
         else:
             return InvitationStatusResponse(
                 email=email,
                 status="expired",
-                code=row["code"],
                 expires_at=row["expires_at"]
             )
 

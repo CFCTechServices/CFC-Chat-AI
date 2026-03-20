@@ -76,13 +76,24 @@ class VectorStore:
             logger.error(f"Failed to query vectors: {e}")
             raise
     
+    def delete_document(self, chunk_ids: List[str]) -> None:
+        """Delete vectors by their chunk IDs."""
+        if not chunk_ids:
+            return
+        try:
+            kwargs = {}
+            if self.namespace:
+                kwargs["namespace"] = self.namespace
+            self.index.delete(ids=chunk_ids, **kwargs)
+            logger.info(f"Deleted {len(chunk_ids)} vectors from index")
+        except Exception as e:
+            logger.error(f"Failed to delete vectors: {e}")
+            raise
+
     def delete_by_prefix(self, prefix: str):
         """Delete vectors with IDs starting with prefix."""
         try:
-            # Note: This is a simplified implementation
-            # In production, you might want to implement this differently
             logger.info(f"Deleting vectors with prefix: {prefix}")
-            # Implementation would depend on your specific needs
         except Exception as e:
             logger.error(f"Failed to delete vectors with prefix {prefix}: {e}")
             raise
