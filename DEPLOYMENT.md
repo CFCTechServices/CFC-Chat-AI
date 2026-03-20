@@ -16,7 +16,8 @@ This document records the full deployment journey for the CFC Chat-AI applicatio
 8. [Nginx Configuration](#8-nginx-configuration)
 9. [Environment Variables Reference](#9-environment-variables-reference)
 10. [Maintenance & Operations](#10-maintenance--operations)
-11. [Architecture Diagram](#11-architecture-diagram)
+11. [Deployment on Windows VM (Docker Desktop + IIS)](#11-deployment-on-windows-vm-docker-desktop--iis)
+12. [Architecture Diagram](#12-architecture-diagram)
 
 ---
 
@@ -543,13 +544,111 @@ On first startup, OpenAI Whisper will download the `base` model (~140 MB). This 
 
 ---
 
-## 11. Architecture Diagram
+## 11. Deployment on Windows VM (Docker Desktop + IIS)
+
+If the VM runs Windows Server instead of Linux, the application code remains unchanged — only the deployment infrastructure differs.
+
+### Prerequisites
+
+| Software | Purpose | Install Method |
+|----------|---------|----------------|
+| WSL2 | Required backend for Docker Desktop | `wsl --install` (admin PowerShell), then reboot |
+| Docker Desktop | Runs the backend container | [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/) |
+| Git for Windows | Clone the repo | [git-scm.com](https://git-scm.com/download/win) |
+| IIS | Reverse proxy (replaces Nginx) | Server Manager → Add Roles → Web Server (IIS) |
+| IIS URL Rewrite | Rewrite rules for SPA and proxy | [iis.net/downloads/microsoft/url-rewrite](https://www.iis.net/downloads/microsoft/url-rewrite) |
+| IIS ARR | Application Request Routing for proxy | [iis.net/downloads/microsoft/application-request-routing](https://www.iis.net/downloads/microsoft/application-request-routing) |
+
+> **Windows VM sizing:** 8 GB RAM / 60 GB disk minimum (higher than Linux due to Docker Desktop + WSL2 overhead). See `VM_REQUIREMENTS.md` for details.
+
+### Step 1: Enable ARR Proxy in IIS
+
+1. Open **IIS Manager**
+2. Click the **server name** (top level, not a site)
+3. Double-click **Application Request Routing Cache**
+4. Click **Server Proxy Settings** in the Actions pane
+5. Check **Enable proxy** → Apply
+
+### Step 2: Clone and Configure
+
+```powershell
+cd C:\
+git clone <repository-url> cfcchat
+cd cfcchat
+Copy-Item .env.example .env
+# Edit .env with production values (Notepad, VS Code, etc.)
+```
+
+### Step 3: Deploy with PowerShell
+
+```powershell
+# Run as Administrator
+.\deploy.ps1
+```
+
+This script:
+1. Copies frontend files to `C:\inetpub\cfcchat`
+2. Builds the Docker image
+3. Starts the container
+
+### Step 4: Configure IIS Site
+
+1. Open **IIS Manager**
+2. Right-click **Sites** → **Add Website**
+   - Site name: `CFC Chat AI`
+   - Physical path: `C:\inetpub\cfcchat`
+   - Binding: Port 80 (and 443 for HTTPS)
+3. Copy the IIS config:
+   ```powershell
+   Copy-Item deployment\iis-web.config C:\inetpub\cfcchat\web.config
+   ```
+
+### Step 5: Verify
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:8000/api/health
+Invoke-RestMethod http://127.0.0.1:8000/api/health/detailed
+```
+
+### Windows Maintenance Commands
+
+```powershell
+# Check container status
+docker compose ps
+
+# View logs
+docker compose logs -f backend
+
+# Restart after code changes
+git pull
+.\deploy.ps1
+
+# Check disk usage
+Get-PSDrive C | Select-Object Used, Free
+docker system df
+```
+
+### Key Differences from Linux
+
+| Aspect | Linux | Windows |
+|--------|-------|---------|
+| Reverse proxy | Nginx | IIS + ARR |
+| Deploy script | `deploy.sh` (bash) | `deploy.ps1` (PowerShell) |
+| Web root | `/var/www/cfcchat` | `C:\inetpub\cfcchat` |
+| Docker backend | Native | WSL2 |
+| HTTPS | Certbot | IIS SSL bindings or Win-ACME |
+| Service manager | systemd | Docker Desktop auto-start |
+
+---
+
+## 12. Architecture Diagram
 
 ```
 Internet
    │
    ▼
-[Nginx :80/:443]  ←── Frontend static files from /var/www/cfcchat
+[Nginx :80/:443]  ←── Frontend static files from /var/www/cfcchat      (Linux)
+[IIS   :80/:443]  ←── Frontend static files from C:\inetpub\cfcchat    (Windows)
    │
    │  /api/*
    ▼
@@ -569,3 +668,4 @@ Data persistence:
 ```
 
 ---
+

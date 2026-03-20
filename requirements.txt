@@ -23,3 +23,8 @@ openai-whisper
 # Add a Python helper that bundles ffmpeg binaries or provides a bridge:
 imageio-ffmpeg>=0.4.8
 
+# SSL certificate bundle — used by main.py and supabase_service.py for HTTPS
+certifi
+
+# scikit-learn — used by app/transcription/summarize_transcript.py for TF-IDF
+scikit-learn

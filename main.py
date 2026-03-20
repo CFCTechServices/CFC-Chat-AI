@@ -2,6 +2,8 @@
 CFC Animal Feed Software Chatbot API
 Main FastAPI application with organized structure
 """
+from contextlib import asynccontextmanager
+
 from fastapi.staticfiles import StaticFiles
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,9 +38,6 @@ from app.api.endpoints.admin import router as admin_router
 
 from app.api.endpoints.upload import router as upload_router
 
-#app = FastAPI()
-
-#app.include_router(upload_router, prefix="/files", tags=["Files"])
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -46,11 +45,53 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+# ---------------------------------------------------------------------------
+# Lifespan — runs startup/shutdown logic for the application
+# ---------------------------------------------------------------------------
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Startup and shutdown logic for the application."""
+    # ---- Startup ----
+    logger.info("Starting CFC Animal Feed Software Chatbot API")
+
+    # Ensure ffmpeg is available for Whisper transcription
+    if shutil.which("ffmpeg") is None:
+        msg = (
+            "ffmpeg binary not found. ffmpeg is required for video/audio transcription. "
+            "Install it (macOS): `brew install ffmpeg` — or on Linux: `sudo apt install ffmpeg` "
+            "or via conda: `conda install -c conda-forge ffmpeg`. After installation restart the server."
+        )
+        logger.error(msg)
+        raise RuntimeError(msg)
+
+    # Create data directories if they don't exist
+    settings.DATA_DIR.mkdir(exist_ok=True)
+    settings.DOCUMENTS_DIR.mkdir(exist_ok=True)
+    settings.VIDEOS_DIR.mkdir(exist_ok=True)
+    settings.PROCESSED_DIR.mkdir(exist_ok=True)
+
+    # Create subdirectories
+    (settings.DOCUMENTS_DIR / "docx").mkdir(exist_ok=True)
+    (settings.DOCUMENTS_DIR / "doc").mkdir(exist_ok=True)
+    (settings.VIDEOS_DIR / "transcripts").mkdir(exist_ok=True)
+
+    logger.info("Data directories initialized")
+    logger.info(f"API running at http://{settings.API_HOST}:{settings.API_PORT}")
+    logger.info(f"API documentation available at http://{settings.API_HOST}:{settings.API_PORT}/docs")
+
+    yield  # Application runs here
+
+    # ---- Shutdown ----
+    logger.info("Shutting down CFC Animal Feed Software Chatbot API")
+
+
 # Initialize FastAPI app
 app = FastAPI(
     title=settings.API_TITLE,
     version=settings.API_VERSION,
-    description="AI-powered help chatbot for animal-feed software with document search and Q&A capabilities"
+    description="AI-powered help chatbot for animal-feed software with document search and Q&A capabilities",
+    lifespan=lifespan,
 )
 
 WEB_DIR = BASE_DIR / "web"
@@ -61,20 +102,27 @@ app.mount(
 )
 
 # Add CORS middleware
+# Allowed origins are read from the CORS_ORIGINS environment variable
+# (comma-separated). Set it to your production domain(s) in .env.
+_cors_origins = [
+    o.strip()
+    for o in os.getenv("CORS_ORIGINS", "http://localhost:8000").split(",")
+    if o.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO: Restrict to specific origins in production
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(health.router)
-app.include_router(ingest.router)
+# Include routers — all routes are served under /api
+app.include_router(health.router, prefix="/api")
+app.include_router(ingest.router, prefix="/api")          # /api/ingest/*
 app.include_router(chat.router, prefix="/api/chat")
-app.include_router(visibility.router)
-app.include_router(upload_router, prefix="/files", tags=["Files"])
+app.include_router(visibility.router, prefix="/api")      # /api/visibility/*
+app.include_router(upload_router, prefix="/api/files", tags=["Files"])
 app.include_router(videos.router)
 app.include_router(auth.router, prefix="/api/auth")
 app.include_router(sessions.router, prefix="/api/chat")
@@ -84,35 +132,6 @@ app.include_router(profile.router, prefix="/api/profile")
 
 
 
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize services on startup."""
-    logger.info("Starting CFC Animal Feed Software Chatbot API")
-    # Ensure ffmpeg is available for Whisper transcription
-    if shutil.which("ffmpeg") is None:
-        msg = (
-            "ffmpeg binary not found. ffmpeg is required for video/audio transcription. "
-            "Install it (macOS): `brew install ffmpeg` — or on Linux: `sudo apt install ffmpeg` "
-            "or via conda: `conda install -c conda-forge ffmpeg`. After installation restart the server."
-        )
-        logger.error(msg)
-        raise RuntimeError(msg)
-    
-    # Create data directories if they don't exist
-    settings.DATA_DIR.mkdir(exist_ok=True)
-    settings.DOCUMENTS_DIR.mkdir(exist_ok=True)
-    settings.VIDEOS_DIR.mkdir(exist_ok=True)
-    settings.PROCESSED_DIR.mkdir(exist_ok=True)
-    
-    # Create subdirectories
-    (settings.DOCUMENTS_DIR / "docx").mkdir(exist_ok=True)
-    (settings.DOCUMENTS_DIR / "doc").mkdir(exist_ok=True)
-    (settings.VIDEOS_DIR / "transcripts").mkdir(exist_ok=True)
-    
-    logger.info("Data directories initialized")
-    logger.info(f"API running at http://{settings.API_HOST}:{settings.API_PORT}")
-    logger.info(f"API documentation available at http://{settings.API_HOST}:{settings.API_PORT}/docs")
 
 # ---------- SPA catch-all (must be AFTER all API routes) ----------
 # Client-side routes like /chat, /admin, /settings etc. need to serve
@@ -126,12 +145,6 @@ async def serve_spa(full_path: str):
     if first_segment in _SPA_ROUTES:
         return FileResponse(WEB_DIR / "index.html")
     raise HTTPException(status_code=404, detail="Not Found")
-
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    """Cleanup on shutdown."""
-    logger.info("Shutting down CFC Animal Feed Software Chatbot API")
 
 if __name__ == "__main__":
     import uvicorn
