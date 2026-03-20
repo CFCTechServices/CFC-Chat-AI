@@ -13,7 +13,6 @@ from dotenv import load_dotenv
 # Load environment variables
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
-
 # ==============================
 # CONFIGURATION - UPDATE THESE
 # ==============================
