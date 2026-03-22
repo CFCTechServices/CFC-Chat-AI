@@ -51,11 +51,13 @@ venv/
 #       Test Coverage
 ########################################
 coverage/
+.coverage
 
 ########################################
 #       Data & Generated Files
 ########################################
 !data/
+data/documents/
 data/processed/
 data/processed/**
 

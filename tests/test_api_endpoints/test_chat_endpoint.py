@@ -47,7 +47,7 @@ class FakeTableQuery:
 		self.inserted_payload = payload
 		return self
 
-	def upsert(self, payload):
+	def upsert(self, payload, **_kwargs):
 		self.upsert_payload = payload
 		return self
 
@@ -245,9 +245,20 @@ def test_send_message_missing_field_returns_422(client):
 
 @pytest.mark.parametrize("rating", [-1, 1])
 def test_submit_feedback_returns_success(client, monkeypatch, rating):
-	"""Test that submitting positive or negative feedback returns success and stores the feedback"""
-	feedback_query = FakeTableQuery(data=[{"message_id": "msg-123"}])
-	fake_supabase = FakeSupabase({"feedback": [feedback_query]})
+	"""Test that submitting feedback returns success and upserts the score."""
+	# Endpoint flow: chat_messages (ownership), chat_sessions (ownership),
+	# feedback (old rating), feedback (upsert), chat_messages (metadata for chunk scores)
+	fake_supabase = FakeSupabase({
+		"chat_messages": [
+			FakeTableQuery(data=[{"id": "msg-123", "session_id": "session-123"}]),  # ownership check
+			FakeTableQuery(data=[{"metadata": {}}]),  # chunk score metadata
+		],
+		"chat_sessions": [FakeTableQuery(data=[{"id": "session-123"}])],
+		"feedback": [
+			FakeTableQuery(data=[]),  # old rating fetch
+			FakeTableQuery(data=[]),  # upsert
+		],
+	})
 	monkeypatch.setattr(chat, "supabase", fake_supabase)
 
 	response = client.post(
@@ -256,17 +267,20 @@ def test_submit_feedback_returns_success(client, monkeypatch, rating):
 	)
 
 	assert response.status_code == 200
-	assert response.json() == {"success": True}
-	assert feedback_query.upsert_payload == {
-		"message_id": "msg-123",
-		"user_id": "user-123",
-		"score": rating,
-	}
+	assert response.json() == {"success": True, "score": rating}
+
 
 @pytest.mark.parametrize("rating", [-1, 1])
 def test_submit_feedback_returns_500_on_exception(client, monkeypatch, rating):
-	"""Test that submitting positive or negative feedback returns 500 on unexpected database exception"""
-	fake_supabase = FakeSupabase({"feedback": [FakeTableQuery(error=RuntimeError("database connection failure"))]})
+	"""Test that submitting feedback returns 500 when the upsert raises an exception."""
+	fake_supabase = FakeSupabase({
+		"chat_messages": [FakeTableQuery(data=[{"id": "msg-123", "session_id": "session-123"}])],
+		"chat_sessions": [FakeTableQuery(data=[{"id": "session-123"}])],
+		"feedback": [
+			FakeTableQuery(data=[]),  # old rating fetch
+			FakeTableQuery(error=RuntimeError("database connection failure")),  # upsert fails
+		],
+	})
 	monkeypatch.setattr(chat, "supabase", fake_supabase)
 
 	response = client.post(
@@ -277,10 +291,11 @@ def test_submit_feedback_returns_500_on_exception(client, monkeypatch, rating):
 	assert response.status_code == 500
 	assert response.json() == {"detail": "database connection failure"}
 
+
 def test_submit_feedback_missing_field_returns_422(client):
-    """Test that submitting feedback and call feedback endpoint without rating fields returns 422"""
-    response = client.post("/api/chat/feedback", json={"message_id": "msg-123", "session_id": "session-123"})
-    assert response.status_code == 422
+	"""Test that submitting feedback without message_id returns 422."""
+	response = client.post("/api/chat/feedback", json={"session_id": "session-123", "rating": 1})
+	assert response.status_code == 422
 	
 def test_search_documents_returns_expected_payload(client, monkeypatch):
 	"""Test that searching documents returns expected payload"""

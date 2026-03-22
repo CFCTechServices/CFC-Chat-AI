@@ -56,6 +56,12 @@ class FakeInvitationQuery:
         self.filters.append((column, value))
         return self
 
+    def order(self, *args, **kwargs):
+        return self
+
+    def limit(self, *args, **kwargs):
+        return self
+
     def single(self):
         return self
 
@@ -165,97 +171,71 @@ def test_forgot_password_missing_email_returns_422(client):
 
     assert response.status_code == 422
 
-@pytest.mark.parametrize("supabase_data, invite_code, valid, message, email",
-                        [({"email": "invitee@cfctech.com", "is_used": False}, "INVITE-123", True, "Invite code is valid.", "invitee@cfctech.com"),
-                         ({"email": "invitee@cfctech.com", "is_used": True}, "INVITE-USED", False, "Invite code has already been used.", None),
-                         ])
-def test_validate_invite_returns_valid_with_email(client, monkeypatch, mock_settings, supabase_data, invite_code, valid, message, email):
-    """Test that the validate invite endpoint returns correct validity and email based on Supabase data."""
+from datetime import datetime, timezone, timedelta
+
+def _future_expires_at() -> str:
+    return (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+
+def _past_expires_at() -> str:
+    return "2020-01-01T00:00:00+00:00"
+
+
+def test_check_email_eligible_when_invited_and_active(client, monkeypatch):
+    """Invited email with a non-expired invite returns eligible=True."""
     patch_supabase_module(
         monkeypatch,
-        FakeSupabase(data=supabase_data),
+        FakeSupabase(data=[{"expires_at": _future_expires_at(), "is_registered": False}]),
     )
 
-    response = client.post("/api/auth/validate-invite", json={"invite_code": invite_code})
+    response = client.post("/api/auth/check-email", json={"email": "invitee@cfctech.com"})
 
     assert response.status_code == 200
     assert response.json() == {
-        "valid": valid,
-        "message": message,
-        "email": email,
+        "eligible": True,
+        "message": "Email is eligible for registration.",
     }
 
 
-def test_validate_invite_returns_invalid_on_exception(client, monkeypatch):
-    """Test that the validate invite endpoint returns invalid when an exception occurs."""
+def test_check_email_ineligible_when_not_invited(client, monkeypatch):
+    """Email not in invitations table returns eligible=False."""
+    patch_supabase_module(monkeypatch, FakeSupabase(data=[]))
+
+    response = client.post("/api/auth/check-email", json={"email": "unknown@cfctech.com"})
+
+    assert response.status_code == 200
+    assert response.json()["eligible"] is False
+    assert "not been invited" in response.json()["message"].lower()
+
+
+def test_check_email_ineligible_when_invite_expired(client, monkeypatch):
+    """Invited email with an expired invite returns eligible=False."""
+    patch_supabase_module(
+        monkeypatch,
+        FakeSupabase(data=[{"expires_at": _past_expires_at(), "is_registered": False}]),
+    )
+
+    response = client.post("/api/auth/check-email", json={"email": "expired@cfctech.com"})
+
+    assert response.status_code == 200
+    assert response.json()["eligible"] is False
+    assert "expired" in response.json()["message"].lower()
+
+
+def test_check_email_ineligible_on_exception(client, monkeypatch):
+    """Returns eligible=False gracefully when Supabase throws."""
     patch_supabase_module(
         monkeypatch,
         FakeSupabase(error=RuntimeError("supabase is down")),
     )
 
-    response = client.post("/api/auth/validate-invite", json={"invite_code": "INVITE-ERROR"})
+    response = client.post("/api/auth/check-email", json={"email": "error@cfctech.com"})
 
     assert response.status_code == 200
-    assert response.json() == {
-        "valid": False,
-        "message": "Invalid invite code.",
-        "email": None,
-    }
+    assert response.json()["eligible"] is False
 
 
-def test_validate_invite_missing_code_returns_422(client):
-    """Test that the validate invite endpoint returns 422 when invite code is missing."""
-    response = client.post("/api/auth/validate-invite", json={})
-
-    assert response.status_code == 422
-
-
-def test_mark_invite_used_returns_success_when_updated(client, monkeypatch):
-    """Test that the mark invite used endpoint returns success when the invite is marked as used."""
-    fake_supabase = FakeSupabase(data=[{"code": "INVITE-123", "is_used": True}])
-    patch_supabase_module(monkeypatch, fake_supabase)
-
-    response = client.post("/api/auth/mark-invite-used", json={"invite_code": "INVITE-123"})
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "success": True,
-        "message": "Invite marked as used.",
-    }
-    assert fake_supabase.table_name == "invitations"
-    assert fake_supabase.query.update_payload == {"is_used": True}
-    assert ("code", "INVITE-123") in fake_supabase.query.filters
-    assert ("is_used", False) in fake_supabase.query.filters
-
-
-def test_mark_invite_used_returns_not_found(client, monkeypatch, mock_settings):
-    """Test that the mark invite used endpoint returns not found when no invite code matches."""
-    patch_supabase_module(monkeypatch, FakeSupabase(data=[]))
-
-    response = client.post("/api/auth/mark-invite-used", json={"invite_code": "INVITE-404"})
-
-    assert response.status_code == 200
-    assert response.json() == {
-        "success": False,
-        "message": "Invite code not found or already used.",
-    }
-
-
-def test_mark_invite_used_returns_500_on_exception(client, monkeypatch):
-    """Test that the mark invite used endpoint returns 500 when an exception occurs."""
-    patch_supabase_module(
-        monkeypatch,
-        FakeSupabase(error=RuntimeError("database unavailable")),
-    )
-
-    response = client.post("/api/auth/mark-invite-used", json={"invite_code": "INVITE-ERROR"})
-
-    assert response.status_code == 500
-    assert response.json() == {"detail": "Failed to mark invite as used."}
-
-
-def test_mark_invite_used_missing_code_returns_422(client):
-    """Test that the mark invite used endpoint returns 422 when invite code is missing."""
-    response = client.post("/api/auth/mark-invite-used", json={})
+def test_check_email_missing_email_returns_422(client):
+    """Missing email body field returns 422."""
+    response = client.post("/api/auth/check-email", json={})
 
     assert response.status_code == 422
