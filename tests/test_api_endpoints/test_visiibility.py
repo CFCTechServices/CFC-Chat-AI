@@ -72,7 +72,63 @@ def test_get_vector_store_stats_uses_totalVectorCount_key(client, monkeypatch):
     response = client.get("/visibility/vector-store")
 
     assert response.status_code == 200
+    assert response.json()["success"] is True
     assert response.json()["total_vectors"] == 99
+
+
+def test_get_vector_store_stats_zero_total_vector_count(client, monkeypatch):
+    """Test that total_vector_count of 0 is respected and not treated as falsy.
+    If the endpoint used `or` chaining, 0 would fall through to totalVectorCount (99),
+    producing an incorrect result.
+    """
+    patch_vector_store(
+        monkeypatch,
+        FakeVectorStore(
+            stats={"total_vector_count": 0, "totalVectorCount": 99, "namespaces": {}},
+            index_name="index",
+        ),
+    )
+
+    response = client.get("/visibility/vector-store")
+
+    assert response.status_code == 200
+    assert response.json()["total_vectors"] == 0
+
+
+def test_get_vector_store_stats_empty_stats_dict(client, monkeypatch):
+    """Test that an completely empty stats dict returns safe zero/None defaults."""
+    patch_vector_store(
+        monkeypatch,
+        FakeVectorStore(stats={}, index_name="index"),
+    )
+
+    response = client.get("/visibility/vector-store")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["total_vectors"] == 0
+    assert data["namespaces"] == []
+    assert data["dimension"] is None
+    assert data["index_fullness"] is None
+
+
+def test_get_vector_store_stats_namespaces_none(client, monkeypatch):
+    """Test that an explicit None value for namespaces is handled safely."""
+    patch_vector_store(
+        monkeypatch,
+        FakeVectorStore(
+            stats={"total_vector_count": 500, "namespaces": None},
+            index_name="index",
+        ),
+    )
+
+    response = client.get("/visibility/vector-store")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_vectors"] == 500
+    assert data["namespaces"] == []
 
 
 def test_get_vector_store_stats_sums_namespaces_when_no_total_key(client, monkeypatch):
@@ -88,6 +144,7 @@ def test_get_vector_store_stats_sums_namespaces_when_no_total_key(client, monkey
     response = client.get("/visibility/vector-store")
 
     assert response.status_code == 200
+    assert response.json()["success"] is True
     assert response.json()["total_vectors"] == 1000
 
 
@@ -156,16 +213,17 @@ def test_get_vector_store_stats_uses_index_fullness_snake_case(client, monkeypat
     response = client.get("/visibility/vector-store")
 
     assert response.status_code == 200
+    assert response.json()["success"] is True
     assert response.json()["index_fullness"] == 0.75
 
 def test_get_vector_store_stats_returns_500_on_exception(client, monkeypatch):
-    """Test that a 500 status code is returned when an exception occurs while fetching stats."""
+    """Test that a 500 status code is returned when Pinecone is unavailable (API_44)."""
     patch_vector_store(
         monkeypatch,
-        FakeVectorStore(error=RuntimeError("pinecone unavailable"), index_name="index"),
+        FakeVectorStore(error=ConnectionError("Failed to connect to Pinecone index"), index_name="index"),
     )
 
     response = client.get("/visibility/vector-store")
 
     assert response.status_code == 500
-    assert response.json()["detail"] == "Failed to fetch vector store stats"
+    assert response.json() == {"detail": "Failed to fetch vector store stats"}

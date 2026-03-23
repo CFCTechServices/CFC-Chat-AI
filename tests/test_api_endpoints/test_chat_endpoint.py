@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 import pytest
 from app.api.endpoints import chat
 from app.services.content_repository import ContentRepository
+from app.services.supabase_content_repository import SupabaseContentRepository
 
 
 @pytest.fixture()
@@ -638,3 +639,46 @@ def test_serve_image_returns_existing_file(client, local_content_root):
 	assert response.status_code == 200
 	assert response.headers["content-type"].startswith("image/jpeg")
 	assert response.content == b"fake-jpeg"
+
+
+class FakeSupabaseContentRepository(SupabaseContentRepository):
+	"""Subclass that skips __init__ to avoid requiring real Supabase credentials."""
+
+	def __init__(self, url="https://supabase.example.com/storage/image.jpg", error=None):
+		self._url = url
+		self._error = error
+
+	def public_url(self, storage_path: str) -> str:
+		self.last_called_with = storage_path
+		if self._error:
+			raise self._error
+		return self._url
+
+
+def test_serve_image_redirects_to_supabase_url(client, monkeypatch):
+	"""Test that serving an image redirects to the Supabase public URL (API_29)."""
+	expected_url = "https://supabase.example.com/storage/v1/object/public/cfc-docs/docs/doc123/images/feed.jpg"
+	fake_repo = FakeSupabaseContentRepository(url=expected_url)
+	monkeypatch.setattr(chat, "_content_repository", fake_repo)
+
+	response = client.get(
+		"/api/chat/content/images/docs/doc123/images/feed.jpg",
+		follow_redirects=False,
+	)
+
+	assert response.status_code in (302, 307)
+	assert response.headers["location"] == expected_url
+	assert fake_repo.last_called_with == "docs/doc123/images/feed.jpg"
+
+
+def test_serve_image_returns_404_when_supabase_public_url_fails(client, monkeypatch):
+	"""Test that a 404 is returned when the Supabase public URL cannot be retrieved."""
+	monkeypatch.setattr(
+		chat, "_content_repository",
+		FakeSupabaseContentRepository(error=RuntimeError("bucket not found")),
+	)
+
+	response = client.get("/api/chat/content/images/docs/doc123/images/feed.jpg")
+
+	assert response.status_code == 404
+	assert response.json() == {"detail": "Image not found in Supabase storage"}
