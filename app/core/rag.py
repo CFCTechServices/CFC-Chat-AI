@@ -94,14 +94,26 @@ class RAGPipeline:
                     "vtt_url": db_row.get("vtt_url") or metadata.get("vtt_url"),
                 })
 
-            # ── Feedback-driven re-ranking (Phase 1) ──
+            # ── Feedback-driven re-ranking (Phase 1 + Phase 2) ──────────────
             if settings.FEEDBACK_ENABLED:
                 ranked_chunk_ids = [c["chunk_id"] for c in context_chunks if c.get("chunk_id")]
                 if ranked_chunk_ids:
-                    feedback_scores = self.feedback_service.get_chunk_scores(ranked_chunk_ids)
-                    if feedback_scores:
+                    # Phase 1: global accumulated vote scores
+                    global_scores = self.feedback_service.get_chunk_scores(ranked_chunk_ids)
+
+                    # Phase 2: query-aware weighted scores.
+                    # Uses the query_embedding already computed above for Pinecone.
+                    # get_query_aware_scores fails-open → returns {} if the
+                    # migration/table isn't deployed yet, degrading to Phase 1 only.
+                    query_aware_scores = self.feedback_service.get_query_aware_scores(
+                        query_embedding, ranked_chunk_ids,
+                    )
+
+                    if global_scores or query_aware_scores:
                         context_chunks = self.feedback_service.rerank(
-                            context_chunks, feedback_scores,
+                            context_chunks,
+                            feedback_scores=global_scores,
+                            query_aware_scores=query_aware_scores,
                         )
 
             return context_chunks

@@ -11,14 +11,19 @@ from app.config import settings
 from app.services.content_repository import ContentRepository
 from app.services.supabase_content_repository import SupabaseContentRepository
 from app.core.auth import get_current_user, supabase
+from app.core.embeddings import EmbeddingModel
 from app.core.feedback_service import FeedbackService
 
 logger = logging.getLogger(__name__)
-_feedback_service = FeedbackService()
 router = APIRouter(tags=["chat"])
 
 # Initialize chat service
 chat_service = ChatService()
+
+# Phase 2: shared embedding model + feedback service for event recording.
+# EmbeddingModel is lazy-loaded (model downloads on first encode call).
+_embedding_model = EmbeddingModel()
+_feedback_service = FeedbackService()
 
 # Initialize content repository (same logic as ingest.py)
 if settings.SUPABASE_URL and settings.SUPABASE_BUCKET:
@@ -154,48 +159,83 @@ async def submit_feedback(request: FeedbackRequest, user: Any = Depends(get_curr
         if request.rating is not None and request.rating not in (-1, 1):
             raise HTTPException(status_code=400, detail="Rating must be -1, 1, or null")
 
-        # ── Fetch old rating so we can compute the delta ──
-        old_rating = None
+        # ── Phase 1: Single atomic RPC ────────────────────────────────────────
+        # Reads old rating, upserts new rating, and updates
+        # chunk_feedback_scores — all inside one Postgres transaction.
+        # Eliminates the read-modify-write race condition.
         try:
-            old_fb = supabase.table("feedback")\
-                .select("score")\
-                .eq("message_id", request.message_id)\
-                .eq("user_id", user.id)\
-                .execute()
-            if old_fb.data:
-                old_rating = old_fb.data[0].get("score")
-        except Exception:
-            pass  # If we can't read the old rating, treat as None (first vote)
+            supabase.rpc(
+                "submit_message_feedback",
+                {
+                    "p_message_id": request.message_id,
+                    "p_user_id":    str(user.id),
+                    "p_new_rating": request.rating,
+                },
+            ).execute()
+        except Exception as exc:
+            logger.warning("Atomic feedback RPC failed: %s", exc)
+            raise HTTPException(status_code=500, detail="Failed to save feedback")
 
-        data = {
-            "message_id": request.message_id,
-            "user_id": user.id,
-            "score": request.rating,  # -1, 1, or None (cleared)
-        }
-
-        # UPSERT keyed on (message_id, user_id) unique constraint
-        supabase.table("feedback")\
-            .upsert(data, on_conflict="message_id,user_id")\
-            .execute()
-
-        # ── Update chunk feedback scores (Phase 1) ──
-        if old_rating != request.rating:
+        # ── Phase 2: Record query-aware feedback event ────────────────────────
+        # Only store an event when the user gives a concrete vote (not a clear).
+        # We need:
+        #   1. chunk_ids from the assistant message citations
+        #   2. the preceding user message text (the original query)
+        #   3. the query embedding (encoded here in Python — Postgres can't do it)
+        if settings.FEEDBACK_ENABLED and request.rating is not None:
             try:
-                msg_res = supabase.table("chat_messages")\
-                    .select("metadata")\
-                    .eq("id", request.message_id)\
+                # Step A: fetch the assistant message (session_id + created_at + citations)
+                asst_res = (
+                    supabase.table("chat_messages")
+                    .select("session_id, created_at, metadata")
+                    .eq("id", request.message_id)
+                    .eq("role", "assistant")
+                    .single()
                     .execute()
+                )
+                asst_row = asst_res.data if asst_res and asst_res.data else None
 
-                if msg_res.data:
-                    citations = (msg_res.data[0].get("metadata") or {}).get("citations", [])
-                    chunk_ids = [c["chunk_id"] for c in citations if c.get("chunk_id")]
+                if asst_row:
+                    # Step B: extract chunk_ids from the stored citations
+                    citations = (asst_row.get("metadata") or {}).get("citations") or []
+                    chunk_ids = [
+                        c["chunk_id"]
+                        for c in citations
+                        if isinstance(c, dict) and c.get("chunk_id")
+                    ]
+
                     if chunk_ids:
-                        _feedback_service.update_chunk_scores(
-                            chunk_ids, old_rating, request.rating,
+                        # Step C: find the most recent user message sent *before*
+                        #         this assistant reply (that is the original query)
+                        user_msg_res = (
+                            supabase.table("chat_messages")
+                            .select("content")
+                            .eq("session_id", asst_row["session_id"])
+                            .eq("role", "user")
+                            .lt("created_at", asst_row["created_at"])
+                            .order("created_at", desc=True)
+                            .limit(1)
+                            .execute()
                         )
+                        user_rows = user_msg_res.data if user_msg_res else []
+                        query_text = user_rows[0]["content"] if user_rows else None
+
+                        if query_text:
+                            # Step D: encode the query (lazy-loads the model on first call)
+                            query_embedding = _embedding_model.encode_query(query_text)
+
+                            # Step E: persist one event row per cited chunk
+                            _feedback_service.record_feedback_events(
+                                chunk_ids=chunk_ids,
+                                message_id=request.message_id,
+                                query_embedding=query_embedding,
+                                rating=request.rating,
+                            )
             except Exception as exc:
-                logger.warning("Failed to update chunk feedback scores: %s", exc)
-                # Non-critical: feedback was saved, chunk scores will catch up
+                # Phase 2 event recording is best-effort — never block the response.
+                logger.warning(
+                    "Phase 2 feedback event recording failed (non-fatal): %s", exc
+                )
 
         return {"success": True, "score": request.rating}
     except HTTPException:
