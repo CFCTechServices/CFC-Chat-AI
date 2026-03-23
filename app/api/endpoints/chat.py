@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any, Union
@@ -129,8 +129,90 @@ async def send_message(request: ChatMessageRequest, user: Any = Depends(get_curr
         logger.error(f"Error processing message: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+def _record_phase2_feedback_event(message_id: str, rating: Optional[int]) -> None:
+    """
+    Background task: keep chunk_feedback_events consistent with the user's
+    current rating for a message.
+
+    Always deletes any existing events for this message_id first, then inserts
+    fresh ones if the new rating is non-null.  This covers three cases:
+      • New vote      (rating = +1/-1, no prior events)  → insert
+      • Changed vote  (rating = +1/-1, prior events exist) → delete old, insert new
+      • Cleared vote  (rating = None)                    → delete old, done
+
+    Runs AFTER the HTTP response has been sent (FastAPI BackgroundTasks), so
+    the ~100-200 ms sentence-transformer inference never adds latency to the
+    feedback endpoint.  Fails silently — never surfaces to the user.
+    """
+    try:
+        # Step A: always delete stale events for this message first.
+        # message_id is implicitly user-scoped (messages belong to sessions
+        # which belong to one user), so this is safe with no user_id filter.
+        supabase.table("chunk_feedback_events").delete().eq("message_id", message_id).execute()
+
+        # If the user cleared their rating, we're done — no new events to store.
+        if rating is None:
+            return
+
+        # Step B: fetch the assistant message (session_id + created_at + citations)
+        asst_res = (
+            supabase.table("chat_messages")
+            .select("session_id, created_at, metadata")
+            .eq("id", message_id)
+            .eq("role", "assistant")
+            .single()
+            .execute()
+        )
+        asst_row = asst_res.data if asst_res and asst_res.data else None
+        if not asst_row:
+            return
+
+        # Step C: extract chunk_ids from the stored citations
+        citations = (asst_row.get("metadata") or {}).get("citations") or []
+        chunk_ids = [
+            c["chunk_id"]
+            for c in citations
+            if isinstance(c, dict) and c.get("chunk_id")
+        ]
+        if not chunk_ids:
+            return
+
+        # Step D: find the most recent user message sent *before* this reply
+        user_msg_res = (
+            supabase.table("chat_messages")
+            .select("content")
+            .eq("session_id", asst_row["session_id"])
+            .eq("role", "user")
+            .lt("created_at", asst_row["created_at"])
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        user_rows = user_msg_res.data if user_msg_res else []
+        query_text = user_rows[0]["content"] if user_rows else None
+        if not query_text:
+            return
+
+        # Step E: encode the query — the slow CPU step, safe here off the critical path
+        query_embedding = _embedding_model.encode_query(query_text)
+
+        # Step F: persist one event row per cited chunk (fresh, no duplicates)
+        _feedback_service.record_feedback_events(
+            chunk_ids=chunk_ids,
+            message_id=message_id,
+            query_embedding=query_embedding,
+            rating=rating,
+        )
+    except Exception as exc:
+        logger.warning("Phase 2 background feedback event failed (non-fatal): %s", exc)
+
+
 @router.post("/feedback")
-async def submit_feedback(request: FeedbackRequest, user: Any = Depends(get_current_user)):
+async def submit_feedback(
+    request: FeedbackRequest,
+    background_tasks: BackgroundTasks,
+    user: Any = Depends(get_current_user),
+):
     """
     Submit or update feedback for a message.
     Uses UPSERT keyed on (message_id, user_id) unique constraint.
@@ -142,16 +224,16 @@ async def submit_feedback(request: FeedbackRequest, user: Any = Depends(get_curr
             .select("id, session_id")\
             .eq("id", request.message_id)\
             .execute()
-        
+
         if not msg_check.data:
             raise HTTPException(status_code=404, detail="Message not found")
-        
+
         session_check = supabase.table("chat_sessions")\
             .select("id")\
             .eq("id", msg_check.data[0]["session_id"])\
             .eq("user_id", user.id)\
             .execute()
-        
+
         if not session_check.data:
             raise HTTPException(status_code=403, detail="Not your message")
 
@@ -160,9 +242,8 @@ async def submit_feedback(request: FeedbackRequest, user: Any = Depends(get_curr
             raise HTTPException(status_code=400, detail="Rating must be -1, 1, or null")
 
         # ── Phase 1: Single atomic RPC ────────────────────────────────────────
-        # Reads old rating, upserts new rating, and updates
-        # chunk_feedback_scores — all inside one Postgres transaction.
-        # Eliminates the read-modify-write race condition.
+        # Reads old rating, upserts new rating, and updates chunk_feedback_scores
+        # — all inside one Postgres transaction (no read-modify-write race).
         try:
             supabase.rpc(
                 "submit_message_feedback",
@@ -176,66 +257,20 @@ async def submit_feedback(request: FeedbackRequest, user: Any = Depends(get_curr
             logger.warning("Atomic feedback RPC failed: %s", exc)
             raise HTTPException(status_code=500, detail="Failed to save feedback")
 
-        # ── Phase 2: Record query-aware feedback event ────────────────────────
-        # Only store an event when the user gives a concrete vote (not a clear).
-        # We need:
-        #   1. chunk_ids from the assistant message citations
-        #   2. the preceding user message text (the original query)
-        #   3. the query embedding (encoded here in Python — Postgres can't do it)
-        if settings.FEEDBACK_ENABLED and request.rating is not None:
-            try:
-                # Step A: fetch the assistant message (session_id + created_at + citations)
-                asst_res = (
-                    supabase.table("chat_messages")
-                    .select("session_id, created_at, metadata")
-                    .eq("id", request.message_id)
-                    .eq("role", "assistant")
-                    .single()
-                    .execute()
-                )
-                asst_row = asst_res.data if asst_res and asst_res.data else None
-
-                if asst_row:
-                    # Step B: extract chunk_ids from the stored citations
-                    citations = (asst_row.get("metadata") or {}).get("citations") or []
-                    chunk_ids = [
-                        c["chunk_id"]
-                        for c in citations
-                        if isinstance(c, dict) and c.get("chunk_id")
-                    ]
-
-                    if chunk_ids:
-                        # Step C: find the most recent user message sent *before*
-                        #         this assistant reply (that is the original query)
-                        user_msg_res = (
-                            supabase.table("chat_messages")
-                            .select("content")
-                            .eq("session_id", asst_row["session_id"])
-                            .eq("role", "user")
-                            .lt("created_at", asst_row["created_at"])
-                            .order("created_at", desc=True)
-                            .limit(1)
-                            .execute()
-                        )
-                        user_rows = user_msg_res.data if user_msg_res else []
-                        query_text = user_rows[0]["content"] if user_rows else None
-
-                        if query_text:
-                            # Step D: encode the query (lazy-loads the model on first call)
-                            query_embedding = _embedding_model.encode_query(query_text)
-
-                            # Step E: persist one event row per cited chunk
-                            _feedback_service.record_feedback_events(
-                                chunk_ids=chunk_ids,
-                                message_id=request.message_id,
-                                query_embedding=query_embedding,
-                                rating=request.rating,
-                            )
-            except Exception as exc:
-                # Phase 2 event recording is best-effort — never block the response.
-                logger.warning(
-                    "Phase 2 feedback event recording failed (non-fatal): %s", exc
-                )
+        # ── Phase 2: Schedule query-aware event sync as a background task ───────
+        # Always schedule — not just for new votes.  The background task handles
+        # all three transitions:
+        #   changed vote  → delete stale events, insert fresh ones
+        #   new vote      → delete (no-op), insert fresh ones
+        #   cleared vote  → delete stale events, nothing to insert
+        # The sentence-transformer encode_query() (~100-200 ms on CPU) only
+        # runs inside the task, after the response is already sent.
+        if settings.FEEDBACK_ENABLED:
+            background_tasks.add_task(
+                _record_phase2_feedback_event,
+                message_id=request.message_id,
+                rating=request.rating,
+            )
 
         return {"success": True, "score": request.rating}
     except HTTPException:
