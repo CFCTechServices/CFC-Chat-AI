@@ -20,6 +20,13 @@ from docx.document import Document as _DocxDocument
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 
+# PDF support
+try:
+    import pdfplumber
+    _HAS_PDFPLUMBER = True
+except ImportError:
+    _HAS_PDFPLUMBER = False
+
 from app.config import settings  # if you need settings in the future
 
 # Ensure python-docx exposes VML namespace during xpath calls (needed for legacy images)
@@ -142,6 +149,20 @@ class DocumentProcessor:
 
     # -------- Public entry --------
 
+    def process_directory(self, directory: Path) -> List[Dict[str, Any]]:
+        """Process all supported files in a directory recursively."""
+        results: List[Dict[str, Any]] = []
+        supported_extensions = {".pdf", ".doc", ".docx"}
+
+        for file_path in sorted(directory.rglob("*")):
+            if not file_path.is_file():
+                continue
+            if file_path.suffix.lower() not in supported_extensions:
+                continue
+            results.append(self.process_document(file_path))
+
+        return results
+
     def process_document(self, file_path: Path) -> Dict[str, Any]:
         try:
             if not file_path.exists():
@@ -150,6 +171,16 @@ class DocumentProcessor:
             ext = file_path.suffix.lower()
             doc_slug = _slugify(file_path.stem)
             doc_id = doc_slug or str(uuid.uuid4())
+
+            # PDF support
+            if ext == ".pdf":
+                if not _HAS_PDFPLUMBER:
+                    return {
+                        "success": False,
+                        "error": "pdfplumber is not installed. Please install it to process PDFs.",
+                        "source": str(file_path),
+                    }
+                return self._process_pdf(file_path, doc_id=doc_id)
 
             # Normalize: convert if .doc OR a bogus .docx (renamed .doc)
             if ext == ".doc" or (ext == ".docx" and not _is_valid_docx(file_path)):
@@ -175,6 +206,56 @@ class DocumentProcessor:
         except Exception as e:
             logger.exception("process_document failed")
             return {"success": False, "error": str(e), "source": str(file_path)}
+
+    def _process_pdf(self, pdf_path: Path, doc_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Extract text from PDF using pdfplumber and return pipeline-compatible output.
+        """
+        try:
+            with pdfplumber.open(str(pdf_path)) as pdf:
+                pages_text = [page.extract_text() or "" for page in pdf.pages]
+
+            text = "\n".join(t for t in pages_text if t).strip()
+            if not text:
+                return {
+                    "success": False,
+                    "error": "No extractable text found in PDF (possibly scanned/image-only).",
+                    "source": str(pdf_path),
+                }
+
+            chunks = []
+            words = text.split()
+            chunk_size_words = 500
+            for i in range(0, len(words), chunk_size_words):
+                chunk_text = " ".join(words[i:i + chunk_size_words]).strip()
+                if not chunk_text:
+                    continue
+                chunks.append({
+                    "chunk_id": f"{doc_id}_chunk_{i // chunk_size_words + 1}",
+                    "section_id": None,
+                    "text": chunk_text,
+                    "image_paths": [],
+                })
+
+            if not chunks:
+                return {
+                    "success": False,
+                    "error": "No textual chunks produced from PDF.",
+                    "source": str(pdf_path),
+                }
+
+            return {
+                "success": True,
+                "doc_id": doc_id,
+                "source": str(pdf_path),
+                "doc_slug": _slugify(pdf_path.stem),
+                "sections": [],
+                "images": [],
+                "chunks": chunks,
+            }
+        except Exception as e:
+            logger.exception("_process_pdf failed")
+            return {"success": False, "error": str(e), "source": str(pdf_path)}
 
     # -------- Conversion --------
 

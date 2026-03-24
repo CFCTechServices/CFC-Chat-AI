@@ -19,6 +19,7 @@ google-generativeai>=0.8.3
 supabase>=2.0.0
 resend
 email-validator
+pdfplumber>=0.11.0
 
 # ffmpeg is a system binary required by Whisper for audio/video processing.
 # Install it on your OS (macOS: `brew install ffmpeg`, Ubuntu: `sudo apt install ffmpeg`).
