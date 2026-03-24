@@ -77,15 +77,34 @@ class Settings:
     DEFAULT_TOP_K = 5
     MAX_CONTEXT_LENGTH = 4000
 
-    # Feedback Re-Ranking Settings
-    # FEEDBACK_ENABLED: set to "false" to disable re-ranking entirely.
+    # ── Feedback Re-Ranking Settings ──────────────────────────────────────────
+    # FEEDBACK_ENABLED: set "false" to disable all feedback re-ranking.
     FEEDBACK_ENABLED: bool = os.getenv("FEEDBACK_ENABLED", "true").lower() in ("true", "1", "yes")
-    # FEEDBACK_ALPHA: max boost/penalty fraction. With tanh, the multiplier
-    #   is bounded to (1 - alpha, 1 + alpha). Default 0.3 → ±30% max.
+
+    # Phase 1 – Global score boost
+    # FEEDBACK_ALPHA: max boost/penalty fraction applied by the global signal.
+    #   With tanh the multiplier is bounded to (1 − alpha, 1 + alpha).
+    #   Default 0.3 → ±30 % max from global votes alone.
     FEEDBACK_ALPHA: float = float(os.getenv("FEEDBACK_ALPHA", "0.3"))
-    # FEEDBACK_SCALE: controls how quickly tanh saturates.
-    #   Lower = saturates faster (fewer votes needed to hit the ceiling).
+    # FEEDBACK_SCALE: controls how quickly the global tanh saturates.
+    #   Lower value → saturates faster (fewer votes needed to hit the ceiling).
     FEEDBACK_SCALE: float = float(os.getenv("FEEDBACK_SCALE", "5.0"))
+
+    # Phase 2 – Query-aware score boost
+    # FEEDBACK_ALPHA_QUERY: max boost/penalty fraction applied by the
+    #   query-aware signal.  Kept smaller (0.15) so that a single highly-
+    #   similar past query can nudge the ranking without overwhelming it.
+    #   Combined ceiling with Phase 1: (1 − 0.30 − 0.15, 1 + 0.30 + 0.15)
+    #   = (0.55, 1.45) — still tight.
+    FEEDBACK_ALPHA_QUERY: float = float(os.getenv("FEEDBACK_ALPHA_QUERY", "0.15"))
+    # FEEDBACK_SCALE_QUERY: tanh saturation scale for the query-aware signal.
+    #   The weighted score is a float (sum of rating × similarity), so it
+    #   saturates at smaller absolute values than the integer global net score.
+    FEEDBACK_SCALE_QUERY: float = float(os.getenv("FEEDBACK_SCALE_QUERY", "3.0"))
+    # FEEDBACK_SIM_THRESHOLD: minimum cosine similarity between the stored
+    #   query embedding and the current query for an event to be counted.
+    #   0.75 means only very similar questions trigger the boost.
+    FEEDBACK_SIM_THRESHOLD: float = float(os.getenv("FEEDBACK_SIM_THRESHOLD", "0.75"))
 
 settings = Settings()
 

@@ -51,11 +51,15 @@ venv/
 #       Test Coverage
 ########################################
 coverage/
+.coverage
+.coverage.*
+tests/.coverage
+htmlcov/
 
 ########################################
 #       Data & Generated Files
 ########################################
-!data/
+data/
 data/processed/
 data/processed/**
 
@@ -77,5 +81,6 @@ data/videos/meta/*.whisper.json
 *.m4a
 
 # Docs that shouldn't be tracked
-CFC Nutrient Ratio Templates Guide.docx
+*.docx
+*.pdf
 __pycache__/main.cpython-312.pyc
