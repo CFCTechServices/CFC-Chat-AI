@@ -27,6 +27,14 @@ try:
 except ImportError:
     _HAS_PDFPLUMBER = False
 
+# OCR fallback support for scanned/image-only PDFs
+try:
+    import pytesseract
+    from pdf2image import convert_from_path
+    _HAS_PDF_OCR = True
+except ImportError:
+    _HAS_PDF_OCR = False
+
 from app.config import settings  # if you need settings in the future
 
 # Ensure python-docx exposes VML namespace during xpath calls (needed for legacy images)
@@ -42,6 +50,16 @@ except Exception:
     pass
 
 logger = logging.getLogger(__name__)
+
+
+def _configure_tesseract_from_env() -> None:
+    """Allow overriding tesseract executable path via TESSERACT_CMD env var."""
+    if not _HAS_PDF_OCR:
+        return
+
+    tesseract_cmd = os.getenv("TESSERACT_CMD")
+    if tesseract_cmd:
+        pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
 
 # Optional Windows COM for high-fidelity DOC->DOCX
 try:
@@ -105,6 +123,34 @@ def _slugify(name: str) -> str:
     name = re.sub(r"[^\w\-]+", "-", name)
     name = re.sub(r"-{2,}", "-", name).strip("-")
     return name or "document"
+
+
+def _extract_pdf_text_with_ocr(pdf_path: Path) -> str:
+    """
+    OCR fallback for scanned/image-only PDFs.
+    Requires system binaries: Tesseract OCR and Poppler.
+    """
+    if not _HAS_PDF_OCR:
+        return ""
+
+    _configure_tesseract_from_env()
+
+    try:
+        pages = convert_from_path(str(pdf_path), dpi=200)
+    except Exception:
+        logger.exception("Failed to render PDF pages for OCR: %s", pdf_path)
+        return ""
+
+    page_texts: List[str] = []
+    for page in pages:
+        try:
+            text = pytesseract.image_to_string(page) or ""
+            if text.strip():
+                page_texts.append(text)
+        except Exception:
+            logger.exception("OCR failed for a page in PDF: %s", pdf_path)
+
+    return "\n".join(page_texts).strip()
 
 
 # -------------------------
@@ -217,11 +263,24 @@ class DocumentProcessor:
 
             text = "\n".join(t for t in pages_text if t).strip()
             if not text:
-                return {
-                    "success": False,
-                    "error": "No extractable text found in PDF (possibly scanned/image-only).",
-                    "source": str(pdf_path),
-                }
+                logger.info("No direct text extracted from PDF; attempting OCR fallback: %s", pdf_path)
+                text = _extract_pdf_text_with_ocr(pdf_path)
+
+                if not text:
+                    ocr_hint = ""
+                    if not _HAS_PDF_OCR:
+                        ocr_hint = (
+                            " OCR fallback is unavailable; install pytesseract and pdf2image "
+                            "and ensure Tesseract/Poppler system binaries are installed."
+                        )
+                    return {
+                        "success": False,
+                        "error": (
+                            "No extractable text found in PDF (possibly scanned/image-only)."
+                            f"{ocr_hint}"
+                        ),
+                        "source": str(pdf_path),
+                    }
 
             chunks = []
             words = text.split()
