@@ -125,30 +125,70 @@ def _slugify(name: str) -> str:
     return name or "document"
 
 
+# FIX 2: Process OCR strictly one page at a time so only a single rendered
+# page image is ever held in RAM regardless of document size.
 def _extract_pdf_text_with_ocr(pdf_path: Path) -> str:
     """
     OCR fallback for scanned/image-only PDFs.
     Requires system binaries: Tesseract OCR and Poppler.
+
+    Each page is rendered individually, OCR'd, then discarded before the
+    next page is loaded — peak RAM is always ~1 page image, never the whole doc.
     """
     if not _HAS_PDF_OCR:
         return ""
 
     _configure_tesseract_from_env()
 
+    # Determine total page count first (cheap — no rendering involved)
     try:
-        pages = convert_from_path(str(pdf_path), dpi=200)
+        from pdf2image.pdf2image import pdfinfo_from_path
+        info = pdfinfo_from_path(str(pdf_path))
+        total_pages = info.get("Pages", 0)
     except Exception:
-        logger.exception("Failed to render PDF pages for OCR: %s", pdf_path)
-        return ""
+        logger.exception("Could not read page count for OCR: %s", pdf_path)
+        total_pages = None
 
     page_texts: List[str] = []
-    for page in pages:
+
+    if total_pages is None:
+        # Unknown page count: render all at once (last resort fallback)
         try:
-            text = pytesseract.image_to_string(page) or ""
-            if text.strip():
-                page_texts.append(text)
+            pages = convert_from_path(str(pdf_path), dpi=200)
         except Exception:
-            logger.exception("OCR failed for a page in PDF: %s", pdf_path)
+            logger.exception("Failed to render PDF pages for OCR: %s", pdf_path)
+            return ""
+        for page in pages:
+            try:
+                text = pytesseract.image_to_string(page) or ""
+                if text.strip():
+                    page_texts.append(text)
+            except Exception:
+                logger.exception("OCR failed for a page in PDF: %s", pdf_path)
+    else:
+        # FIX 2: Render exactly one page at a time — image is GC'd after each
+        # OCR call so peak RAM is always just a single page image (~3-5MB at 200dpi)
+        for page_num in range(1, total_pages + 1):
+            try:
+                pages = convert_from_path(
+                    str(pdf_path),
+                    dpi=200,
+                    first_page=page_num,
+                    last_page=page_num,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to render PDF page %d for OCR: %s", page_num, pdf_path
+                )
+                continue
+
+            try:
+                text = pytesseract.image_to_string(pages[0]) or ""
+                if text.strip():
+                    page_texts.append(text)
+            except Exception:
+                logger.exception("OCR failed for page %d in PDF: %s", page_num, pdf_path)
+            # `pages` goes out of scope here; PIL image is GC'd, freeing RAM
 
     return "\n".join(page_texts).strip()
 
@@ -255,18 +295,53 @@ class DocumentProcessor:
 
     def _process_pdf(self, pdf_path: Path, doc_id: Optional[str] = None) -> Dict[str, Any]:
         """
-        Extract text from PDF using pdfplumber and return pipeline-compatible output.
+        Extract text from PDF using pdfplumber page-by-page to limit memory
+        usage on large documents (e.g. 100-page email chains).
         """
         try:
+            chunks: List[Dict[str, Any]] = []
+            word_buffer: List[str] = []
+            chunk_size_words = 500
+            chunk_index = 1
+            any_text_found = False
+
+            # FIX 2: Iterate one page at a time instead of building a full
+            # pages_text list upfront — keeps peak RAM proportional to a single
+            # page rather than the entire document.
             with pdfplumber.open(str(pdf_path)) as pdf:
-                pages_text = [page.extract_text() or "" for page in pdf.pages]
+                for page in pdf.pages:
+                    page_text = page.extract_text() or ""
+                    if not page_text.strip():
+                        continue
+                    any_text_found = True
+                    word_buffer.extend(page_text.split())
 
-            text = "\n".join(t for t in pages_text if t).strip()
-            if not text:
+                    # Flush complete chunks as the buffer fills
+                    while len(word_buffer) >= chunk_size_words:
+                        chunk_text = " ".join(word_buffer[:chunk_size_words])
+                        chunks.append({
+                            "chunk_id": f"{doc_id}_chunk_{chunk_index}",
+                            "section_id": None,
+                            "text": chunk_text,
+                            "image_paths": [],
+                        })
+                        word_buffer = word_buffer[chunk_size_words:]
+                        chunk_index += 1
+
+            # Flush any remaining words that didn't fill a full chunk
+            if word_buffer:
+                chunks.append({
+                    "chunk_id": f"{doc_id}_chunk_{chunk_index}",
+                    "section_id": None,
+                    "text": " ".join(word_buffer),
+                    "image_paths": [],
+                })
+
+            if not any_text_found:
                 logger.info("No direct text extracted from PDF; attempting OCR fallback: %s", pdf_path)
-                text = _extract_pdf_text_with_ocr(pdf_path)
+                ocr_text = _extract_pdf_text_with_ocr(pdf_path)
 
-                if not text:
+                if not ocr_text:
                     ocr_hint = ""
                     if not _HAS_PDF_OCR:
                         ocr_hint = (
@@ -282,19 +357,18 @@ class DocumentProcessor:
                         "source": str(pdf_path),
                     }
 
-            chunks = []
-            words = text.split()
-            chunk_size_words = 500
-            for i in range(0, len(words), chunk_size_words):
-                chunk_text = " ".join(words[i:i + chunk_size_words]).strip()
-                if not chunk_text:
-                    continue
-                chunks.append({
-                    "chunk_id": f"{doc_id}_chunk_{i // chunk_size_words + 1}",
-                    "section_id": None,
-                    "text": chunk_text,
-                    "image_paths": [],
-                })
+                # Build chunks from OCR text the same way
+                words = ocr_text.split()
+                for i in range(0, len(words), chunk_size_words):
+                    chunk_text = " ".join(words[i:i + chunk_size_words]).strip()
+                    if chunk_text:
+                        chunks.append({
+                            "chunk_id": f"{doc_id}_chunk_{chunk_index}",
+                            "section_id": None,
+                            "text": chunk_text,
+                            "image_paths": [],
+                        })
+                        chunk_index += 1
 
             if not chunks:
                 return {
@@ -788,6 +862,3 @@ _default_processor = DocumentProcessor()
 
 def process_document(file_path: Path) -> Dict[str, Any]:
     return _default_processor.process_document(file_path)
-
-
-

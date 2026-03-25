@@ -84,6 +84,9 @@
     const [bulkFiles, setBulkFiles] = React.useState([]);
     const [bulkItems, setBulkItems] = React.useState([]);
     const [bulkBusy, setBulkBusy] = React.useState(false);
+    // FIX 1: Dedicated bulk error state so PDF errors show on the Bulk Upload
+    // card instead of accidentally updating singleStatus.
+    const [bulkStatus, setBulkStatus] = React.useState(null);
 
     const handleSingleChange = (e) => {
       const file = e.target.files?.[0] || null;
@@ -124,13 +127,16 @@
       if (hasPdf) {
         setBulkFiles([]);
         setBulkItems([]);
-        setSingleStatus({
+        // FIX 1: Use bulkStatus (not singleStatus) so the error appears
+        // beneath the Bulk Upload card where the user is working.
+        setBulkStatus({
           state: 'error',
           message: 'PDF files are only supported in the Email Upload dropbox.',
         });
         e.target.value = '';
         return;
       }
+      setBulkStatus(null);
       setBulkFiles(files);
       setBulkItems(
         files.map((f) => ({
@@ -146,6 +152,7 @@
     const handleBulkUpload = async () => {
       if (!bulkFiles.length) return;
       setBulkBusy(true);
+      setBulkStatus(null);
       const updated = [...bulkItems];
 
       const updateItem = (idx, patch) => {
@@ -245,6 +252,12 @@
               {bulkBusy ? 'Uploading…' : 'Start bulk upload'}
             </PrimaryButton>
           </div>
+          {/* FIX 1: Render bulkStatus error here, scoped to this card */}
+          {bulkStatus && (
+            <div className={`status-pill status-${bulkStatus.state || 'info'}`}>
+              {bulkStatus.message}
+            </div>
+          )}
           <div className="bulk-list">
             {bulkItems.map((item) => (
               <div key={item.id} className="bulk-item">
