@@ -3,7 +3,7 @@ CFC Animal Feed Software Chatbot API
 Main FastAPI application with organized structure
 """
 from fastapi.staticfiles import StaticFiles
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 import logging
@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 import os
 import shutil
 import certifi
+import imageio_ffmpeg
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
@@ -45,6 +46,28 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+def _ensure_ffmpeg_available() -> str | None:
+    """Return ffmpeg path if available; otherwise None."""
+    ffmpeg_path = shutil.which("ffmpeg")
+    if ffmpeg_path:
+        return ffmpeg_path
+
+    try:
+        bundled_ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+    except (OSError, RuntimeError, ValueError):
+        return None
+
+    if not bundled_ffmpeg or not Path(bundled_ffmpeg).exists():
+        return None
+
+    ffmpeg_dir = str(Path(bundled_ffmpeg).parent)
+    current_path = os.environ.get("PATH", "")
+    if ffmpeg_dir not in current_path.split(os.pathsep):
+        os.environ["PATH"] = ffmpeg_dir + os.pathsep + current_path
+
+    return shutil.which("ffmpeg") or bundled_ffmpeg
 
 # Initialize FastAPI app
 app = FastAPI(
@@ -90,14 +113,17 @@ async def startup_event():
     """Initialize services on startup."""
     logger.info("Starting CFC Animal Feed Software Chatbot API")
     # Ensure ffmpeg is available for Whisper transcription
-    if shutil.which("ffmpeg") is None:
+    ffmpeg_path = _ensure_ffmpeg_available()
+    if ffmpeg_path is None:
         msg = (
             "ffmpeg binary not found. ffmpeg is required for video/audio transcription. "
-            "Install it (macOS): `brew install ffmpeg` — or on Linux: `sudo apt install ffmpeg` "
+            "Install it on Windows: `winget install Gyan.FFmpeg` (or `choco install ffmpeg`), "
+            "macOS: `brew install ffmpeg`, Linux: `sudo apt install ffmpeg`, "
             "or via conda: `conda install -c conda-forge ffmpeg`. After installation restart the server."
         )
         logger.error(msg)
         raise RuntimeError(msg)
+    logger.info("ffmpeg available at: %s", ffmpeg_path)
     
     # Create data directories if they don't exist
     settings.DATA_DIR.mkdir(exist_ok=True)
