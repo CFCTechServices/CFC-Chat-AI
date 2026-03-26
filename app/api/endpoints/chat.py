@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any, Union
 import logging
 import json
+import os
 from app.api.models.requests import SearchRequest, AskRequest, RecommendationRequest
 from app.api.models.responses import SearchResponse, AskResponse, RecommendationResponse, SearchResult, ImageReference
 from app.services.chat_service import ChatService
@@ -26,7 +27,8 @@ _embedding_model = EmbeddingModel()
 _feedback_service = FeedbackService()
 
 # Initialize content repository (same logic as ingest.py)
-if settings.SUPABASE_URL and settings.SUPABASE_BUCKET:
+_has_supabase_bucket = bool(settings.SUPABASE_BUCKET or os.getenv("SUPABASE_BUCKET_DOCS"))
+if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY and _has_supabase_bucket:
     _content_repository = SupabaseContentRepository()
     logger.info("Using SupabaseContentRepository for image serving.")
 else:
@@ -433,8 +435,7 @@ async def ask_question(request: AskRequest):
                     context_text=img.get("context_text"),
                 )
                 for img in result["relevant_images"]
-            ]
-        
+            ]    
         return AskResponse(
             success=True,
             question=request.question,
@@ -537,34 +538,86 @@ async def serve_image(path: str):
     Path format: docs/{doc_id}/images/{filename}
     For Supabase: Returns redirect to public URL
     For local: Returns file from filesystem
+    
+    Also handles legacy short paths (images/{id}.ext) by searching the content root.
     """
     try:
+        logger.info(f"Image request: {path}")
+        
         # Validate path format
-        if not path.startswith("docs/"):
+        if not path.startswith("docs/") and not path.startswith("images/"):
             raise HTTPException(status_code=400, detail="Invalid image path format")
         
         # Handle Supabase storage
         if isinstance(_content_repository, SupabaseContentRepository):
             try:
-                public_url = _content_repository.public_url(path)
-                return RedirectResponse(url=public_url)
+                clean_path = path.lstrip("/")
+                try:
+                    signed_url = _content_repository.create_signed_url(
+                        clean_path,
+                        source_type="document",
+                        expires_in=3600,
+                    )
+                    return RedirectResponse(url=signed_url)
+                except Exception:
+                    public_url = _content_repository.public_url(clean_path)
+                    return RedirectResponse(url=public_url)
             except Exception as e:
                 logger.error(f"Error getting Supabase URL for {path}: {e}")
                 raise HTTPException(status_code=404, detail="Image not found in Supabase storage")
         
         # Handle local storage
-        # Convert storage path (docs/{doc_id}/images/{filename}) to filesystem path
-        # Storage path: docs/{doc_id}/images/{filename}
-        # Filesystem path: {LOCAL_CONTENT_ROOT}/{doc_id}/images/{filename}
-        path_parts = path.split("/")
-        if len(path_parts) < 4 or path_parts[0] != "docs" or path_parts[2] != "images":
-            raise HTTPException(status_code=400, detail="Invalid image path format")
+        # Support both new format (docs/{doc_id}/images/{filename}) and legacy format (images/{filename})
+        image_path = None
+        search_paths = []
         
-        doc_id = path_parts[1]
-        filename = "/".join(path_parts[3:])  # Handle filenames with subdirectories (unlikely but safe)
+        if path.startswith("docs/"):
+            # New format: docs/{doc_id}/images/{filename}
+            # Convert storage path to filesystem path: {LOCAL_CONTENT_ROOT}/{doc_id}/images/{filename}
+            path_parts = path.split("/")
+            if len(path_parts) < 4 or path_parts[0] != "docs" or path_parts[2] != "images":
+                raise HTTPException(status_code=400, detail="Invalid image path format")
+            
+            doc_id = path_parts[1]
+            filename = "/".join(path_parts[3:])  # Handle filenames with subdirectories (unlikely but safe)
+            image_path = settings.LOCAL_CONTENT_ROOT / doc_id / "images" / filename
+            search_paths.append(image_path)
+            logger.info(f"Checking new format path: {image_path}")
+            
+        else:
+            # Legacy format: images/{filename}
+            # Search through all doc directories for this image
+            filename = path.split("/", 1)[1] if "/" in path else path
+            logger.info(f"Legacy format, searching for filename: {filename}")
+            
+            # Check all doc directories for the image
+            root = settings.LOCAL_CONTENT_ROOT
+            if root.exists():
+                for doc_dir in sorted(root.iterdir()):
+                    if doc_dir.is_dir():
+                        candidate = doc_dir / "images" / filename
+                        search_paths.append(candidate)
+                        if candidate.exists():
+                            image_path = candidate
+                            logger.info(f"Found in doc directory: {candidate}")
+                            break
         
-        # Build filesystem path
-        image_path = settings.LOCAL_CONTENT_ROOT / doc_id / "images" / filename
+        # If still not found with legacy searching, try direct path as fallback
+        if not image_path or not image_path.exists():
+            # One more attempt: maybe it's just in images/ directly
+            direct_path = settings.LOCAL_CONTENT_ROOT / "images" / (path.split("/")[-1] if "/" in path else path)
+            search_paths.append(direct_path)
+            if direct_path.exists():
+                image_path = direct_path
+                logger.info(f"Found in direct path: {direct_path}")
+        
+        if not image_path or not image_path.exists():
+            # Log all paths we tried
+            logger.warning(f"Image not found. Checked paths: {search_paths}")
+            logger.warning(f"Content root exists: {settings.LOCAL_CONTENT_ROOT.exists()}")
+            if settings.LOCAL_CONTENT_ROOT.exists():
+                logger.warning(f"Content root contents: {list(settings.LOCAL_CONTENT_ROOT.iterdir())}")
+            raise HTTPException(status_code=404, detail="Image not found")
         
         # Security check: ensure path is within content root
         try:
@@ -572,8 +625,7 @@ async def serve_image(path: str):
         except ValueError:
             raise HTTPException(status_code=403, detail="Access denied")
         
-        if not image_path.exists():
-            raise HTTPException(status_code=404, detail="Image not found")
+        logger.info(f"Serving image from: {image_path}")
         
         # Determine content type from extension
         ext = image_path.suffix.lower()
@@ -590,11 +642,11 @@ async def serve_image(path: str):
         return FileResponse(
             path=image_path,
             media_type=media_type,
-            filename=filename
+            filename=image_path.name
         )
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error serving image {path}: {e}")
+        logger.error(f"Error serving image {path}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

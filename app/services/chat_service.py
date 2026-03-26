@@ -116,9 +116,11 @@ class ChatService:
             if settings.OPENAI_API_KEY or settings.GEMINI_API_KEY:
                 try:
                     answer, image_positions = self._generate_llm_answer(question, formatted_context, relevant_images, conversation_history)
-                    # Remove image markers from answer text
+                    # Remove image markers and chunk citations from answer text
                     import re
-                    answer = re.sub(r'\[IMAGE:\s*[^\]]+\]', '', answer).strip()
+                    answer = re.sub(r'\[IMAGE:\s*[^\]]+\]', '', answer)
+                    answer = re.sub(r'\[CHUNKS_CITED:[^\]]+\]', '', answer)
+                    answer = answer.strip()
                 except Exception as llm_exc:
                     logger.warning(f"LLM generation failed, falling back to stub: {llm_exc}")
                     # Fallback to simple answer (handles empty chunks)
@@ -421,20 +423,24 @@ class ChatService:
         
         Args:
             question: User's question
-            formatted_context: Formatted context text
-            available_images: List of available images with metadata
+            formatted_context: Formatted context text with [CHUNK_ID: xxx] markers
+            available_images: List of available images with metadata (including chunk_id)
             conversation_history: Optional list of previous messages in format [{"role": "user"|"assistant", "content": "text"}]
         
         Returns:
             Tuple of (answer_text, image_positions) where image_positions is a list of
-            dicts with 'position' (int) and 'path' (str) keys
+            dicts with 'position' (int), 'path' (str), and 'chunk_id' (str) keys
         """
         system_prompt = (
             "You are a helpful assistant that answers questions with help from the provided context. "
             "If the context does not directly contain the answer, use the context to answer to the best of your ability. "
             "If the question is any kind of small talk, such as a greeting or thanking you, respond accordingly and kindly. "
             "If the question is very clearly unrelated to the context, say that you're unsure and offer to help with something else. "
-            "Respond clearly and concisely."
+            "Respond clearly and concisely.\n\n"
+            "IMPORTANT: At the end of your response, list which chunks you actually cited to form your answer. "
+            "Format them as: [CHUNKS_CITED: chunk_id_1, chunk_id_2, chunk_id_3, ...]. "
+            "Only list chunks you directly referenced or drew information from. Even if only using one chunk, use this format. "
+            "This helps us show only relevant images from the chunks you actually used."
         )
         
         # Build image context if available
@@ -443,16 +449,17 @@ class ChatService:
             image_list = []
             for img in available_images:
                 path = img.get('path', '')
+                chunk_id = img.get('chunk_id', 'unknown')
                 context_text = img.get('context_text', '')[:150]  # Truncate for prompt
-                image_list.append(f"- [IMAGE: {path}] - Context: {context_text}")
+                image_list.append(f"- [IMAGE: {path}] (from [CHUNK_ID: {chunk_id}]) - Context: {context_text}")
             
             image_context = (
                 "\n\nAvailable relevant images (include [IMAGE: path] markers in your response when appropriate):\n"
                 + "\n".join(image_list) + 
                 "\n\nWhen your answer would benefit from showing an image, include [IMAGE: path] at the "
                 "point in your response where the image should appear. Place images immediately after the sentence "
-                "that describes what the corresponding image illustrates. Only reference images that are "
-                "directly relevant to answering the question. Do not place an image marker between a sentence and "
+                "that describes what the corresponding image illustrates. Only reference images from chunks you cited "
+                "in [CHUNKS_CITED: ...]. Do not place an image marker between a sentence and "
                 "its corresponding punctuation. Do not place an image marker somewhere that will break up a sentence."
             )
         
@@ -494,7 +501,9 @@ class ChatService:
             if not content:
                 raise RuntimeError("Empty response from OpenAI")
             answer_text = content.strip()
-            image_positions = self._parse_image_references(answer_text, available_images or [])
+            # Extract cited chunk IDs and use them to filter images
+            cited_chunks = self._extract_cited_chunks(answer_text)
+            image_positions = self._parse_image_references_by_chunks(answer_text, available_images or [], cited_chunks)
             return answer_text, image_positions
 
         if settings.GEMINI_API_KEY:
@@ -527,25 +536,55 @@ class ChatService:
             if not content:
                 raise RuntimeError("Empty response from Gemini")
             answer_text = content.strip()
-            image_positions = self._parse_image_references(answer_text, available_images or [])
+            # Extract cited chunk IDs and use them to filter images
+            cited_chunks = self._extract_cited_chunks(answer_text)
+            image_positions = self._parse_image_references_by_chunks(answer_text, available_images or [], cited_chunks)
             return answer_text, image_positions
 
         raise RuntimeError("No LLM API key configured")
     
-    def _parse_image_references(self, answer_text: str, available_images: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Parse [IMAGE: path] markers from LLM response and return positions.
+    def _extract_cited_chunks(self, answer_text: str) -> set:
+        """Extract chunk IDs from [CHUNKS_CITED: ...] marker in LLM response.
+        
+        Args:
+            answer_text: LLM response text
+        
+        Returns:
+            Set of chunk IDs that the LLM cited
+        """
+        import re
+        
+        # Look for [CHUNKS_CITED: chunk1, chunk2, ...] pattern
+        match = re.search(r'\[CHUNKS_CITED:\s*([^\]]+)\]', answer_text)
+        if not match:
+            return set()
+        
+        cited_text = match.group(1)
+        # Split by comma and strip whitespace
+        chunk_ids = {cid.strip() for cid in cited_text.split(',') if cid.strip()}
+        return chunk_ids
+    
+    def _parse_image_references_by_chunks(self, answer_text: str, available_images: List[Dict[str, Any]], cited_chunks: set) -> List[Dict[str, Any]]:
+        """Parse [IMAGE: path] markers from LLM response and filter by cited chunks.
         
         Args:
             answer_text: LLM response text that may contain [IMAGE: path] markers
             available_images: List of available images to validate against
+            cited_chunks: Set of chunk IDs that the LLM cited
         
         Returns:
-            List of dicts with 'position' (character index) and 'path' (image path)
+            List of dicts with 'position' (character index), 'path' (image path), and 'chunk_id'
         """
         import re
         
+        # If no chunks were cited explicitly, include all images (fallback)
+        # Otherwise, only include images from cited chunks
+        valid_images = available_images
+        if cited_chunks:
+            valid_images = [img for img in available_images if img.get('chunk_id') in cited_chunks]
+        
         # Create a set of valid image paths for quick lookup
-        valid_paths = {img.get('path', '') for img in available_images}
+        valid_paths = {img.get('path', ''): img for img in valid_images}
         
         # Find all [IMAGE: path] markers
         pattern = r'\[IMAGE:\s*([^\]]+)\]'
@@ -557,9 +596,11 @@ class ChatService:
             # Only include if path is in available images
             if path in valid_paths:
                 position = match.start()  # Position where marker starts
+                img_meta = valid_paths[path]
                 image_positions.append({
                     'position': position,
-                    'path': path
+                    'path': path,
+                    'chunk_id': img_meta.get('chunk_id', ''),
                 })
         
         # Sort by position

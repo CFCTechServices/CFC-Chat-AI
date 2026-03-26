@@ -27,10 +27,17 @@ try:
 except ImportError:
     _HAS_PDFPLUMBER = False
 
+# pymupdf for structured PDF extraction (headings, images, tables)
+try:
+    import fitz  # pymupdf
+    _HAS_PYMUPDF = True
+except ImportError:
+    _HAS_PYMUPDF = False
+
 # OCR fallback support for scanned/image-only PDFs
 try:
     import pytesseract
-    from pdf2image import convert_from_path
+    from pdf2image import convert_from_path, pdfinfo_from_path
     _HAS_PDF_OCR = True
 except ImportError:
     _HAS_PDF_OCR = False
@@ -125,8 +132,7 @@ def _slugify(name: str) -> str:
     return name or "document"
 
 
-# FIX 2: Process OCR strictly one page at a time so only a single rendered
-# page image is ever held in RAM regardless of document size.
+
 def _extract_pdf_text_with_ocr(pdf_path: Path) -> str:
     """
     OCR fallback for scanned/image-only PDFs.
@@ -142,7 +148,6 @@ def _extract_pdf_text_with_ocr(pdf_path: Path) -> str:
 
     # Determine total page count first (cheap — no rendering involved)
     try:
-        from pdf2image.pdf2image import pdfinfo_from_path
         info = pdfinfo_from_path(str(pdf_path))
         total_pages = info.get("Pages", 0)
     except Exception:
@@ -166,8 +171,9 @@ def _extract_pdf_text_with_ocr(pdf_path: Path) -> str:
             except Exception:
                 logger.exception("OCR failed for a page in PDF: %s", pdf_path)
     else:
-        # FIX 2: Render exactly one page at a time — image is GC'd after each
-        # OCR call so peak RAM is always just a single page image (~3-5MB at 200dpi)
+        # Render exactly one page at a time to minimize peak RAM usage.
+        # Each page image is garbage collected after OCR, keeping memory
+        # at ~3-5MB per page regardless of total document size.
         for page_num in range(1, total_pages + 1):
             try:
                 pages = convert_from_path(
@@ -245,7 +251,15 @@ class DocumentProcessor:
                 continue
             if file_path.suffix.lower() not in supported_extensions:
                 continue
-            results.append(self.process_document(file_path))
+            result = self.process_document(file_path)
+            results.append(result)
+            # Log failures for debuggability in batch operations
+            if not result.get("success", False):
+                logger.warning(
+                    "Failed to process file %s: %s",
+                    file_path,
+                    result.get("error", "Unknown error")
+                )
 
         return results
 
@@ -295,19 +309,228 @@ class DocumentProcessor:
 
     def _process_pdf(self, pdf_path: Path, doc_id: Optional[str] = None) -> Dict[str, Any]:
         """
-        Extract text from PDF using pdfplumber page-by-page to limit memory
-        usage on large documents (e.g. 100-page email chains).
+        Dispatch to structured extraction (pymupdf) when available, otherwise
+        fall back to flat word-buffer extraction via pdfplumber only.
         """
-        try:
-            chunks: List[Dict[str, Any]] = []
-            word_buffer: List[str] = []
-            chunk_size_words = 500
-            chunk_index = 1
-            any_text_found = False
+        if _HAS_PYMUPDF:
+            return self._process_pdf_structured(pdf_path, doc_id=doc_id)
+        return self._process_pdf_flat(pdf_path, doc_id=doc_id)
 
-            # FIX 2: Iterate one page at a time instead of building a full
-            # pages_text list upfront — keeps peak RAM proportional to a single
-            # page rather than the entire document.
+    def _process_pdf_structured(self, pdf_path: Path, doc_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Structured PDF extraction using pymupdf + pdfplumber:
+          - Detects headings from font size / bold flags → section hierarchy
+          - Extracts tables via pdfplumber, interleaved by y-position
+          - Extracts embedded images (SHA1 dedup, same _ImageRecord path as DOCX)
+          - Feeds sections into the shared _build_chunks() — identical to DOCX chunking
+        """
+        doc_slug = _slugify(pdf_path.stem)
+
+        try:
+            fitz_doc = fitz.open(str(pdf_path))
+        except Exception as e:
+            return {"success": False, "error": f"Failed to open PDF: {e}", "source": str(pdf_path)}
+
+        try:
+            # ── Pass 1: collect all span sizes to compute the body baseline ──
+            all_sizes: List[float] = []
+            for fitz_page in fitz_doc:
+                for block in fitz_page.get_text("dict")["blocks"]:
+                    if block["type"] != 0:
+                        continue
+                    for line in block["lines"]:
+                        for span in line["spans"]:
+                            if span["text"].strip():
+                                all_sizes.append(span["size"])
+
+            if not all_sizes:
+                # Scanned / image-only PDF — hand off to OCR fallback
+                fitz_doc.close()
+                return self._process_pdf_ocr_fallback(pdf_path, doc_id=doc_id)
+
+            all_sizes.sort()
+            baseline_size: float = all_sizes[len(all_sizes) // 2]  # median
+
+            # ── Pass 2: page-by-page structured extraction ───────────────────
+            sections: List[Dict[str, Any]] = []
+            images: List[_ImageRecord] = []
+            seen_hashes: set = set()
+            img_seq = 0
+            current_section: Optional[Dict[str, Any]] = None
+            sec_idx = 0
+
+            def _open_section(title: str, level: int) -> Dict[str, Any]:
+                nonlocal sec_idx
+                sec_idx += 1
+                sec: Dict[str, Any] = {
+                    "section_id": str(uuid.uuid4()),
+                    "title": title,
+                    "level": level,
+                    "blocks": [],
+                    "suggested_name": f"{doc_slug}__sec{sec_idx:03d}_{_slugify(title)[:40]}.json",
+                    "doc_slug": doc_slug,
+                    "index": sec_idx,
+                }
+                sections.append(sec)
+                return sec
+
+            def _ensure_section() -> Dict[str, Any]:
+                nonlocal current_section
+                if current_section is None:
+                    current_section = _open_section("Untitled", 1)
+                return current_section
+
+            with pdfplumber.open(str(pdf_path)) as plumber_pdf:
+                for page_idx in range(len(fitz_doc)):
+                    fitz_page = fitz_doc[page_idx]
+                    plumber_page = plumber_pdf.pages[page_idx]
+
+                    # ── Tables: extract via pdfplumber, record bboxes ────────
+                    # pdfplumber uses top-left origin (top = distance from page top),
+                    # matching pymupdf's y-axis direction — no coordinate flip needed.
+                    table_regions: List[Tuple[Optional[Tuple], List[List[str]]]] = []
+                    try:
+                        for tbl in plumber_page.find_tables():
+                            rows = tbl.extract() or []
+                            clean = [[cell or "" for cell in row] for row in rows]
+                            table_regions.append((tbl.bbox, clean))
+                    except Exception:
+                        # find_tables unavailable (older pdfplumber) — no bbox info
+                        for raw in plumber_page.extract_tables() or []:
+                            clean = [[cell or "" for cell in row] for row in raw]
+                            table_regions.append((None, clean))
+
+                    table_bboxes = [bbox for (bbox, _) in table_regions if bbox is not None]
+
+                    def _in_table_region(block_bbox: Tuple) -> bool:
+                        bx0, by0, bx1, by1 = block_bbox
+                        for tx0, ty0, tx1, ty1 in table_bboxes:
+                            if bx0 < tx1 and bx1 > tx0 and by0 < ty1 and by1 > ty0:
+                                return True
+                        return False
+
+                    # ── Text blocks: heading detection via font metadata ──────
+                    # Collect (y0, kind, data) tuples then sort by vertical position.
+                    ordered: List[Tuple[float, str, Dict]] = []
+
+                    for block in fitz_page.get_text("dict")["blocks"]:
+                        if block["type"] != 0:
+                            continue
+                        if _in_table_region(block["bbox"]):
+                            continue  # text inside a table is handled via pdfplumber
+
+                        for line in block["lines"]:
+                            spans = [s for s in line["spans"] if s["text"].strip()]
+                            if not spans:
+                                continue
+                            line_text = " ".join(s["text"] for s in spans).strip()
+                            if not line_text:
+                                continue
+
+                            avg_size = sum(s["size"] for s in spans) / len(spans)
+                            is_bold = any(s["flags"] & 16 for s in spans)
+                            is_heading = (
+                                avg_size >= baseline_size * 1.2
+                                or (is_bold and avg_size >= baseline_size * 1.05)
+                            )
+
+                            y0: float = line["bbox"][1]
+                            if is_heading:
+                                if avg_size >= baseline_size * 1.8:
+                                    level = 1
+                                elif avg_size >= baseline_size * 1.4:
+                                    level = 2
+                                else:
+                                    level = 3
+                                ordered.append((y0, "heading", {"text": line_text, "level": level}))
+                            else:
+                                ordered.append((y0, "text", {"text": line_text}))
+
+                    # Insert tables at their top-y position for correct interleaving
+                    for (bbox, rows) in table_regions:
+                        y0 = float(bbox[1]) if bbox else float("inf")
+                        ordered.append((y0, "table", {"rows": rows}))
+
+                    ordered.sort(key=lambda t: t[0])
+
+                    # ── Apply ordered blocks into sections ───────────────────
+                    for _, btype, data in ordered:
+                        if btype == "heading":
+                            current_section = _open_section(data["text"], data["level"])
+                        elif btype == "text":
+                            text = _norm_text(data["text"])
+                            if text:
+                                _ensure_section()["blocks"].append({"type": "text", "text": text})
+                        elif btype == "table":
+                            _ensure_section()["blocks"].append({"type": "table", "rows": data["rows"]})
+
+                    # ── Images: extract via pymupdf, SHA1 dedup ──────────────
+                    for img_info in fitz_page.get_images(full=True):
+                        xref = img_info[0]
+                        try:
+                            img_dict = fitz_doc.extract_image(xref)
+                            img_bytes = img_dict["image"]
+                            h = _hash_bytes(img_bytes)
+                            if h in seen_hashes:
+                                continue
+                            seen_hashes.add(h)
+                            img_ext = "." + img_dict.get("ext", "png")
+                            img_id = h[:16]
+                            img_seq += 1
+                            rec = _ImageRecord(
+                                image_id=img_id,
+                                extension=img_ext,
+                                data=img_bytes,
+                                width_px=img_dict.get("width"),
+                                height_px=img_dict.get("height"),
+                                doc_slug=doc_slug,
+                                seq=img_seq,
+                                suggested_name=f"{doc_slug}__img{img_seq:03d}{img_ext}",
+                            )
+                            images.append(rec)
+                            _ensure_section()["blocks"].append({"type": "image", "path": rec.placeholder_path})
+                        except Exception:
+                            logger.warning(
+                                "Failed to extract image xref=%d on page %d of %s",
+                                xref, page_idx, pdf_path,
+                            )
+
+        finally:
+            fitz_doc.close()
+
+        if not sections or not any(sec.get("blocks") for sec in sections):
+            return {"success": False, "error": "No content extracted from PDF.", "source": str(pdf_path)}
+
+        chunks = self._build_chunks(sections)
+        if not chunks:
+            return {"success": False, "error": "No textual chunks produced from PDF.", "source": str(pdf_path)}
+
+        logger.info(
+            "PDF structured extraction: %d sections, %d images, %d chunks — %s",
+            len(sections), len(images), len(chunks), pdf_path.name,
+        )
+        return {
+            "success": True,
+            "doc_id": doc_id,
+            "source": str(pdf_path),
+            "doc_slug": doc_slug,
+            "sections": sections,
+            "images": [self._image_to_dict(img) for img in images],
+            "chunks": chunks,
+        }
+
+    def _process_pdf_flat(self, pdf_path: Path, doc_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Flat word-buffer extraction via pdfplumber only (no section structure).
+        Used as fallback when pymupdf is not installed.
+        """
+        doc_slug = _slugify(pdf_path.stem)
+        chunks: List[Dict[str, Any]] = []
+        word_buffer: List[str] = []
+        chunk_size_words = 500
+        any_text_found = False
+
+        try:
             with pdfplumber.open(str(pdf_path)) as pdf:
                 for page in pdf.pages:
                     page_text = page.extract_text() or ""
@@ -316,79 +539,100 @@ class DocumentProcessor:
                     any_text_found = True
                     word_buffer.extend(page_text.split())
 
-                    # Flush complete chunks as the buffer fills
                     while len(word_buffer) >= chunk_size_words:
                         chunk_text = " ".join(word_buffer[:chunk_size_words])
                         chunks.append({
-                            "chunk_id": f"{doc_id}_chunk_{chunk_index}",
+                            "chunk_id": str(uuid.uuid4()),
                             "section_id": None,
                             "text": chunk_text,
                             "image_paths": [],
                         })
                         word_buffer = word_buffer[chunk_size_words:]
-                        chunk_index += 1
 
-            # Flush any remaining words that didn't fill a full chunk
             if word_buffer:
                 chunks.append({
-                    "chunk_id": f"{doc_id}_chunk_{chunk_index}",
+                    "chunk_id": str(uuid.uuid4()),
                     "section_id": None,
                     "text": " ".join(word_buffer),
                     "image_paths": [],
                 })
 
             if not any_text_found:
-                logger.info("No direct text extracted from PDF; attempting OCR fallback: %s", pdf_path)
-                ocr_text = _extract_pdf_text_with_ocr(pdf_path)
-
-                if not ocr_text:
-                    ocr_hint = ""
-                    if not _HAS_PDF_OCR:
-                        ocr_hint = (
-                            " OCR fallback is unavailable; install pytesseract and pdf2image "
-                            "and ensure Tesseract/Poppler system binaries are installed."
-                        )
-                    return {
-                        "success": False,
-                        "error": (
-                            "No extractable text found in PDF (possibly scanned/image-only)."
-                            f"{ocr_hint}"
-                        ),
-                        "source": str(pdf_path),
-                    }
-
-                # Build chunks from OCR text the same way
-                words = ocr_text.split()
-                for i in range(0, len(words), chunk_size_words):
-                    chunk_text = " ".join(words[i:i + chunk_size_words]).strip()
-                    if chunk_text:
-                        chunks.append({
-                            "chunk_id": f"{doc_id}_chunk_{chunk_index}",
-                            "section_id": None,
-                            "text": chunk_text,
-                            "image_paths": [],
-                        })
-                        chunk_index += 1
+                return self._process_pdf_ocr_fallback(pdf_path, doc_id=doc_id)
 
             if not chunks:
-                return {
-                    "success": False,
-                    "error": "No textual chunks produced from PDF.",
-                    "source": str(pdf_path),
-                }
+                return {"success": False, "error": "No textual chunks produced from PDF.", "source": str(pdf_path)}
 
             return {
                 "success": True,
                 "doc_id": doc_id,
                 "source": str(pdf_path),
-                "doc_slug": _slugify(pdf_path.stem),
+                "doc_slug": doc_slug,
                 "sections": [],
                 "images": [],
                 "chunks": chunks,
             }
         except Exception as e:
-            logger.exception("_process_pdf failed")
+            logger.exception("_process_pdf_flat failed")
             return {"success": False, "error": str(e), "source": str(pdf_path)}
+
+    def _process_pdf_ocr_fallback(self, pdf_path: Path, doc_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        OCR fallback for scanned / image-only PDFs.
+        Returns a single flat section with word-buffer chunks (no structure available from OCR output).
+        """
+        doc_slug = _slugify(pdf_path.stem)
+        logger.info("No direct text in PDF; attempting OCR fallback: %s", pdf_path)
+        ocr_text = _extract_pdf_text_with_ocr(pdf_path)
+
+        if not ocr_text:
+            ocr_hint = (
+                " OCR fallback is unavailable; install pytesseract and pdf2image "
+                "and ensure Tesseract/Poppler system binaries are installed."
+                if not _HAS_PDF_OCR else ""
+            )
+            return {
+                "success": False,
+                "error": f"No extractable text found in PDF (possibly scanned/image-only).{ocr_hint}",
+                "source": str(pdf_path),
+            }
+
+        section_id = str(uuid.uuid4())
+        chunks: List[Dict[str, Any]] = []
+        words = ocr_text.split()
+        chunk_size_words = 500
+        for i in range(0, len(words), chunk_size_words):
+            chunk_text = " ".join(words[i:i + chunk_size_words]).strip()
+            if chunk_text:
+                chunks.append({
+                    "chunk_id": str(uuid.uuid4()),
+                    "section_id": section_id,
+                    "text": chunk_text,
+                    "image_paths": [],
+                })
+
+        if not chunks:
+            return {"success": False, "error": "No textual chunks produced from PDF.", "source": str(pdf_path)}
+
+        sections = [{
+            "section_id": section_id,
+            "title": "Untitled",
+            "level": 1,
+            "blocks": [],
+            "suggested_name": f"{doc_slug}__sec001_untitled.json",
+            "doc_slug": doc_slug,
+            "index": 1,
+        }]
+
+        return {
+            "success": True,
+            "doc_id": doc_id,
+            "source": str(pdf_path),
+            "doc_slug": doc_slug,
+            "sections": sections,
+            "images": [],
+            "chunks": chunks,
+        }
 
     # -------- Conversion --------
 
