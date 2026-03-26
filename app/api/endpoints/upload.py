@@ -83,12 +83,16 @@ async def upload_file(file: UploadFile = File(...)):
         # Pydantic v1/v2 compatibility
         to_dict = getattr(ingest_result, "model_dump", None) or getattr(ingest_result, "dict")
         ingestion_data = to_dict()
+        # Clean up local staging file now that ingestion is complete
+        try:
+            local_path.unlink(missing_ok=True)
+        except Exception:
+            pass
     except Exception as ing_exc:
         ingestion_data = {"success": False, "error": str(ing_exc)}
 
     return {
         "message": "File uploaded and ingestion triggered",
-        "local_path": str(local_path),
         "supabase": supabase_info,
         "ingestion": ingestion_data,
     }
@@ -136,7 +140,6 @@ async def bulk_upload(files: List[UploadFile] = File(...)) -> Dict[str, Any]:
             local_path = documents_dir / original_filename # Use original filename for local save
             with local_path.open("wb") as f:
                 f.write(contents)
-            item["local_path"] = str(local_path)
 
             # Optional Supabase mirror
             if sb is not None:
@@ -155,6 +158,11 @@ async def bulk_upload(files: List[UploadFile] = File(...)) -> Dict[str, Any]:
                 to_dict = getattr(ingest_result, "model_dump", None) or getattr(ingest_result, "dict")
                 item["ingestion"] = to_dict()
                 success_count += 1
+                # Clean up local staging file
+                try:
+                    local_path.unlink(missing_ok=True)
+                except Exception:
+                    pass
             except Exception as ing_exc:
                 item["ingestion"] = {"success": False, "error": str(ing_exc)}
                 failure_count += 1
