@@ -4,7 +4,7 @@
 
 | Spec | Minimum | Recommended |
 |------|---------|-------------|
-| **OS** | Windows Server 2022 | Windows Server 2022 |
+| **OS** | Windows 10 Pro | Windows 10 Pro |
 | **vCPUs** | 2 | 4 |
 | **RAM** | 8 GB | 16 GB |
 | **Disk** | 60 GB | 100 GB |
@@ -16,8 +16,10 @@
 
 | VM Size | vCPUs | RAM |
 |---------|-------|-----|
-| **Standard_D2s_v5** | 2 | 8 GB |
-| **Standard_D4s_v5** *(recommended)* | 4 | 16 GB |
+| **Standard_D2s_v3** | 2 | 8 GB |
+| **Standard_D4s_v3** *(recommended)* | 4 | 16 GB |
+
+> **Note:** Azure VMs with Windows 10 Pro typically use the `Standard_D*` series with a Windows 10 client OS image.
 
 ---
 
@@ -44,10 +46,12 @@ Then **reboot** the VM.
 - Use default settings during installation
 
 ### 4. IIS (Internet Information Services)
-IIS is built into Windows Server but must be enabled:
-1. Open **Server Manager** → **Add Roles and Features**
-2. Select **Web Server (IIS)** → Install
-3. Download and install these two IIS extensions:
+IIS is built into Windows 10 Pro but must be enabled:
+1. Press **Windows + R** → type `optionalfeatures` → press Enter
+2. In the list, expand **Internet Information Services** and check the box
+3. Also check **Internet Information Services → World Wide Web Services → Application Development Features → CGI** (required for proxy features)
+4. Click **OK** and wait for Windows to apply the changes
+5. Download and install these two IIS extensions:
    - [URL Rewrite Module](https://www.iis.net/downloads/microsoft/url-rewrite)
    - [Application Request Routing (ARR)](https://www.iis.net/downloads/microsoft/application-request-routing)
 

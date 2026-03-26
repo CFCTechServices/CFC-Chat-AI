@@ -51,7 +51,7 @@ The application code is entirely cross-platform. **No Python or JavaScript files
 
 | Spec | Linux | Windows |
 |------|-------|---------|
-| OS | Ubuntu 22.04 LTS | Windows Server 2022 |
+| OS | Ubuntu 22.04 LTS | Windows 10 Pro |
 | RAM minimum | 4 GB | 8 GB (Docker Desktop + WSL2 overhead) |
 | Disk minimum | 40 GB | 60 GB (WSL2 disk image + Docker layers) |
 | Reverse proxy | Nginx | IIS + URL Rewrite + ARR |

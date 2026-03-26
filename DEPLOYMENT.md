@@ -546,7 +546,7 @@ On first startup, OpenAI Whisper will download the `base` model (~140 MB). This 
 
 ## 11. Deployment on Windows VM (Docker Desktop + IIS)
 
-If the VM runs Windows Server instead of Linux, the application code remains unchanged — only the deployment infrastructure differs.
+If the VM runs Windows instead of Linux, the application code remains unchanged — only the deployment infrastructure differs. The instructions below apply to **Windows 10 Pro** (the confirmed VM OS).
 
 ### Prerequisites
 
@@ -555,19 +555,20 @@ If the VM runs Windows Server instead of Linux, the application code remains unc
 | WSL2 | Required backend for Docker Desktop | `wsl --install` (admin PowerShell), then reboot |
 | Docker Desktop | Runs the backend container | [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/) |
 | Git for Windows | Clone the repo | [git-scm.com](https://git-scm.com/download/win) |
-| IIS | Reverse proxy (replaces Nginx) | Server Manager → Add Roles → Web Server (IIS) |
+| IIS | Reverse proxy (replaces Nginx) | **Win + R** → `optionalfeatures` → check **Internet Information Services** |
 | IIS URL Rewrite | Rewrite rules for SPA and proxy | [iis.net/downloads/microsoft/url-rewrite](https://www.iis.net/downloads/microsoft/url-rewrite) |
 | IIS ARR | Application Request Routing for proxy | [iis.net/downloads/microsoft/application-request-routing](https://www.iis.net/downloads/microsoft/application-request-routing) |
 
 > **Windows VM sizing:** 8 GB RAM / 60 GB disk minimum (higher than Linux due to Docker Desktop + WSL2 overhead). See `VM_REQUIREMENTS.md` for details.
 
-### Step 1: Enable ARR Proxy in IIS
+### Step 1: Enable IIS on Windows 10 Pro
 
-1. Open **IIS Manager**
-2. Click the **server name** (top level, not a site)
-3. Double-click **Application Request Routing Cache**
-4. Click **Server Proxy Settings** in the Actions pane
-5. Check **Enable proxy** → Apply
+1. Press **Windows + R** → type `optionalfeatures` → press Enter
+2. Expand **Internet Information Services** → check the top-level box
+3. Also expand: **World Wide Web Services → Application Development Features** → check **CGI**
+4. Click **OK** — Windows will install IIS
+5. Install **URL Rewrite** and **ARR** from the links above
+6. Open **IIS Manager** → click the **computer name** (top level) → double-click **Application Request Routing Cache** → **Server Proxy Settings** → check **Enable proxy** → Apply
 
 ### Step 2: Clone and Configure
 
