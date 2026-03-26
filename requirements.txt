@@ -9,7 +9,7 @@ numpy
 pathlib
 typing-extensions
 python-dotenv
-pywin32
+pywin32; sys_platform == "win32"
 python-multipart>=0.0.20
 pytest
 supabase>=2.0.0
