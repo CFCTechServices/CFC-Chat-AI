@@ -2,12 +2,21 @@
   const { Card, PrimaryButton } = window.CFC.Primitives;
 
   const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.m4v', '.mkv', '.webm'];
+  const NON_PDF_UPLOAD_ACCEPT = '.doc,.docx,.txt,.md,.mp4,.mov,.m4v,.mkv,.webm';
+  const EMAIL_PDF_ACCEPT = '.pdf,application/pdf';
 
   function isVideoFile(file) {
     if (!file) return false;
     if (file.type && file.type.startsWith('video/')) return true;
     const lower = (file.name || '').toLowerCase();
     return VIDEO_EXTENSIONS.some((ext) => lower.endsWith(ext));
+  }
+
+  function isPdfFile(file) {
+    if (!file) return false;
+    const lower = (file.name || '').toLowerCase();
+    if (lower.endsWith('.pdf')) return true;
+    return file.type === 'application/pdf';
   }
 
   function fileSlug(file) {
@@ -68,12 +77,29 @@
     const [singleStatus, setSingleStatus] = React.useState(null);
     const [singleProgress, setSingleProgress] = React.useState(0);
 
+    const [emailFile, setEmailFile] = React.useState(null);
+    const [emailStatus, setEmailStatus] = React.useState(null);
+    const [emailProgress, setEmailProgress] = React.useState(0);
+
     const [bulkFiles, setBulkFiles] = React.useState([]);
     const [bulkItems, setBulkItems] = React.useState([]);
     const [bulkBusy, setBulkBusy] = React.useState(false);
+    // FIX 1: Dedicated bulk error state so PDF errors show on the Bulk Upload
+    // card instead of accidentally updating singleStatus.
+    const [bulkStatus, setBulkStatus] = React.useState(null);
 
     const handleSingleChange = (e) => {
       const file = e.target.files?.[0] || null;
+      if (file && isPdfFile(file)) {
+        setSingleFile(null);
+        setSingleStatus({
+          state: 'error',
+          message: 'PDF uploads are only supported in the Email Upload dropbox.',
+        });
+        setSingleProgress(0);
+        e.target.value = '';
+        return;
+      }
       setSingleFile(file);
       setSingleStatus(null);
       setSingleProgress(0);
@@ -97,6 +123,20 @@
 
     const handleBulkChange = (e) => {
       const files = Array.from(e.target.files || []);
+      const hasPdf = files.some(isPdfFile);
+      if (hasPdf) {
+        setBulkFiles([]);
+        setBulkItems([]);
+        // FIX 1: Use bulkStatus (not singleStatus) so the error appears
+        // beneath the Bulk Upload card where the user is working.
+        setBulkStatus({
+          state: 'error',
+          message: 'PDF files are only supported in the Email Upload dropbox.',
+        });
+        e.target.value = '';
+        return;
+      }
+      setBulkStatus(null);
       setBulkFiles(files);
       setBulkItems(
         files.map((f) => ({
@@ -112,6 +152,7 @@
     const handleBulkUpload = async () => {
       if (!bulkFiles.length) return;
       setBulkBusy(true);
+      setBulkStatus(null);
       const updated = [...bulkItems];
 
       const updateItem = (idx, patch) => {
@@ -139,13 +180,45 @@
       setBulkBusy(false);
     };
 
+    const handleEmailChange = (e) => {
+      const file = e.target.files?.[0] || null;
+      if (file && !isPdfFile(file)) {
+        setEmailFile(null);
+        setEmailStatus({
+          state: 'error',
+          message: 'Email Upload only accepts PDF files.',
+        });
+        setEmailProgress(0);
+        e.target.value = '';
+        return;
+      }
+      setEmailFile(file);
+      setEmailStatus(null);
+      setEmailProgress(0);
+    };
+
+    const handleEmailUpload = async () => {
+      if (!emailFile) return;
+      setEmailStatus({ state: 'uploading', message: 'Uploading email PDF…' });
+      try {
+        const data = await uploadSingleFile(emailFile, setEmailProgress);
+        setEmailStatus({
+          state: 'done',
+          message: 'Email PDF uploaded and ingested.',
+          data,
+        });
+      } catch (err) {
+        setEmailStatus({ state: 'error', message: err.message || String(err) });
+      }
+    };
+
     return (
       <div className="admin-grid">
         <Card className="admin-card">
           <h2>Upload</h2>
-          <p className="muted">Upload a single document or video. We&apos;ll detect the file type and ingest it appropriately.</p>
+          <p className="muted">Upload a single document or video (PDF excluded). We&apos;ll detect the file type and ingest it appropriately.</p>
           <div className="file-picker">
-            <input type="file" onChange={handleSingleChange} className="file-input" />
+            <input type="file" accept={NON_PDF_UPLOAD_ACCEPT} onChange={handleSingleChange} className="file-input" />
             {singleFile && (
               <div className="file-chip">
                 <span>{singleFile.name}</span>
@@ -170,15 +243,21 @@
 
         <Card className="admin-card">
           <h2>Bulk Upload</h2>
-          <p className="muted">Select a collection of documents and videos. Each file is queued, uploaded, and ingested with progress tracking.</p>
+          <p className="muted">Select a collection of documents and videos (PDF excluded). Each file is queued, uploaded, and ingested with progress tracking.</p>
           <div className="file-picker">
-            <input type="file" multiple onChange={handleBulkChange} className="file-input" />
+            <input type="file" accept={NON_PDF_UPLOAD_ACCEPT} multiple onChange={handleBulkChange} className="file-input" />
           </div>
           <div className="admin-actions">
             <PrimaryButton type="button" onClick={handleBulkUpload} disabled={bulkBusy || !bulkFiles.length}>
               {bulkBusy ? 'Uploading…' : 'Start bulk upload'}
             </PrimaryButton>
           </div>
+          {/* FIX 1: Render bulkStatus error here, scoped to this card */}
+          {bulkStatus && (
+            <div className={`status-pill status-${bulkStatus.state || 'info'}`}>
+              {bulkStatus.message}
+            </div>
+          )}
           <div className="bulk-list">
             {bulkItems.map((item) => (
               <div key={item.id} className="bulk-item">
@@ -198,6 +277,35 @@
               </div>
             ))}
           </div>
+        </Card>
+
+        <Card className="admin-card">
+          <h2>Email Upload</h2>
+          <p className="muted">Upload email exports as PDF. This is the only upload dropbox that supports PDF files.</p>
+          <div className="file-picker">
+            <input type="file" accept={EMAIL_PDF_ACCEPT} onChange={handleEmailChange} className="file-input" />
+            {emailFile && (
+              <div className="file-chip">
+                <span>{emailFile.name}</span>
+                <span className="file-chip-kind">Email PDF</span>
+              </div>
+            )}
+          </div>
+          {emailProgress > 0 && (
+            <div className="progress-bar">
+              <div className="progress-fill" style={{ width: `${emailProgress}%` }} />
+            </div>
+          )}
+          <div className="admin-actions">
+            <PrimaryButton type="button" onClick={handleEmailUpload} disabled={!emailFile}>
+              Upload Email PDF
+            </PrimaryButton>
+          </div>
+          {emailStatus && (
+            <div className={`status-pill status-${emailStatus.state || 'info'}`}>
+              {emailStatus.message}
+            </div>
+          )}
         </Card>
       </div>
     );

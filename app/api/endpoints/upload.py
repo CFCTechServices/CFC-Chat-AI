@@ -27,6 +27,9 @@ SUPABASE_BUCKET = os.getenv("SUPABASE_BUCKET", "cfc-docs")
 UPLOAD_DIR = Path(__file__).parent.parent.parent / "data" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+# Supported file types for upload
+ALLOWED_EXTENSIONS = {".pdf", ".doc", ".docx", ".txt", ".md", ".mp4", ".mov", ".m4v", ".mkv", ".webm"}
+
 
 def _doc_id_from_filename(filename: str) -> str:
     """Derive the same doc_id that DocumentProcessor assigns from a filename."""
@@ -48,6 +51,11 @@ async def upload_file(file: UploadFile = File(...)):
 
     if not file or not file.filename:
         raise HTTPException(status_code=400, detail="No file provided")
+
+    # Validate file extension
+    ext = Path(file.filename).suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
 
     # Read file bytes once
     contents = await file.read()
@@ -89,6 +97,7 @@ async def upload_file(file: UploadFile = File(...)):
         except Exception:
             pass
     except Exception as ing_exc:
+        logger.error("Ingestion failed for %s: %s", file.filename, ing_exc)
         ingestion_data = {"success": False, "error": str(ing_exc)}
 
     return {
