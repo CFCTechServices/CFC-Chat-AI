@@ -76,55 +76,28 @@ def get_jwt_token_from_supabase(email: str, password: str) -> Optional[str]:
         return None
 
 
-def test_admin_invite(jwt_token: str, target_email: str):
-    """
-    Tests the admin invite endpoint.
-    """
-    print(f"\n📧 Sending invitation to {target_email}...")
-    
+import pytest
+
+pytestmark = pytest.mark.integration
+
+
+def test_admin_invite(real_jwt_token: str, target_email: str):
+    """Test the admin invite endpoint."""
     url = f"{API_BASE_URL}/api/admin/invite"
     headers = {
-        "Authorization": f"Bearer {jwt_token}",
-        "Content-Type": "application/json"
+        "Authorization": f"Bearer {real_jwt_token}",
+        "Content-Type": "application/json",
     }
-    payload = {
-        "email": target_email
-    }
-    
-    try:
-        response = requests.post(url, headers=headers, json=payload)
-        
-        print(f"\n📊 Response Status: {response.status_code}")
-        print(f"📝 Response Body:")
-        print(json.dumps(response.json(), indent=2))
-        
-        if response.status_code == 200:
-            response_data = response.json()
-            message = response_data.get("message", "")
-            
-            # Check if email was actually sent or just created
-            if "email disabled" in message.lower():
-                print("\n✅ SUCCESS! Invitation created in database!")
-                print(f"   ℹ️  Email sending is currently disabled.")
-                print(f"   📋 The invitation code has been stored in the database.")
-                print(f"   📧 Share the invite code manually with {target_email}")
-            else:
-                print("\n✅ SUCCESS! Invitation sent successfully!")
-                print(f"   📧 Email sent to {target_email}")
-                print(f"   📬 Check the inbox for the invitation email.")
-            
-            print(f"   🗄️  Verify in 'public.invitations' table in your database.")
-        elif response.status_code == 403:
-            print("\n❌ FORBIDDEN: User does not have admin permissions")
-        elif response.status_code == 401:
-            print("\n❌ UNAUTHORIZED: Invalid or expired JWT token")
-        else:
-            print(f"\n⚠️  Unexpected response code: {response.status_code}")
-            
-    except requests.exceptions.RequestException as e:
-        print(f"❌ Request failed: {e}")
-        if hasattr(e, 'response') and e.response is not None:
-            print(f"Response: {e.response.text}")
+    payload = {"email": target_email}
+
+    response = requests.post(url, headers=headers, json=payload)
+    assert response.status_code == 200, (
+        f"Expected 200 but got {response.status_code}: {response.text}"
+    )
+    data = response.json()
+    assert "message" in data, f"Unexpected response body: {data}"
+    assert "email" in data, f"Response missing 'email': {data}"
+    assert "expires_at" in data, f"Response missing 'expires_at': {data}"
 
 
 def main():
