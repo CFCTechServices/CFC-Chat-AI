@@ -242,16 +242,16 @@ def _prepare_vectors(processed: Dict[str, Any]) -> Tuple[List[Tuple[str, List[fl
     try:
         # use upsert so re-ingestion won't error on duplicate PKs
         supabase.table("document_chunks").upsert(rows).execute()
-    except Exception:
-        # best-effort: log is handled by caller; don't fail ingestion entirely here
-        pass
+    except Exception as db_exc:
+        logger.error("Failed to upsert %d chunks for doc_id=%s to document_chunks: %s", len(rows), doc_id, db_exc)
+        raise
 
     # 3) Build Pinecone vectors with minimal metadata (no full text)
     vectors: List[Tuple[str, List[float], Dict]] = []
     for index, chunk in enumerate(chunks):
         metadata = {
             "doc_id": doc_id,
-            "section_id": chunk.get("section_id"),
+            "section_id": chunk.get("section_id") or "",
             "source": source,
             "source_type": chunk.get("source_type", "document"),
         }

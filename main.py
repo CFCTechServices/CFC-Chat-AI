@@ -82,6 +82,12 @@ app.include_router(admin_router, prefix="/api/admin")
 app.include_router(profile.router, prefix="/api/profile")
 
 
+@app.get("/content/images/{path:path}")
+async def serve_content_image_alias(path: str):
+    """Backward-compatible image route used by the web UI."""
+    return await chat.serve_image(path)
+
+
 
 
 
@@ -92,12 +98,11 @@ async def startup_event():
     # Ensure ffmpeg is available for Whisper transcription
     if shutil.which("ffmpeg") is None:
         msg = (
-            "ffmpeg binary not found. ffmpeg is required for video/audio transcription. "
-            "Install it (macOS): `brew install ffmpeg` — or on Linux: `sudo apt install ffmpeg` "
-            "or via conda: `conda install -c conda-forge ffmpeg`. After installation restart the server."
+            "ffmpeg binary not found. Video/audio transcription will be unavailable. "
+            "Install it (Windows): download from https://ffmpeg.org/download.html and add to PATH, "
+            "or via conda: `conda install -c conda-forge ffmpeg`. Restart the server after installation."
         )
-        logger.error(msg)
-        raise RuntimeError(msg)
+        logger.warning(msg)
     
     # Create data directories if they don't exist
     settings.DATA_DIR.mkdir(exist_ok=True)
