@@ -109,18 +109,12 @@ def test_upload_single_file_returns_expected_response(client, temp_documents_dir
 
     assert response.status_code == 200
 
-    local_file_path = temp_documents_dir / test_filename
-    assert local_file_path.exists()
-    with local_file_path.open("rb") as f:
-        assert f.read() == test_content
-
     expected_storage_path = f"docs/beef-nutrition/original/{test_filename}"
     assert expected_storage_path in fake_supabase.files
     assert fake_supabase.files[expected_storage_path] == test_content
 
     body = response.json()
     assert body["message"] == "File uploaded and ingestion triggered"
-    assert body["local_path"] == str(local_file_path)
     assert body["supabase"] == {"path": expected_storage_path}
     assert body["ingestion"] == {"success": True, "filename": test_filename}
 
@@ -179,15 +173,8 @@ def test_upload_file_supabase_failure_returns_success_with_error_payload(
     )
 
     assert response.status_code == 200
-
-    local_file_path = temp_documents_dir / test_filename
-    assert local_file_path.exists()
-    with local_file_path.open("rb") as f:
-        assert f.read() == test_content
-
     body = response.json()
     assert body["message"] == "File uploaded and ingestion triggered"
-    assert body["local_path"] == str(local_file_path)
     assert "error" in body["supabase"]
     assert body["supabase"]["error"] == "Supabase upload failed"
     assert body["ingestion"] == {"success": True, "filename": test_filename}
@@ -222,6 +209,7 @@ def test_bulk_upload_returns_expected_payload(client, temp_documents_dir, mock_s
 
     monkeypatch.setattr(upload, "create_client", make_fake_supabase_client(fake_supabase))
     monkeypatch.setattr(upload, "ingest_document", mock_ingest_document)
+    
 
     response = client.post(
         "/bulk",
@@ -247,8 +235,6 @@ def test_bulk_upload_returns_expected_payload(client, temp_documents_dir, mock_s
     assert second_file["ingestion"] == {"success": True, "filename": "chickennutrition.txt"}
     assert ingest_calls == ["beefnutrition.txt", "chickennutrition.txt"]
 
-    assert (temp_documents_dir / "beefnutrition.txt").read_bytes() == b"This is beef nutrition information."
-    assert (temp_documents_dir / "chickennutrition.txt").read_bytes() == b"This is chicken nutrition information."
     assert fake_supabase.files["docs/beefnutrition/original/beefnutrition.txt"] == b"This is beef nutrition information."
     assert fake_supabase.files["docs/chickennutrition/original/chickennutrition.txt"] == b"This is chicken nutrition information."
 
@@ -294,11 +280,12 @@ def test_bulk_upload_handles_ingest_failure_returns_success_with_ingest_error(cl
         if request.filename == "car.txt":
             raise RuntimeError("ingest failed for car information")
 
-        class FakeIngestResult:
+        """model_dump in ingest part has to be returned as an object"""
+        class FakeResult:
             def model_dump(self):
                 return {"success": True, "filename": request.filename}
 
-        return FakeIngestResult()
+        return FakeResult()
 
     monkeypatch.setattr(upload, "create_client", make_fake_supabase_client(fake_supabase))
     monkeypatch.setattr(upload, "ingest_document", mock_ingest_document)

@@ -30,6 +30,17 @@ class SupabaseQueryResponse:
 		self.data = data
 
 
+class FakeRpcQuery:
+	def __init__(self, data=None, error: Exception | None = None):
+		self._data = data
+		self._error = error
+
+	def execute(self):
+		if self._error:
+			raise self._error
+		return SupabaseQueryResponse(self._data)
+
+
 class FakeTableQuery:
 	"""A fake Supabase client and query classes for testing"""
 	def __init__(self, data=None, error: Exception | None = None):
@@ -72,9 +83,11 @@ class FakeTableQuery:
 
 class FakeSupabase:
 	"""A fake Supabase client for testing"""
-	def __init__(self, table_queries):
+	def __init__(self, table_queries, rpc_queries=None):
 		self.table_queries = {name: list(queries) for name, queries in table_queries.items()}
+		self.rpc_queries = {name: list(queries) for name, queries in (rpc_queries or {}).items()}
 		self.table_calls = []
+		self.rpc_calls = []
 
 	def table(self, table_name: str):
 		self.table_calls.append(table_name)
@@ -83,6 +96,15 @@ class FakeSupabase:
 			raise AssertionError(f"Unexpected table call: {table_name}")
 		query = queue.pop(0)
 		self.table_queries[table_name] = queue
+		return query
+
+	def rpc(self, fn_name: str, params: dict):
+		self.rpc_calls.append((fn_name, params))
+		queue = self.rpc_queries.get(fn_name, [])
+		if not queue:
+			raise AssertionError(f"Unexpected rpc call: {fn_name}")
+		query = queue.pop(0)
+		self.rpc_queries[fn_name] = queue
 		return query
 
 
@@ -246,19 +268,15 @@ def test_send_message_missing_field_returns_422(client):
 
 @pytest.mark.parametrize("rating", [-1, 1])
 def test_submit_feedback_returns_success(client, monkeypatch, rating):
-	"""Test that submitting feedback returns success and upserts the score."""
-	# Endpoint flow: chat_messages (ownership), chat_sessions (ownership),
-	# feedback (old rating), feedback (upsert), chat_messages (metadata for chunk scores)
+	"""Test that submitting feedback returns success and persists score via atomic RPC."""
+	monkeypatch.setattr(chat.settings, "FEEDBACK_ENABLED", False, raising=False)
 	fake_supabase = FakeSupabase({
 		"chat_messages": [
 			FakeTableQuery(data=[{"id": "msg-123", "session_id": "session-123"}]),  # ownership check
-			FakeTableQuery(data=[{"metadata": {}}]),  # chunk score metadata
 		],
 		"chat_sessions": [FakeTableQuery(data=[{"id": "session-123"}])],
-		"feedback": [
-			FakeTableQuery(data=[]),  # old rating fetch
-			FakeTableQuery(data=[]),  # upsert
-		],
+	}, rpc_queries={
+		"submit_message_feedback": [FakeRpcQuery(data={"ok": True})],
 	})
 	monkeypatch.setattr(chat, "supabase", fake_supabase)
 
@@ -269,18 +287,27 @@ def test_submit_feedback_returns_success(client, monkeypatch, rating):
 
 	assert response.status_code == 200
 	assert response.json() == {"success": True, "score": rating}
+	assert fake_supabase.rpc_calls == [
+		(
+			"submit_message_feedback",
+			{
+				"p_message_id": "msg-123",
+				"p_user_id": "user-123",
+				"p_new_rating": rating,
+			},
+		)
+	]
 
 
 @pytest.mark.parametrize("rating", [-1, 1])
 def test_submit_feedback_returns_500_on_exception(client, monkeypatch, rating):
-	"""Test that submitting feedback returns 500 when the upsert raises an exception."""
+	"""Test that submitting feedback returns 500 when the atomic RPC raises an exception."""
+	monkeypatch.setattr(chat.settings, "FEEDBACK_ENABLED", False, raising=False)
 	fake_supabase = FakeSupabase({
 		"chat_messages": [FakeTableQuery(data=[{"id": "msg-123", "session_id": "session-123"}])],
 		"chat_sessions": [FakeTableQuery(data=[{"id": "session-123"}])],
-		"feedback": [
-			FakeTableQuery(data=[]),  # old rating fetch
-			FakeTableQuery(error=RuntimeError("database connection failure")),  # upsert fails
-		],
+	}, rpc_queries={
+		"submit_message_feedback": [FakeRpcQuery(error=RuntimeError("database connection failure"))],
 	})
 	monkeypatch.setattr(chat, "supabase", fake_supabase)
 
@@ -290,7 +317,7 @@ def test_submit_feedback_returns_500_on_exception(client, monkeypatch, rating):
 	)
 
 	assert response.status_code == 500
-	assert response.json() == {"detail": "database connection failure"}
+	assert response.json() == {"detail": "Failed to save feedback"}
 
 
 def test_submit_feedback_missing_field_returns_422(client):
