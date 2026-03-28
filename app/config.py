@@ -57,12 +57,15 @@ class Settings:
     SUPABASE_BUCKET: Optional[str] = os.getenv("SUPABASE_BUCKET")
     SUPABASE_BUCKET_VIDEOS: Optional[str] = os.getenv("SUPABASE_BUCKET_VIDEOS", SUPABASE_BUCKET)
     LOCAL_CONTENT_ROOT = PROCESSED_DIR / "content_repository"
-    # OpenAI Settings
-    OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
-    OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    # Azure OpenAI Settings
+    # AZURE_OPENAI_ENDPOINT: e.g. https://<resource>.openai.azure.com/
+    # AZURE_OPENAI_DEPLOYMENT: the deployment name set in Azure portal (e.g. gpt-4o-mini)
+    AZURE_OPENAI_API_KEY: Optional[str] = os.getenv("AZURE_OPENAI_API_KEY")
+    AZURE_OPENAI_ENDPOINT: Optional[str] = os.getenv("AZURE_OPENAI_ENDPOINT")
+    AZURE_OPENAI_DEPLOYMENT: Optional[str] = os.getenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4o-mini")
+    AZURE_OPENAI_API_VERSION: str = os.getenv("AZURE_OPENAI_API_VERSION", "2024-08-01-preview")
 
 
-    
     # Resend API Configuration (for email invitations)
     RESEND_API_KEY: Optional[str] = os.getenv("RESEND_API_KEY")
     FRONTEND_BASE_URL: str = os.getenv("FRONTEND_BASE_URL", "http://localhost:8000/ui")

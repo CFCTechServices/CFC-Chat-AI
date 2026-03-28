@@ -1,18 +1,19 @@
 """
-Tests for the GPT-4o-mini LLM integration in ChatService.
+Tests for the Azure OpenAI GPT-4o-mini integration in ChatService.
 
-These tests use unittest.mock to patch the OpenAI client so that no real
+These tests use unittest.mock to patch the AzureOpenAI client so that no real
 API calls are made.  They verify:
-  - The correct model name is forwarded to the OpenAI API
-  - Conversation history is included in the messages array
-  - A RuntimeError is raised when OPENAI_API_KEY is absent
-  - Gemini-related settings are no longer present on the Settings object
+  - Azure settings (API key, endpoint, deployment, version) are present on Settings
+  - Standard OpenAI / Gemini settings are no longer present
+  - _generate_llm_answer uses AzureOpenAI with the correct credentials
+  - Conversation history is correctly included in the messages array
+  - A RuntimeError is raised when Azure credentials are missing
   - The no-LLM fallback (simple stub answer) still works
+  - google.generativeai is no longer imported
 """
 
 from __future__ import annotations
 
-import types
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -24,27 +25,28 @@ from app.config import settings
 # Settings sanity checks
 # ---------------------------------------------------------------------------
 
-def test_default_openai_model_is_gpt4o_mini():
-    """OPENAI_MODEL must default to gpt-4o-mini after the migration."""
-    assert settings.OPENAI_MODEL == "gpt-4o-mini"
+def test_azure_settings_present():
+    """All required Azure OpenAI settings must be defined on Settings."""
+    assert hasattr(settings, "AZURE_OPENAI_API_KEY"), "AZURE_OPENAI_API_KEY missing from Settings"
+    assert hasattr(settings, "AZURE_OPENAI_ENDPOINT"), "AZURE_OPENAI_ENDPOINT missing from Settings"
+    assert hasattr(settings, "AZURE_OPENAI_DEPLOYMENT"), "AZURE_OPENAI_DEPLOYMENT missing from Settings"
+    assert hasattr(settings, "AZURE_OPENAI_API_VERSION"), "AZURE_OPENAI_API_VERSION missing from Settings"
+    assert settings.AZURE_OPENAI_DEPLOYMENT == "gpt-4o-mini"
+    assert settings.AZURE_OPENAI_API_VERSION == "2024-08-01-preview"
 
 
-def test_gemini_settings_removed():
-    """GEMINI_API_KEY and GEMINI_MODEL must no longer exist on Settings."""
-    assert not hasattr(settings, "GEMINI_API_KEY"), (
-        "GEMINI_API_KEY should have been removed from Settings"
-    )
-    assert not hasattr(settings, "GEMINI_MODEL"), (
-        "GEMINI_MODEL should have been removed from Settings"
-    )
+def test_openai_and_gemini_settings_removed():
+    """Standard OPENAI_API_KEY, OPENAI_MODEL, and Gemini settings must all be gone."""
+    for attr in ("OPENAI_API_KEY", "OPENAI_MODEL", "GEMINI_API_KEY", "GEMINI_MODEL"):
+        assert not hasattr(settings, attr), f"{attr} should have been removed from Settings"
 
 
 # ---------------------------------------------------------------------------
-# _generate_llm_answer — OpenAI path
+# Helpers
 # ---------------------------------------------------------------------------
 
-def _make_openai_response(text: str):
-    """Build a minimal fake openai.chat.completions.create response."""
+def _make_azure_response(text: str):
+    """Build a minimal fake AzureOpenAI chat.completions.create response."""
     msg = MagicMock()
     msg.content = text
     choice = MagicMock()
@@ -54,22 +56,28 @@ def _make_openai_response(text: str):
     return resp
 
 
+# ---------------------------------------------------------------------------
+# _generate_llm_answer — Azure path
+# ---------------------------------------------------------------------------
+
 @patch("app.services.chat_service.settings")
 @patch("app.services.chat_service.ChatService.__init__", return_value=None)
-def test_generate_llm_answer_uses_gpt4o_mini(mock_init, mock_settings):
-    """_generate_llm_answer must call OpenAI with model=gpt-4o-mini."""
-    mock_settings.OPENAI_API_KEY = "sk-test-key"
-    mock_settings.OPENAI_MODEL = "gpt-4o-mini"
+def test_generate_llm_answer_uses_azure_client(mock_init, mock_settings):
+    """_generate_llm_answer must create an AzureOpenAI client with the correct credentials."""
+    mock_settings.AZURE_OPENAI_API_KEY = "azure-key"
+    mock_settings.AZURE_OPENAI_ENDPOINT = "https://my-resource.openai.azure.com/"
+    mock_settings.AZURE_OPENAI_DEPLOYMENT = "gpt-4o-mini"
+    mock_settings.AZURE_OPENAI_API_VERSION = "2024-08-01-preview"
 
-    fake_response = _make_openai_response("Test answer. [CHUNKS_CITED: chunk-1]")
+    fake_response = _make_azure_response("Test answer. [CHUNKS_CITED: chunk-1]")
 
     from app.services.chat_service import ChatService
 
     service = ChatService.__new__(ChatService)
 
-    with patch("openai.OpenAI") as mock_openai_cls:
+    with patch("openai.AzureOpenAI") as mock_azure_cls:
         mock_client = MagicMock()
-        mock_openai_cls.return_value = mock_client
+        mock_azure_cls.return_value = mock_client
         mock_client.chat.completions.create.return_value = fake_response
 
         answer, _ = service._generate_llm_answer(
@@ -77,22 +85,29 @@ def test_generate_llm_answer_uses_gpt4o_mini(mock_init, mock_settings):
             formatted_context="[CHUNK_ID: chunk-1]\nSome context.",
         )
 
+    # AzureOpenAI must have been constructed with the right credentials
+    mock_azure_cls.assert_called_once()
+    kwargs = mock_azure_cls.call_args.kwargs
+    assert kwargs["api_key"] == "azure-key"
+    assert kwargs["azure_endpoint"] == "https://my-resource.openai.azure.com/"
+    assert kwargs["api_version"] == "2024-08-01-preview"
+
+    # Deployment name must be passed as model
     create_call = mock_client.chat.completions.create.call_args
-    assert create_call is not None, "chat.completions.create was not called"
-    assert create_call.kwargs.get("model") == "gpt-4o-mini", (
-        f"Expected model=gpt-4o-mini, got {create_call.kwargs.get('model')}"
-    )
+    assert create_call.kwargs.get("model") == "gpt-4o-mini"
     assert "Test answer" in answer
 
 
 @patch("app.services.chat_service.settings")
 @patch("app.services.chat_service.ChatService.__init__", return_value=None)
 def test_generate_llm_answer_includes_conversation_history(mock_init, mock_settings):
-    """Conversation history messages must appear before the current question."""
-    mock_settings.OPENAI_API_KEY = "sk-test-key"
-    mock_settings.OPENAI_MODEL = "gpt-4o-mini"
+    """Conversation history messages must appear in the messages array before the current question."""
+    mock_settings.AZURE_OPENAI_API_KEY = "azure-key"
+    mock_settings.AZURE_OPENAI_ENDPOINT = "https://my-resource.openai.azure.com/"
+    mock_settings.AZURE_OPENAI_DEPLOYMENT = "gpt-4o-mini"
+    mock_settings.AZURE_OPENAI_API_VERSION = "2024-08-01-preview"
 
-    fake_response = _make_openai_response("Answer. [CHUNKS_CITED: chunk-1]")
+    fake_response = _make_azure_response("Answer. [CHUNKS_CITED: chunk-1]")
     history = [
         {"role": "user", "content": "Hi"},
         {"role": "assistant", "content": "Hello!"},
@@ -102,9 +117,9 @@ def test_generate_llm_answer_includes_conversation_history(mock_init, mock_setti
 
     service = ChatService.__new__(ChatService)
 
-    with patch("openai.OpenAI") as mock_openai_cls:
+    with patch("openai.AzureOpenAI") as mock_azure_cls:
         mock_client = MagicMock()
-        mock_openai_cls.return_value = mock_client
+        mock_azure_cls.return_value = mock_client
         mock_client.chat.completions.create.return_value = fake_response
 
         service._generate_llm_answer(
@@ -118,22 +133,23 @@ def test_generate_llm_answer_includes_conversation_history(mock_init, mock_setti
 
     # system + user(Hi) + assistant(Hello!) + user(current question)
     assert roles[0] == "system"
-    assert roles[1] == "user"    # "Hi"
+    assert roles[1] == "user"       # "Hi"
     assert roles[2] == "assistant"  # "Hello!"
-    assert roles[-1] == "user"   # current question
+    assert roles[-1] == "user"      # current question
 
 
 @patch("app.services.chat_service.settings")
 @patch("app.services.chat_service.ChatService.__init__", return_value=None)
-def test_generate_llm_answer_raises_when_no_api_key(mock_init, mock_settings):
-    """A RuntimeError should be raised when OPENAI_API_KEY is missing."""
-    mock_settings.OPENAI_API_KEY = None  # No key set
+def test_generate_llm_answer_raises_when_credentials_missing(mock_init, mock_settings):
+    """A RuntimeError should be raised when Azure credentials are not configured."""
+    mock_settings.AZURE_OPENAI_API_KEY = None
+    mock_settings.AZURE_OPENAI_ENDPOINT = None
 
     from app.services.chat_service import ChatService
 
     service = ChatService.__new__(ChatService)
 
-    with pytest.raises(RuntimeError, match="No OpenAI API key configured"):
+    with pytest.raises(RuntimeError, match="Azure OpenAI API key and endpoint must both be configured"):
         service._generate_llm_answer(
             question="Any question?",
             formatted_context="",
@@ -141,21 +157,21 @@ def test_generate_llm_answer_raises_when_no_api_key(mock_init, mock_settings):
 
 
 # ---------------------------------------------------------------------------
-# ask_question — stub fallback when no key is configured
+# ask_question — stub fallback when azure credentials are absent
 # ---------------------------------------------------------------------------
 
 @patch("app.services.chat_service.settings")
 @patch("app.services.chat_service.ChatService.__init__", return_value=None)
-def test_ask_question_uses_simple_stub_without_api_key(mock_init, mock_settings):
-    """When OPENAI_API_KEY is absent, ask_question falls back gracefully."""
-    mock_settings.OPENAI_API_KEY = None
+def test_ask_question_uses_simple_stub_without_azure_credentials(mock_init, mock_settings):
+    """When Azure credentials are absent, ask_question falls back to the simple stub."""
+    mock_settings.AZURE_OPENAI_API_KEY = None
+    mock_settings.AZURE_OPENAI_ENDPOINT = None
     mock_settings.DEFAULT_TOP_K = 3
 
     from app.services.chat_service import ChatService
 
     service = ChatService.__new__(ChatService)
 
-    # Stub out the internal helpers that require actual infrastructure
     service._is_vector_store_empty = MagicMock(return_value=False)
     service.document_rag_pipeline = MagicMock()
     service.document_rag_pipeline.retrieve_context.return_value = [
@@ -178,7 +194,7 @@ def test_ask_question_uses_simple_stub_without_api_key(mock_init, mock_settings)
     result = service.ask_question("What does CFC do?")
 
     assert result["success"] is True
-    assert result["answer"]  # non-empty stub answer
+    assert result["answer"]
     assert "CFC manufactures animal feed" in result["answer"]
 
 
@@ -187,14 +203,9 @@ def test_ask_question_uses_simple_stub_without_api_key(mock_init, mock_settings)
 # ---------------------------------------------------------------------------
 
 def test_google_generativeai_not_imported():
-    """After migration, google.generativeai must not be importable from chat_service."""
-    import sys
-    import importlib
-
-    # Re-import to get a fresh module reference
+    """After migration, google.generativeai must not be present in chat_service module namespace."""
     import app.services.chat_service as cs_module
 
-    # The module's globals should not have 'genai' or 'google' bound at the top level
     assert "genai" not in vars(cs_module), (
         "'genai' is still present in chat_service module namespace"
     )

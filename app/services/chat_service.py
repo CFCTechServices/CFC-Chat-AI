@@ -113,7 +113,7 @@ class ChatService:
             # If an LLM is configured, generate a grounded answer; otherwise use simple stub
             answer = ""
             image_positions = []
-            if settings.OPENAI_API_KEY:
+            if settings.AZURE_OPENAI_API_KEY and settings.AZURE_OPENAI_ENDPOINT:
                 try:
                     answer, image_positions = self._generate_llm_answer(question, formatted_context, relevant_images, conversation_history)
                     # Remove image markers and chunk citations from answer text
@@ -469,17 +469,22 @@ class ChatService:
             "Answer:"
         )
 
-        if settings.OPENAI_API_KEY:
+        if settings.AZURE_OPENAI_API_KEY and settings.AZURE_OPENAI_ENDPOINT:
             try:
-                from openai import OpenAI  # type: ignore
+                from openai import AzureOpenAI  # type: ignore
             except Exception as exc:
                 raise RuntimeError(f"OpenAI SDK not available: {exc}")
 
-            client = OpenAI()
-            
+            client = AzureOpenAI(
+                api_key=settings.AZURE_OPENAI_API_KEY,
+                azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+                api_version=settings.AZURE_OPENAI_API_VERSION,
+            )
+            model_name = settings.AZURE_OPENAI_DEPLOYMENT
+
             # Build messages array with conversation history
             messages = [{"role": "system", "content": system_prompt}]
-            
+
             # Add conversation history if provided
             if conversation_history:
                 for msg in conversation_history:
@@ -487,26 +492,27 @@ class ChatService:
                     content = msg.get("content", "")
                     if role in ["user", "assistant"] and content:
                         messages.append({"role": role, "content": content})
-            
+
             # Add current question
             messages.append({"role": "user", "content": user_prompt})
-            
+
             resp = client.chat.completions.create(
-                model=getattr(settings, "OPENAI_MODEL", "gpt-3.5-turbo"),
+                model=model_name,
                 messages=messages,
                 temperature=0.2,
                 max_tokens=500,
             )
             content = resp.choices[0].message.content if resp and resp.choices else None
             if not content:
-                raise RuntimeError("Empty response from OpenAI")
+                raise RuntimeError("Empty response from Azure OpenAI")
             answer_text = content.strip()
-            # Extract cited chunk IDs and use them to filter images
             cited_chunks = self._extract_cited_chunks(answer_text)
             image_positions = self._parse_image_references_by_chunks(answer_text, available_images or [], cited_chunks)
             return answer_text, image_positions
 
-        raise RuntimeError("No OpenAI API key configured")
+        raise RuntimeError("Azure OpenAI API key and endpoint must both be configured")
+
+
     
     def _extract_cited_chunks(self, answer_text: str) -> set:
         """Extract chunk IDs from [CHUNKS_CITED: ...] marker in LLM response.
