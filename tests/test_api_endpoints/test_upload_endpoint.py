@@ -145,7 +145,14 @@ def test_upload_file_with_no_filename(client):
     assert detail[0]["loc"] == ["body", "file"]
     assert detail[0]["type"] == "value_error"
 
-    
+def test_upload_file_with_invalid_extension(client):
+    """Test that uploading a file with an invalid extension returns 400."""
+    response = client.post(
+        "/upload",
+        files={"file": ("beefnutrition.exe", b"content", "application/octet-stream")},
+    )
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Unsupported file type: .exe"}
 
 def test_upload_file_supabase_failure_returns_success_with_error_payload(
     client, temp_documents_dir, mock_settings, monkeypatch

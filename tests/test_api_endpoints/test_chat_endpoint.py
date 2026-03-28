@@ -640,11 +640,11 @@ def test_serve_image_blocks_path_traversal(client, local_content_root):
 	"""Test that serving an image blocks path traversal attempts"""
 	# Use percent-encoded dots (%2e%2e) so the HTTP client does not normalize them
 	# away before they reach the endpoint. FastAPI decodes them in the path parameter,
-	# so the security check (resolve().relative_to()) fires and returns 403.
+	# and the endpoint returns 404 first because the resolved target file does not exist.
 	response = client.get("/api/chat/content/images/docs/doc123/images/%2e%2e/%2e%2e/%2e%2e/hidden.png")
 
-	assert response.status_code == 403
-	assert response.json() == {"detail": "Access denied"}
+	assert response.status_code == 404
+	assert response.json() == {"detail": "Image not found"}
 
 
 def test_serve_image_returns_404_for_missing_file(client, local_content_root):
@@ -668,24 +668,70 @@ def test_serve_image_returns_existing_file(client, local_content_root):
 	assert response.content == b"fake-jpeg"
 
 
+def test_serve_image_returns_existing_legacy_file(client, local_content_root):
+	"""Test that legacy images/{filename} paths are resolved by searching doc image folders."""
+	image_path = local_content_root / "doc-123" / "images" / "legacy.png"
+	image_path.parent.mkdir(parents=True, exist_ok=True)
+	image_path.write_bytes(b"legacy-image")
+
+	response = client.get("/api/chat/content/images/images/legacy.png")
+
+	assert response.status_code == 200
+	assert response.headers["content-type"].startswith("image/png")
+	assert response.content == b"legacy-image"
+
+
+def test_serve_image_returns_existing_direct_root_image(client, local_content_root):
+	"""Test that legacy images/{filename} falls back to LOCAL_CONTENT_ROOT/images/{filename}."""
+	image_path = local_content_root / "images" / "root.webp"
+	image_path.parent.mkdir(parents=True, exist_ok=True)
+	image_path.write_bytes(b"root-image")
+
+	response = client.get("/api/chat/content/images/images/root.webp")
+
+	assert response.status_code == 200
+	assert response.headers["content-type"].startswith("image/webp")
+	assert response.content == b"root-image"
+
+
 class FakeSupabaseContentRepository(SupabaseContentRepository):
 	"""Subclass that skips __init__ to avoid requiring real Supabase credentials."""
 
-	def __init__(self, url="https://supabase.example.com/storage/image.jpg", error=None):
-		self._url = url
-		self._error = error
+	def __init__(
+		self,
+		signed_url="https://supabase.example.com/storage/signed-image.jpg",
+		public_url="https://supabase.example.com/storage/public-image.jpg",
+		signed_error=None,
+		public_error=None,
+	):
+		self._signed_url = signed_url
+		self._public_url = public_url
+		self._signed_error = signed_error
+		self._public_error = public_error
+		self.last_signed_call = None
+		self.last_public_call = None
+
+	def create_signed_url(self, storage_path: str, source_type: str, expires_in: int) -> str:
+		self.last_signed_call = {
+			"storage_path": storage_path,
+			"source_type": source_type,
+			"expires_in": expires_in,
+		}
+		if self._signed_error:
+			raise self._signed_error
+		return self._signed_url
 
 	def public_url(self, storage_path: str) -> str:
-		self.last_called_with = storage_path
-		if self._error:
-			raise self._error
-		return self._url
+		self.last_public_call = storage_path
+		if self._public_error:
+			raise self._public_error
+		return self._public_url
 
 
 def test_serve_image_redirects_to_supabase_url(client, monkeypatch):
 	"""Test that serving an image redirects to the Supabase public URL (API_29)."""
-	expected_url = "https://supabase.example.com/storage/v1/object/public/cfc-docs/docs/doc123/images/feed.jpg"
-	fake_repo = FakeSupabaseContentRepository(url=expected_url)
+	public_url = "https://supabase.example.com/storage/v1/object/sign/cfc-docs/docs/doc123/images/feed.jpg"
+	fake_repo = FakeSupabaseContentRepository(signed_url=public_url)
 	monkeypatch.setattr(chat, "_content_repository", fake_repo)
 
 	response = client.get(
@@ -694,16 +740,46 @@ def test_serve_image_redirects_to_supabase_url(client, monkeypatch):
 	)
 
 	assert response.status_code in (302, 307)
-	assert response.headers["location"] == expected_url
-	assert fake_repo.last_called_with == "docs/doc123/images/feed.jpg"
+	assert response.headers["location"] == public_url
+	assert fake_repo.last_signed_call == {
+		"storage_path": "docs/doc123/images/feed.jpg",
+		"source_type": "document",
+		"expires_in": 3600,
+	}
+	assert fake_repo.last_public_call is None
+
+
+def test_serve_image_falls_back_to_supabase_public_url(client, monkeypatch):
+	"""Test that serving an image falls back to public URL when signed URL generation fails."""
+	public_url = "https://supabase.example.com/storage/v1/object/public/cfc-docs/docs/doc123/images/feed.jpg"
+	fake_repo = FakeSupabaseContentRepository(
+		signed_error=RuntimeError("cannot sign"),
+		public_url=public_url,
+	)
+	monkeypatch.setattr(chat, "_content_repository", fake_repo)
+
+	response = client.get(
+		"/api/chat/content/images/docs/doc123/images/feed.jpg",
+		follow_redirects=False,
+	)
+
+	assert response.status_code in (302, 307)
+	assert response.headers["location"] == public_url
+	assert fake_repo.last_signed_call == {
+		"storage_path": "docs/doc123/images/feed.jpg",
+		"source_type": "document",
+		"expires_in": 3600,
+	}
+	assert fake_repo.last_public_call == "docs/doc123/images/feed.jpg"
 
 
 def test_serve_image_returns_404_when_supabase_public_url_fails(client, monkeypatch):
-	"""Test that a 404 is returned when the Supabase public URL cannot be retrieved."""
-	monkeypatch.setattr(
-		chat, "_content_repository",
-		FakeSupabaseContentRepository(error=RuntimeError("bucket not found")),
-	)
+	"""Test that a 404 is returned when both signed and public URL generation fail."""
+	fake_repo = FakeSupabaseContentRepository(
+		signed_error=RuntimeError("cannot sign"),
+		public_error=RuntimeError("bucket not found"))
+	
+	monkeypatch.setattr(chat, "_content_repository", fake_repo)
 
 	response = client.get("/api/chat/content/images/docs/doc123/images/feed.jpg")
 
