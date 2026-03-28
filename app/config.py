@@ -57,13 +57,11 @@ class Settings:
     SUPABASE_BUCKET: Optional[str] = os.getenv("SUPABASE_BUCKET")
     SUPABASE_BUCKET_VIDEOS: Optional[str] = os.getenv("SUPABASE_BUCKET_VIDEOS", SUPABASE_BUCKET)
     LOCAL_CONTENT_ROOT = PROCESSED_DIR / "content_repository"
-    # OpenAI Settings (for future GPT integration)
+    # OpenAI Settings
     OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
-    OPENAI_MODEL = "gpt-3.5-turbo"
+    OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
-    # Gemini Settings (alternative to OpenAI)
-    GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY")
-    GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+
     
     # Resend API Configuration (for email invitations)
     RESEND_API_KEY: Optional[str] = os.getenv("RESEND_API_KEY")
