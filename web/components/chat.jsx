@@ -15,6 +15,33 @@
     };
   }
 
+  const CHAT_META_KEY = 'cfc-chat-sidebar-meta';
+
+  function loadChatMeta() {
+    try {
+      return JSON.parse(window.localStorage.getItem(CHAT_META_KEY) || '{}');
+    } catch {
+      return {};
+    }
+  }
+
+  function saveChatMeta(chatItems) {
+    try {
+      const compact = {};
+      chatItems.forEach((chat) => {
+        if (chat.pinned || chat.favorite) {
+          compact[chat.id] = {
+            pinned: Boolean(chat.pinned),
+            favorite: Boolean(chat.favorite),
+          };
+        }
+      });
+      window.localStorage.setItem(CHAT_META_KEY, JSON.stringify(compact));
+    } catch {
+      // no-op
+    }
+  }
+
   // Convert DB message rows into the UI message shape
   function dbMsgToUI(msg) {
     return {
@@ -64,9 +91,12 @@
       fetch('/api/chat/sessions', { headers: authHeaders(token) })
         .then((res) => (res.ok ? res.json() : []))
         .then((data) => {
+          const meta = loadChatMeta();
           const mapped = data.map((s) => ({
             id: s.id,
             title: s.title || 'Untitled Chat',
+            pinned: Boolean(meta[s.id]?.pinned),
+            favorite: Boolean(meta[s.id]?.favorite),
             messages: [], // loaded on select
           }));
           setChatHistory(mapped);
@@ -406,8 +436,18 @@
         });
         if (!res.ok) return;
         const sess = await res.json();
-        const newEntry = { id: sess.id, title: sess.title || 'New Chat', messages: [] };
-        setChatHistory((prev) => [newEntry, ...prev]);
+        const newEntry = {
+          id: sess.id,
+          title: sess.title || 'New Chat',
+          pinned: false,
+          favorite: false,
+          messages: [],
+        };
+        setChatHistory((prev) => {
+          const next = [newEntry, ...prev];
+          saveChatMeta(next);
+          return next;
+        });
         setActiveChatId(sess.id);
         setMessages([]);
         setInput('');
@@ -450,6 +490,7 @@
       }
 
       const remaining = chatHistory.filter((c) => c.id !== chatId);
+      saveChatMeta(remaining);
       if (remaining.length === 0) {
         setChatHistory([]);
         setActiveChatId(null);
@@ -472,6 +513,26 @@
       setAttachedImages([]);
     };
 
+    const handleTogglePin = (chatId) => {
+      setChatHistory((prev) => {
+        const next = prev.map((chat) =>
+          chat.id === chatId ? { ...chat, pinned: !chat.pinned } : chat,
+        );
+        saveChatMeta(next);
+        return next;
+      });
+    };
+
+    const handleToggleFavorite = (chatId) => {
+      setChatHistory((prev) => {
+        const next = prev.map((chat) =>
+          chat.id === chatId ? { ...chat, favorite: !chat.favorite } : chat,
+        );
+        saveChatMeta(next);
+        return next;
+      });
+    };
+
     // ---- Render ----
     return (
       <Layout fullWidth>
@@ -482,6 +543,8 @@
             onNewChat={handleNewChat}
             onSelectChat={handleSelectChat}
             onDeleteChat={handleDeleteChat}
+            onTogglePin={handleTogglePin}
+            onToggleFavorite={handleToggleFavorite}
           />
 
           <section className="chat-main">
