@@ -48,10 +48,21 @@ def split_into_chunks(text: str, chunk_size: int = None, overlap: int = None) ->
         chunk = text[start:end].strip()
         if chunk:
             chunks.append(chunk)
-        
-        # Move start position considering overlap
-        start = max(end - overlap, end)
-        
+
+        if end >= len(text):
+            break
+
+        # Move start position considering overlap. Ensure progress to avoid
+        # infinite loops: prefer overlapping start but must advance.
+        if overlap and end - overlap > start:
+            start = end - overlap
+            # Snap forward to the next word boundary to avoid mid-word cuts
+            space = text.find(" ", start)
+            if space != -1 and space < end:
+                start = space + 1
+        else:
+            start = end
+
         # Avoid infinite loops
         if start >= len(text):
             break
@@ -70,6 +81,9 @@ def clean_text(text: str) -> str:
     text = re.sub(r'["""]', '"', text)
     text = re.sub(r"[''']", "'", text)
     
+    # Remove space before punctuation (so "word !!!" -> "word!!!")
+    text = re.sub(r'\s+([\.,!?;:])', r'\1', text)
+
     return text.strip()
 
 def extract_metadata_from_text(text: str) -> dict:
