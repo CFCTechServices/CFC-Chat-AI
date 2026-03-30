@@ -84,6 +84,7 @@
     const [bulkFiles, setBulkFiles] = React.useState([]);
     const [bulkItems, setBulkItems] = React.useState([]);
     const [bulkBusy, setBulkBusy] = React.useState(false);
+    const [activeHint, setActiveHint] = React.useState(null);
     // FIX 1: Dedicated bulk error state so PDF errors show on the Bulk Upload
     // card instead of accidentally updating singleStatus.
     const [bulkStatus, setBulkStatus] = React.useState(null);
@@ -212,6 +213,17 @@
       }
     };
 
+    const singleDisabled = !singleFile || singleStatus?.state === 'uploading';
+    const singleDisabledHint = !singleFile
+      ? 'Choose a file first.'
+      : 'Upload in progress...';
+    const bulkDisabled = bulkBusy || !bulkFiles.length;
+    const bulkDisabledHint = !bulkFiles.length
+      ? 'Choose files first.'
+      : 'Bulk upload in progress...';
+    const emailDisabled = !emailFile;
+    const emailDisabledHint = 'Choose a PDF file first.';
+
     return (
       <div className="admin-grid">
         <Card className="admin-card">
@@ -232,7 +244,44 @@
             </div>
           )}
           <div className="admin-actions">
-            <PrimaryButton type="button" onClick={handleSingleUpload}>Upload &amp; ingest</PrimaryButton>
+            <span
+              style={{ display: 'inline-block', position: 'relative' }}
+              onMouseEnter={() => singleDisabled && setActiveHint('single')}
+              onMouseLeave={() => setActiveHint(null)}
+              onFocus={() => singleDisabled && setActiveHint('single')}
+              onBlur={() => setActiveHint(null)}
+            >
+              <PrimaryButton
+                type="button"
+                onClick={handleSingleUpload}
+                disabled={singleDisabled}
+              >
+                Upload &amp; ingest
+              </PrimaryButton>
+              {singleDisabled && activeHint === 'single' && (
+                <span
+                  role="tooltip"
+                  style={{
+                    position: 'absolute',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    bottom: 'calc(100% + 8px)',
+                    background: '#ffffff',
+                    color: '#111827',
+                    border: '1px solid #1f2937',
+                    borderRadius: '0',
+                    boxShadow: 'none',
+                    padding: '4px 8px',
+                    fontSize: '0.9rem',
+                    whiteSpace: 'nowrap',
+                    pointerEvents: 'none',
+                    zIndex: 20,
+                  }}
+                >
+                  {singleDisabledHint}
+                </span>
+              )}
+            </span>
           </div>
           {singleStatus && (
             <div className={`status-pill status-${singleStatus.state || 'info'}`}>
@@ -248,9 +297,40 @@
             <input type="file" accept={NON_PDF_UPLOAD_ACCEPT} multiple onChange={handleBulkChange} className="file-input" />
           </div>
           <div className="admin-actions">
-            <PrimaryButton type="button" onClick={handleBulkUpload} disabled={bulkBusy || !bulkFiles.length}>
-              {bulkBusy ? 'Uploading…' : 'Start bulk upload'}
-            </PrimaryButton>
+            <span
+              style={{ display: 'inline-block', position: 'relative' }}
+              onMouseEnter={() => bulkDisabled && setActiveHint('bulk')}
+              onMouseLeave={() => setActiveHint(null)}
+              onFocus={() => bulkDisabled && setActiveHint('bulk')}
+              onBlur={() => setActiveHint(null)}
+            >
+              <PrimaryButton type="button" onClick={handleBulkUpload} disabled={bulkDisabled}>
+                {bulkBusy ? 'Uploading…' : 'Start bulk upload'}
+              </PrimaryButton>
+              {bulkDisabled && activeHint === 'bulk' && (
+                <span
+                  role="tooltip"
+                  style={{
+                    position: 'absolute',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    bottom: 'calc(100% + 8px)',
+                    background: '#ffffff',
+                    color: '#111827',
+                    border: '1px solid #1f2937',
+                    borderRadius: '0',
+                    boxShadow: 'none',
+                    padding: '4px 8px',
+                    fontSize: '0.9rem',
+                    whiteSpace: 'nowrap',
+                    pointerEvents: 'none',
+                    zIndex: 20,
+                  }}
+                >
+                  {bulkDisabledHint}
+                </span>
+              )}
+            </span>
           </div>
           {/* FIX 1: Render bulkStatus error here, scoped to this card */}
           {bulkStatus && (
@@ -297,9 +377,40 @@
             </div>
           )}
           <div className="admin-actions">
-            <PrimaryButton type="button" onClick={handleEmailUpload} disabled={!emailFile}>
-              Upload Email PDF
-            </PrimaryButton>
+            <span
+              style={{ display: 'inline-block', position: 'relative' }}
+              onMouseEnter={() => emailDisabled && setActiveHint('email')}
+              onMouseLeave={() => setActiveHint(null)}
+              onFocus={() => emailDisabled && setActiveHint('email')}
+              onBlur={() => setActiveHint(null)}
+            >
+              <PrimaryButton type="button" onClick={handleEmailUpload} disabled={emailDisabled}>
+                Upload Email PDF
+              </PrimaryButton>
+              {emailDisabled && activeHint === 'email' && (
+                <span
+                  role="tooltip"
+                  style={{
+                    position: 'absolute',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    bottom: 'calc(100% + 8px)',
+                    background: '#ffffff',
+                    color: '#111827',
+                    border: '1px solid #1f2937',
+                    borderRadius: '0',
+                    boxShadow: 'none',
+                    padding: '4px 8px',
+                    fontSize: '0.9rem',
+                    whiteSpace: 'nowrap',
+                    pointerEvents: 'none',
+                    zIndex: 20,
+                  }}
+                >
+                  {emailDisabledHint}
+                </span>
+              )}
+            </span>
           </div>
           {emailStatus && (
             <div className={`status-pill status-${emailStatus.state || 'info'}`}>
