@@ -52,6 +52,7 @@ venv/
 ########################################
 coverage/
 .coverage
+
 .coverage.*
 tests/.coverage
 htmlcov/
@@ -59,7 +60,12 @@ htmlcov/
 ########################################
 #       Data & Generated Files
 ########################################
+
+!data/
+data/documents/
+
 data/
+
 data/processed/
 data/processed/**
 
