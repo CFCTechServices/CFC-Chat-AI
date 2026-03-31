@@ -94,14 +94,26 @@ class RAGPipeline:
                     "vtt_url": db_row.get("vtt_url") or metadata.get("vtt_url"),
                 })
 
-            # ── Feedback-driven re-ranking (Phase 1) ──
+            # ── Feedback-driven re-ranking (Phase 1 + Phase 2) ──────────────
             if settings.FEEDBACK_ENABLED:
                 ranked_chunk_ids = [c["chunk_id"] for c in context_chunks if c.get("chunk_id")]
                 if ranked_chunk_ids:
-                    feedback_scores = self.feedback_service.get_chunk_scores(ranked_chunk_ids)
-                    if feedback_scores:
+                    # Phase 1: global accumulated vote scores
+                    global_scores = self.feedback_service.get_chunk_scores(ranked_chunk_ids)
+
+                    # Phase 2: query-aware weighted scores.
+                    # Uses the query_embedding already computed above for Pinecone.
+                    # get_query_aware_scores fails-open → returns {} if the
+                    # migration/table isn't deployed yet, degrading to Phase 1 only.
+                    query_aware_scores = self.feedback_service.get_query_aware_scores(
+                        query_embedding, ranked_chunk_ids,
+                    )
+
+                    if global_scores or query_aware_scores:
                         context_chunks = self.feedback_service.rerank(
-                            context_chunks, feedback_scores,
+                            context_chunks,
+                            feedback_scores=global_scores,
+                            query_aware_scores=query_aware_scores,
                         )
 
             return context_chunks
@@ -111,7 +123,10 @@ class RAGPipeline:
             raise
 
     def format_context(self, context_chunks: List[Dict[str, Any]], max_length: int = None) -> str:
-        """Format context chunks into a single context string."""
+        """Format context chunks into a single context string.
+        
+        Each chunk is prefixed with [CHUNK_ID: xxx] so the LLM can cite which chunks it used.
+        """
         if max_length is None:
             max_length = settings.MAX_CONTEXT_LENGTH
 
@@ -119,9 +134,11 @@ class RAGPipeline:
         total_length = 0
 
         for chunk in context_chunks:
+            chunk_id = chunk.get("chunk_id", "unknown")
             title_line = f"Title: {chunk['section_title']}\n" if chunk.get("section_title") else ""
             body = chunk.get("text") or ""
-            chunk_text = f"Source: {chunk.get('source', '')}\n{title_line}{body}\n"
+            # Include chunk_id marker so LLM can cite it
+            chunk_text = f"[CHUNK_ID: {chunk_id}]\nSource: {chunk.get('source', '')}\n{title_line}{body}\n"
 
             if total_length + len(chunk_text) > max_length:
                 break

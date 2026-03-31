@@ -2,6 +2,7 @@
 """
 Test script for profile endpoints (get and update name)
 """
+import pytest
 import requests
 import json
 import os
@@ -95,79 +96,44 @@ def test_get_profile(jwt_token: str):
         print(f"\n❌ Error calling endpoint: {e}")
         return None
 
-def test_update_profile(jwt_token: str, full_name: str):
-    """
-    Test updating user profile name.
-    """
-    print(f"\n✏️  Updating profile name to: {full_name}")
-    
+@pytest.mark.integration
+def test_update_profile(real_jwt_token: str, full_name: str):
+    """Test updating user profile name."""
     url = f"{API_BASE_URL}/api/profile/me"
     headers = {
-        "Authorization": f"Bearer {jwt_token}",
-        "Content-Type": "application/json"
+        "Authorization": f"Bearer {real_jwt_token}",
+        "Content-Type": "application/json",
     }
-    payload = {
-        "full_name": full_name
-    }
-    
-    try:
-        response = requests.patch(url, headers=headers, json=payload)
-        
-        print(f"\n📊 Response Status: {response.status_code}")
-        print(f"📝 Response Body:")
-        try:
-            response_json = response.json()
-            print(json.dumps(response_json, indent=2))
-            
-            if response.status_code == 200:
-                print(f"\n✅ SUCCESS! Profile updated")
-                print(f"   👤 New name: {response_json.get('full_name')}")
-            
-            return response_json
-        except:
-            print(response.text)
-            return None
-            
-    except Exception as e:
-        print(f"\n❌ Error calling endpoint: {e}")
-        return None
+    payload = {"full_name": full_name}
 
-def test_complete_profile(jwt_token: str, full_name: str):
-    """
-    Test completing profile (first-time name setup).
-    """
-    print(f"\n🚀 Completing profile with name: {full_name}")
-    
+    response = requests.patch(url, headers=headers, json=payload)
+    assert response.status_code == 200, (
+        f"Expected 200 but got {response.status_code}: {response.text}"
+    )
+    data = response.json()
+    assert data.get("full_name") == full_name, (
+        f"Expected full_name='{full_name}', got: {data}"
+    )
+
+
+@pytest.mark.integration
+def test_complete_profile(real_jwt_token: str, full_name: str):
+    """Test completing profile (first-time name setup)."""
     url = f"{API_BASE_URL}/api/profile/complete"
     headers = {
-        "Authorization": f"Bearer {jwt_token}",
-        "Content-Type": "application/json"
+        "Authorization": f"Bearer {real_jwt_token}",
+        "Content-Type": "application/json",
     }
-    payload = {
-        "full_name": full_name
-    }
-    
-    try:
-        response = requests.post(url, headers=headers, json=payload)
-        
-        print(f"\n📊 Response Status: {response.status_code}")
-        print(f"📝 Response Body:")
-        try:
-            response_json = response.json()
-            print(json.dumps(response_json, indent=2))
-            
-            if response.status_code == 200:
-                print(f"\n✅ SUCCESS! Profile completed")
-                print(f"   👤 Name: {response_json.get('full_name')}")
-            
-            return response_json
-        except:
-            print(response.text)
-            return None
-            
-    except Exception as e:
-        print(f"\n❌ Error calling endpoint: {e}")
-        return None
+    payload = {"full_name": full_name}
+
+    response = requests.post(url, headers=headers, json=payload)
+    assert response.status_code == 200, (
+        f"Expected 200 but got {response.status_code}: {response.text}"
+    )
+    data = response.json()
+    assert data.get("full_name") == full_name, (
+        f"Expected full_name='{full_name}', got: {data}"
+    )
 
 def main():
     print("=" * 70)

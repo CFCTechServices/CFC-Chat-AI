@@ -1,30 +1,36 @@
 fastapi
 uvicorn[standard]
-gunicorn
+openai-whisper
 pydantic
-pydantic-settings
 pinecone
 sentence-transformers
 python-docx
 numpy
+pathlib
 typing-extensions
 python-dotenv
+pywin32; sys_platform == "win32"
 python-multipart>=0.0.20
 pytest
+coverage
 supabase>=2.0.0
 openai>=1.13.3
 google-generativeai>=0.8.3
+resend
 email-validator
-
-openai-whisper
+pdfplumber>=0.11.0
+pymupdf>=1.23.0
+pytesseract>=0.3.10
+pdf2image>=1.17.0
+Pillow>=10.0.0
 
 # ffmpeg is a system binary required by Whisper for audio/video processing.
 # Install it on your OS (macOS: `brew install ffmpeg`, Ubuntu: `sudo apt install ffmpeg`).
 # Add a Python helper that bundles ffmpeg binaries or provides a bridge:
 imageio-ffmpeg>=0.4.8
 
-# SSL certificate bundle — used by main.py and supabase_service.py for HTTPS
-certifi
-
-# scikit-learn — used by app/transcription/summarize_transcript.py for TF-IDF
-scikit-learn
+# Tesseract and Poppler are system binaries required by pytesseract / pdf2image.
+# macOS:  brew install tesseract poppler
+# Ubuntu: sudo apt install tesseract-ocr poppler-utils
+# Windows: download Tesseract from https://github.com/UB-Mannheim/tesseract/wiki
+#          and set TESSERACT_CMD env var if not on PATH.

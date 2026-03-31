@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any, Union
 import logging
 import json
+import os
 from app.api.models.requests import SearchRequest, AskRequest, RecommendationRequest
 from app.api.models.responses import SearchResponse, AskResponse, RecommendationResponse, SearchResult, ImageReference
 from app.services.chat_service import ChatService
@@ -11,17 +12,23 @@ from app.config import settings
 from app.services.content_repository import ContentRepository
 from app.services.supabase_content_repository import SupabaseContentRepository
 from app.core.auth import get_current_user, supabase
+from app.core.embeddings import EmbeddingModel
 from app.core.feedback_service import FeedbackService
 
 logger = logging.getLogger(__name__)
-_feedback_service = FeedbackService()
 router = APIRouter(tags=["chat"])
 
 # Initialize chat service
 chat_service = ChatService()
 
+# Phase 2: shared embedding model + feedback service for event recording.
+# EmbeddingModel is lazy-loaded (model downloads on first encode call).
+_embedding_model = EmbeddingModel()
+_feedback_service = FeedbackService()
+
 # Initialize content repository (same logic as ingest.py)
-if settings.SUPABASE_URL and settings.SUPABASE_BUCKET:
+_has_supabase_bucket = bool(settings.SUPABASE_BUCKET or os.getenv("SUPABASE_BUCKET_DOCS"))
+if settings.SUPABASE_URL and settings.SUPABASE_SERVICE_ROLE_KEY and _has_supabase_bucket:
     _content_repository = SupabaseContentRepository()
     logger.info("Using SupabaseContentRepository for image serving.")
 else:
@@ -124,8 +131,90 @@ async def send_message(request: ChatMessageRequest, user: Any = Depends(get_curr
         logger.error(f"Error processing message: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+def _record_phase2_feedback_event(message_id: str, rating: Optional[int]) -> None:
+    """
+    Background task: keep chunk_feedback_events consistent with the user's
+    current rating for a message.
+
+    Always deletes any existing events for this message_id first, then inserts
+    fresh ones if the new rating is non-null.  This covers three cases:
+      • New vote      (rating = +1/-1, no prior events)  → insert
+      • Changed vote  (rating = +1/-1, prior events exist) → delete old, insert new
+      • Cleared vote  (rating = None)                    → delete old, done
+
+    Runs AFTER the HTTP response has been sent (FastAPI BackgroundTasks), so
+    the ~100-200 ms sentence-transformer inference never adds latency to the
+    feedback endpoint.  Fails silently — never surfaces to the user.
+    """
+    try:
+        # Step A: always delete stale events for this message first.
+        # message_id is implicitly user-scoped (messages belong to sessions
+        # which belong to one user), so this is safe with no user_id filter.
+        supabase.table("chunk_feedback_events").delete().eq("message_id", message_id).execute()
+
+        # If the user cleared their rating, we're done — no new events to store.
+        if rating is None:
+            return
+
+        # Step B: fetch the assistant message (session_id + created_at + citations)
+        asst_res = (
+            supabase.table("chat_messages")
+            .select("session_id, created_at, metadata")
+            .eq("id", message_id)
+            .eq("role", "assistant")
+            .single()
+            .execute()
+        )
+        asst_row = asst_res.data if asst_res and asst_res.data else None
+        if not asst_row:
+            return
+
+        # Step C: extract chunk_ids from the stored citations
+        citations = (asst_row.get("metadata") or {}).get("citations") or []
+        chunk_ids = [
+            c["chunk_id"]
+            for c in citations
+            if isinstance(c, dict) and c.get("chunk_id")
+        ]
+        if not chunk_ids:
+            return
+
+        # Step D: find the most recent user message sent *before* this reply
+        user_msg_res = (
+            supabase.table("chat_messages")
+            .select("content")
+            .eq("session_id", asst_row["session_id"])
+            .eq("role", "user")
+            .lt("created_at", asst_row["created_at"])
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        user_rows = user_msg_res.data if user_msg_res else []
+        query_text = user_rows[0]["content"] if user_rows else None
+        if not query_text:
+            return
+
+        # Step E: encode the query — the slow CPU step, safe here off the critical path
+        query_embedding = _embedding_model.encode_query(query_text)
+
+        # Step F: persist one event row per cited chunk (fresh, no duplicates)
+        _feedback_service.record_feedback_events(
+            chunk_ids=chunk_ids,
+            message_id=message_id,
+            query_embedding=query_embedding,
+            rating=rating,
+        )
+    except Exception as exc:
+        logger.warning("Phase 2 background feedback event failed (non-fatal): %s", exc)
+
+
 @router.post("/feedback")
-async def submit_feedback(request: FeedbackRequest, user: Any = Depends(get_current_user)):
+async def submit_feedback(
+    request: FeedbackRequest,
+    background_tasks: BackgroundTasks,
+    user: Any = Depends(get_current_user),
+):
     """
     Submit or update feedback for a message.
     Uses UPSERT keyed on (message_id, user_id) unique constraint.
@@ -137,16 +226,16 @@ async def submit_feedback(request: FeedbackRequest, user: Any = Depends(get_curr
             .select("id, session_id")\
             .eq("id", request.message_id)\
             .execute()
-        
+
         if not msg_check.data:
             raise HTTPException(status_code=404, detail="Message not found")
-        
+
         session_check = supabase.table("chat_sessions")\
             .select("id")\
             .eq("id", msg_check.data[0]["session_id"])\
             .eq("user_id", user.id)\
             .execute()
-        
+
         if not session_check.data:
             raise HTTPException(status_code=403, detail="Not your message")
 
@@ -154,48 +243,36 @@ async def submit_feedback(request: FeedbackRequest, user: Any = Depends(get_curr
         if request.rating is not None and request.rating not in (-1, 1):
             raise HTTPException(status_code=400, detail="Rating must be -1, 1, or null")
 
-        # ── Fetch old rating so we can compute the delta ──
-        old_rating = None
+        # ── Phase 1: Single atomic RPC ────────────────────────────────────────
+        # Reads old rating, upserts new rating, and updates chunk_feedback_scores
+        # — all inside one Postgres transaction (no read-modify-write race).
         try:
-            old_fb = supabase.table("feedback")\
-                .select("score")\
-                .eq("message_id", request.message_id)\
-                .eq("user_id", user.id)\
-                .execute()
-            if old_fb.data:
-                old_rating = old_fb.data[0].get("score")
-        except Exception:
-            pass  # If we can't read the old rating, treat as None (first vote)
+            supabase.rpc(
+                "submit_message_feedback",
+                {
+                    "p_message_id": request.message_id,
+                    "p_user_id":    str(user.id),
+                    "p_new_rating": request.rating,
+                },
+            ).execute()
+        except Exception as exc:
+            logger.warning("Atomic feedback RPC failed: %s", exc)
+            raise HTTPException(status_code=500, detail="Failed to save feedback")
 
-        data = {
-            "message_id": request.message_id,
-            "user_id": user.id,
-            "score": request.rating,  # -1, 1, or None (cleared)
-        }
-
-        # UPSERT keyed on (message_id, user_id) unique constraint
-        supabase.table("feedback")\
-            .upsert(data, on_conflict="message_id,user_id")\
-            .execute()
-
-        # ── Update chunk feedback scores (Phase 1) ──
-        if old_rating != request.rating:
-            try:
-                msg_res = supabase.table("chat_messages")\
-                    .select("metadata")\
-                    .eq("id", request.message_id)\
-                    .execute()
-
-                if msg_res.data:
-                    citations = (msg_res.data[0].get("metadata") or {}).get("citations", [])
-                    chunk_ids = [c["chunk_id"] for c in citations if c.get("chunk_id")]
-                    if chunk_ids:
-                        _feedback_service.update_chunk_scores(
-                            chunk_ids, old_rating, request.rating,
-                        )
-            except Exception as exc:
-                logger.warning("Failed to update chunk feedback scores: %s", exc)
-                # Non-critical: feedback was saved, chunk scores will catch up
+        # ── Phase 2: Schedule query-aware event sync as a background task ───────
+        # Always schedule — not just for new votes.  The background task handles
+        # all three transitions:
+        #   changed vote  → delete stale events, insert fresh ones
+        #   new vote      → delete (no-op), insert fresh ones
+        #   cleared vote  → delete stale events, nothing to insert
+        # The sentence-transformer encode_query() (~100-200 ms on CPU) only
+        # runs inside the task, after the response is already sent.
+        if settings.FEEDBACK_ENABLED:
+            background_tasks.add_task(
+                _record_phase2_feedback_event,
+                message_id=request.message_id,
+                rating=request.rating,
+            )
 
         return {"success": True, "score": request.rating}
     except HTTPException:
@@ -358,8 +435,7 @@ async def ask_question(request: AskRequest):
                     context_text=img.get("context_text"),
                 )
                 for img in result["relevant_images"]
-            ]
-        
+            ]    
         return AskResponse(
             success=True,
             question=request.question,
@@ -462,34 +538,86 @@ async def serve_image(path: str):
     Path format: docs/{doc_id}/images/{filename}
     For Supabase: Returns redirect to public URL
     For local: Returns file from filesystem
+    
+    Also handles legacy short paths (images/{id}.ext) by searching the content root.
     """
     try:
+        logger.info(f"Image request: {path}")
+        
         # Validate path format
-        if not path.startswith("docs/"):
+        if not path.startswith("docs/") and not path.startswith("images/"):
             raise HTTPException(status_code=400, detail="Invalid image path format")
         
         # Handle Supabase storage
         if isinstance(_content_repository, SupabaseContentRepository):
             try:
-                public_url = _content_repository.public_url(path)
-                return RedirectResponse(url=public_url)
+                clean_path = path.lstrip("/")
+                try:
+                    signed_url = _content_repository.create_signed_url(
+                        clean_path,
+                        source_type="document",
+                        expires_in=3600,
+                    )
+                    return RedirectResponse(url=signed_url)
+                except Exception:
+                    public_url = _content_repository.public_url(clean_path)
+                    return RedirectResponse(url=public_url)
             except Exception as e:
                 logger.error(f"Error getting Supabase URL for {path}: {e}")
                 raise HTTPException(status_code=404, detail="Image not found in Supabase storage")
         
         # Handle local storage
-        # Convert storage path (docs/{doc_id}/images/{filename}) to filesystem path
-        # Storage path: docs/{doc_id}/images/{filename}
-        # Filesystem path: {LOCAL_CONTENT_ROOT}/{doc_id}/images/{filename}
-        path_parts = path.split("/")
-        if len(path_parts) < 4 or path_parts[0] != "docs" or path_parts[2] != "images":
-            raise HTTPException(status_code=400, detail="Invalid image path format")
+        # Support both new format (docs/{doc_id}/images/{filename}) and legacy format (images/{filename})
+        image_path = None
+        search_paths = []
         
-        doc_id = path_parts[1]
-        filename = "/".join(path_parts[3:])  # Handle filenames with subdirectories (unlikely but safe)
+        if path.startswith("docs/"):
+            # New format: docs/{doc_id}/images/{filename}
+            # Convert storage path to filesystem path: {LOCAL_CONTENT_ROOT}/{doc_id}/images/{filename}
+            path_parts = path.split("/")
+            if len(path_parts) < 4 or path_parts[0] != "docs" or path_parts[2] != "images":
+                raise HTTPException(status_code=400, detail="Invalid image path format")
+            
+            doc_id = path_parts[1]
+            filename = "/".join(path_parts[3:])  # Handle filenames with subdirectories (unlikely but safe)
+            image_path = settings.LOCAL_CONTENT_ROOT / doc_id / "images" / filename
+            search_paths.append(image_path)
+            logger.info(f"Checking new format path: {image_path}")
+            
+        else:
+            # Legacy format: images/{filename}
+            # Search through all doc directories for this image
+            filename = path.split("/", 1)[1] if "/" in path else path
+            logger.info(f"Legacy format, searching for filename: {filename}")
+            
+            # Check all doc directories for the image
+            root = settings.LOCAL_CONTENT_ROOT
+            if root.exists():
+                for doc_dir in sorted(root.iterdir()):
+                    if doc_dir.is_dir():
+                        candidate = doc_dir / "images" / filename
+                        search_paths.append(candidate)
+                        if candidate.exists():
+                            image_path = candidate
+                            logger.info(f"Found in doc directory: {candidate}")
+                            break
         
-        # Build filesystem path
-        image_path = settings.LOCAL_CONTENT_ROOT / doc_id / "images" / filename
+        # If still not found with legacy searching, try direct path as fallback
+        if not image_path or not image_path.exists():
+            # One more attempt: maybe it's just in images/ directly
+            direct_path = settings.LOCAL_CONTENT_ROOT / "images" / (path.split("/")[-1] if "/" in path else path)
+            search_paths.append(direct_path)
+            if direct_path.exists():
+                image_path = direct_path
+                logger.info(f"Found in direct path: {direct_path}")
+        
+        if not image_path or not image_path.exists():
+            # Log all paths we tried
+            logger.warning(f"Image not found. Checked paths: {search_paths}")
+            logger.warning(f"Content root exists: {settings.LOCAL_CONTENT_ROOT.exists()}")
+            if settings.LOCAL_CONTENT_ROOT.exists():
+                logger.warning(f"Content root contents: {list(settings.LOCAL_CONTENT_ROOT.iterdir())}")
+            raise HTTPException(status_code=404, detail="Image not found")
         
         # Security check: ensure path is within content root
         try:
@@ -497,8 +625,7 @@ async def serve_image(path: str):
         except ValueError:
             raise HTTPException(status_code=403, detail="Access denied")
         
-        if not image_path.exists():
-            raise HTTPException(status_code=404, detail="Image not found")
+        logger.info(f"Serving image from: {image_path}")
         
         # Determine content type from extension
         ext = image_path.suffix.lower()
@@ -515,11 +642,11 @@ async def serve_image(path: str):
         return FileResponse(
             path=image_path,
             media_type=media_type,
-            filename=filename
+            filename=image_path.name
         )
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error serving image {path}: {e}")
+        logger.error(f"Error serving image {path}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

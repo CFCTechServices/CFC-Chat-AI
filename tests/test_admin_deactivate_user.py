@@ -65,51 +65,24 @@ def authenticate_with_supabase(email: str, password: str) -> Optional[str]:
         print(f"❌ Error during authentication: {e}")
         return None
 
-def test_deactivate_user(jwt_token: str, user_id: str, reason: str):
-    """
-    Test the admin deactivate user endpoint.
-    """
-    print(f"\n🚫 Attempting to deactivate user...")
-    print(f"   User ID: {user_id}")
-    print(f"   Reason: {reason}")
-    
-    url = f"{API_BASE_URL}/api/admin/users/{user_id}/deactivate"
+import pytest
+
+pytestmark = pytest.mark.integration
+
+
+def test_deactivate_user(real_jwt_token: str, throwaway_user_id: str, reason: str):
+    """Test the admin deactivate user endpoint."""
+    url = f"{API_BASE_URL}/api/admin/users/{throwaway_user_id}/deactivate"
     headers = {
-        "Authorization": f"Bearer {jwt_token}",
-        "Content-Type": "application/json"
+        "Authorization": f"Bearer {real_jwt_token}",
+        "Content-Type": "application/json",
     }
-    payload = {
-        "reason": reason
-    }
-    
-    try:
-        response = requests.post(url, headers=headers, json=payload)
-        
-        print(f"\n📊 Response Status: {response.status_code}")
-        print(f"📝 Response Body:")
-        try:
-            response_json = response.json()
-            print(json.dumps(response_json, indent=2))
-        except:
-            print(response.text)
-        
-        if response.status_code == 200:
-            print(f"\n✅ SUCCESS! User has been deactivated")
-            print(f"   ℹ️  User cannot login anymore")
-            print(f"   💾 All user data has been preserved")
-            print(f"   🔄 User can be reactivated by updating status back to 'active'")
-            print(f"   🗄️  Verify in 'public.profiles' table: status='inactive', deleted_at is set")
-        elif response.status_code == 400:
-            print(f"\n⚠️  Bad Request: Check if user is already deactivated or you're trying to deactivate yourself")
-        elif response.status_code == 403:
-            print(f"\n⚠️  Forbidden: User is not an admin")
-        elif response.status_code == 404:
-            print(f"\n⚠️  Not Found: User ID does not exist")
-        else:
-            print(f"\n⚠️  Unexpected response code: {response.status_code}")
-            
-    except Exception as e:
-        print(f"\n❌ Error calling endpoint: {e}")
+    payload = {"reason": reason}
+
+    response = requests.post(url, headers=headers, json=payload)
+    assert response.status_code == 200, (
+        f"Expected 200 but got {response.status_code}: {response.text}"
+    )
 
 def main():
     print("=" * 70)
