@@ -31,7 +31,6 @@ def test_azure_settings_present():
     assert hasattr(settings, "AZURE_OPENAI_ENDPOINT"), "AZURE_OPENAI_ENDPOINT missing from Settings"
     assert hasattr(settings, "AZURE_OPENAI_DEPLOYMENT"), "AZURE_OPENAI_DEPLOYMENT missing from Settings"
     assert hasattr(settings, "AZURE_OPENAI_API_VERSION"), "AZURE_OPENAI_API_VERSION missing from Settings"
-    assert settings.AZURE_OPENAI_DEPLOYMENT == "gpt-4o-mini"
     assert settings.AZURE_OPENAI_API_VERSION == "2024-08-01-preview"
 
 
