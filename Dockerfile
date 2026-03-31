@@ -3,11 +3,15 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # System dependencies:
-#   build-essential — needed at build time to compile C extensions (removed after install)
-#   ffmpeg — add back here when openai-whisper is re-added to requirements.txt
+#   build-essential  — needed at build time to compile C extensions (removed after install)
+#   ffmpeg           — required by openai-whisper for audio/video processing
+#   tesseract-ocr    — required by pytesseract for OCR on scanned PDF pages
+#   poppler-utils    — required by pdf2image to convert PDF pages to images
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         ffmpeg \
+        tesseract-ocr \
+        poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies before copying application code so that

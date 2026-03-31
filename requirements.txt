@@ -20,7 +20,6 @@ certifi
 requests
 scikit-learn
 gunicorn
-resend
 email-validator
 pdfplumber>=0.11.0
 pymupdf>=1.23.0
