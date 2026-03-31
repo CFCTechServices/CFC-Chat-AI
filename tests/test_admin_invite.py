@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script for the admin list users endpoint.
+Test script for the admin invite endpoint.
 Fill in the configuration section below with your admin credentials.
 """
 
@@ -25,6 +25,9 @@ ADMIN_JWT_TOKEN: Optional[str] = None  # Set to None to use email/password below
 # Option 2: If you need to authenticate, provide admin credentials (loaded from environment)
 ADMIN_EMAIL: Optional[str] = os.getenv("TEST_ADMIN_EMAIL")
 ADMIN_PASSWORD: Optional[str] = os.getenv("TEST_ADMIN_PASSWORD")
+
+# The email address to send the invitation to
+TARGET_EMAIL = "ogxpsych@gmail.com"  # TODO: Set target email here
 
 # API base URL
 API_BASE_URL = "http://localhost:8000"
@@ -73,82 +76,44 @@ def get_jwt_token_from_supabase(email: str, password: str) -> Optional[str]:
         return None
 
 
-def test_list_users(jwt_token: str):
+def test_admin_invite(jwt_token: str, target_email: str):
     """
-    Tests the admin list users endpoint.
+    Tests the admin invite endpoint.
     """
-    print(f"\n👥 Fetching list of all users...")
+    print(f"\n📧 Sending invitation to {target_email}...")
     
-    url = f"{API_BASE_URL}/api/admin/users"
+    url = f"{API_BASE_URL}/api/admin/invite"
     headers = {
         "Authorization": f"Bearer {jwt_token}",
         "Content-Type": "application/json"
     }
+    payload = {
+        "email": target_email
+    }
     
     try:
-        response = requests.get(url, headers=headers)
+        response = requests.post(url, headers=headers, json=payload)
         
         print(f"\n📊 Response Status: {response.status_code}")
         print(f"📝 Response Body:")
-        response_data = response.json()
-        print(json.dumps(response_data, indent=2))
+        print(json.dumps(response.json(), indent=2))
         
         if response.status_code == 200:
-            users = response_data.get("users", [])
-            total = response_data.get("total", 0)
+            response_data = response.json()
+            message = response_data.get("message", "")
             
-            print(f"\n✅ SUCCESS! Retrieved {total} user(s)")
-            
-            if users:
-                print(f"\n📋 User Summary:")
-                print("-" * 70)
-                for i, user in enumerate(users, 1):
-                    status_emoji = {
-                        'active': '✓',
-                        'inactive': '⊗',
-                        'deleted': '✗'
-                    }.get(user.get('status'), '?')
-                    
-                    role_badge = user.get('role', 'unknown').upper()
-                    status_badge = user.get('status', 'unknown').upper()
-                    
-                    print(f"{i}. {status_emoji} {user.get('email', 'N/A')}")
-                    print(f"   Name: {user.get('full_name') or '(not set)'}")
-                    print(f"   Role: {role_badge} | Status: {status_badge}")
-                    print(f"   Created: {user.get('created_at', 'N/A')}")
-                    
-                    if user.get('deleted_at'):
-                        print(f"   Deactivated: {user.get('deleted_at')}")
-                    
-                    print()
-                
-                print("-" * 70)
-                
-                # Verify sorting
-                print("\n🔍 Verification:")
-                active_count = sum(1 for u in users if u.get('status') == 'active')
-                inactive_count = sum(1 for u in users if u.get('status') == 'inactive')
-                deleted_count = sum(1 for u in users if u.get('status') == 'deleted')
-                
-                print(f"   Active users: {active_count}")
-                print(f"   Inactive users: {inactive_count}")
-                print(f"   Deleted users: {deleted_count}")
-                
-                # Check if active users appear first
-                first_active_idx = next((i for i, u in enumerate(users) if u.get('status') == 'active'), None)
-                first_inactive_idx = next((i for i, u in enumerate(users) if u.get('status') in ['inactive', 'deleted']), None)
-                
-                if first_active_idx is not None and first_inactive_idx is not None:
-                    if first_active_idx < first_inactive_idx:
-                        print("   ✅ Sorting verified: Active users appear first")
-                    else:
-                        print("   ⚠️  Warning: Inactive users appear before active users")
-                elif first_active_idx is not None:
-                    print("   ✅ All users are active")
-                
+            # Check if email was actually sent or just created
+            if "email disabled" in message.lower():
+                print("\n✅ SUCCESS! Invitation created in database!")
+                print(f"   ℹ️  Email sending is currently disabled.")
+                print(f"   📋 The invitation code has been stored in the database.")
+                print(f"   📧 Share the invite code manually with {target_email}")
             else:
-                print("\n   ℹ️  No users found in database")
-                
+                print("\n✅ SUCCESS! Invitation sent successfully!")
+                print(f"   📧 Email sent to {target_email}")
+                print(f"   📬 Check the inbox for the invitation email.")
+            
+            print(f"   🗄️  Verify in 'public.invitations' table in your database.")
         elif response.status_code == 403:
             print("\n❌ FORBIDDEN: User does not have admin permissions")
         elif response.status_code == 401:
@@ -167,7 +132,7 @@ def main():
     Main execution function.
     """
     print("=" * 70)
-    print("🧪 Admin List Users Endpoint Test Script")
+    print("🧪 Admin Invite Endpoint Test Script")
     print("=" * 70)
     
     jwt_token = None
@@ -190,8 +155,13 @@ def main():
         print("\n❌ Failed to obtain JWT token. Exiting.")
         return
     
-    # Test the admin list users endpoint
-    test_list_users(jwt_token)
+    if not TARGET_EMAIL:
+        print("\n❌ ERROR: TARGET_EMAIL is not set!")
+        print("Please edit this script and set the TARGET_EMAIL variable.")
+        return
+    
+    # Test the admin invite endpoint
+    test_admin_invite(jwt_token, TARGET_EMAIL)
     
     print("\n" + "=" * 70)
     print("🏁 Test Complete")

@@ -12,7 +12,6 @@ python-dotenv
 pywin32; sys_platform == "win32"
 python-multipart>=0.0.20
 pytest
-coverage
 supabase>=2.0.0
 openai>=1.13.3
 resend
