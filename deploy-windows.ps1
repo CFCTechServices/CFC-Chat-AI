@@ -76,13 +76,21 @@ Write-Host "      Done - Python environment ready."
 # Step 2: Deploy static frontend files to IIS web root
 # ---------------------------------------------------------------------------
 Write-Host ""
-Write-Host "[2/4] Copying frontend static files to $WebRoot..."
+Write-Host "[2/4] Copying frontend static files to $WebRoot\ui\..."
 if (-not (Test-Path $WebRoot)) {
     New-Item -ItemType Directory -Force -Path $WebRoot | Out-Null
 }
-Copy-Item -Path "$ScriptDir\web\*" -Destination $WebRoot -Recurse -Force
+$uiRoot = "$WebRoot\ui"
+if (-not (Test-Path $uiRoot)) {
+    New-Item -ItemType Directory -Force -Path $uiRoot | Out-Null
+}
+
+# Copy web files into the ui/ subfolder (index.html references /ui/* paths)
+Copy-Item -Path "$ScriptDir\web\*" -Destination $uiRoot -Recurse -Force
+
+# Copy IIS web.config to the site root (one level above ui/)
 Copy-Item -Path "$ScriptDir\deployment\iis-web.config" -Destination "$WebRoot\web.config" -Force
-Write-Host "      Done - frontend deployed."
+Write-Host "      Done - frontend deployed to $uiRoot"
 
 # ---------------------------------------------------------------------------
 # Step 3: Install or restart Windows Service

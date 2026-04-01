@@ -62,7 +62,7 @@ pip install -r requirements.txt
 
 # 5. Set up .env
 Copy-Item .env.example .env
-notepad .env   # fill in API keys, CORS_ORIGINS=http://192.168.33.211
+notepad .env   # fill in API keys, CORS_ORIGINS=http://192.168.201.211
 
 # 6. Test the app starts
 python main.py
