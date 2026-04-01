@@ -9,76 +9,86 @@
 | **RAM** | 8 GB | 16 GB |
 | **Disk** | 60 GB | 100 GB |
 
-> **Why higher specs than a typical web app?**  
-> The application runs ML models (sentence-transformers for document search, Whisper for video transcription) and uses Docker with WSL2, which has additional memory and disk overhead compared to native Linux hosting.
-
-### Suggested Azure VM Size
-
-| VM Size | vCPUs | RAM |
-|---------|-------|-----|
-| **Standard_D2s_v3** | 2 | 8 GB |
-| **Standard_D4s_v3** *(recommended)* | 4 | 16 GB |
-
-> **Note:** Azure VMs with Windows 10 Pro typically use the `Standard_D*` series with a Windows 10 client OS image.
+> **Note:** Docker Desktop was evaluated and found incompatible with this VM due to Azure nested virtualization restrictions. The application runs natively using Python + NSSM Windows Service. No Docker is required.
 
 ---
 
 ## Software to Install Before Handoff
 
-Please install the following on the VM before providing access to the development team:
+All steps below require **Administrator privileges** and only need to be done **once**.
 
-### 1. WSL2 (Windows Subsystem for Linux)
-Open **PowerShell as Administrator** and run:
+### 1. Python 3.11
+- Download from: https://python.org/downloads
+- During install, check **"Add Python to PATH"**
+- Verify: open PowerShell → `python --version`
+
+### 2. Git for Windows
+- Download from: https://git-scm.com/download/win
+- Use default settings
+
+### 3. ffmpeg
+- Download a Windows build from: https://ffmpeg.org/download.html → Windows → gyan.dev builds → `ffmpeg-release-essentials.zip`
+- Extract to `C:\ffmpeg`
+- Add `C:\ffmpeg\bin` to the system PATH:
+  - Search "Environment Variables" in Start → Edit the system environment variables → Environment Variables → System variables → Path → Edit → New → `C:\ffmpeg\bin`
+- Verify: `ffmpeg -version`
+
+### 4. Tesseract OCR (for scanned PDF support)
+- Download installer from: https://github.com/UB-Mannheim/tesseract/wiki
+- Install to default path (`C:\Program Files\Tesseract-OCR`)
+- Add `C:\Program Files\Tesseract-OCR` to system PATH (same steps as above)
+- Verify: `tesseract --version`
+
+### 5. Poppler (for PDF to image conversion)
+- Download from: https://github.com/oschwartz10612/poppler-windows/releases → latest `.zip`
+- Extract to `C:\poppler`
+- Add `C:\poppler\Library\bin` to system PATH
+- Verify: `pdftoppm -v`
+
+### 6. NSSM (Windows Service Manager)
+- Download from: https://nssm.cc/download → `nssm-2.24.zip`
+- Extract and copy `win64\nssm.exe` to `C:\Windows\System32\` (so it's on PATH)
+- Verify: `nssm version`
+
+### 7. IIS (Internet Information Services)
+- Press **Win + R** → type `optionalfeatures` → Enter
+- Check **Internet Information Services** (top-level)
+- Also check: **IIS → World Wide Web Services → Application Development Features → CGI**
+- Click OK
+
+### 8. IIS URL Rewrite Module
+- Download from: https://www.iis.net/downloads/microsoft/url-rewrite
+
+### 9. IIS Application Request Routing (ARR)
+- Download from: https://www.iis.net/downloads/microsoft/application-request-routing
+- After install: open IIS Manager → click computer name → **Application Request Routing Cache** → **Server Proxy Settings** → check **Enable proxy** → Apply
+
+### 10. Create App Folder and Grant Dev Access
 ```powershell
-wsl --install
+New-Item -ItemType Directory -Force -Path C:\cfcchat
+# Grant the dev user Full Control:
+# Right-click C:\cfcchat → Properties → Security → Edit → Add dev user → Full Control
 ```
-Then **reboot** the VM.
-
-### 2. Docker Desktop
-- Download from [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop/)
-- During setup, select **"Use WSL 2 based engine"**
-- After install, open Docker Desktop and verify it's running (whale icon in system tray)
-
-> **Note on licensing:** Docker Desktop requires a paid subscription ($5/user/month) for organizations with more than 250 employees or more than $10M in annual revenue (Docker, Inc. terms).
-
-### 3. Git for Windows
-- Download from [git-scm.com/download/win](https://git-scm.com/download/win)
-- Use default settings during installation
-
-### 4. IIS (Internet Information Services)
-IIS is built into Windows 10 Pro but must be enabled:
-1. Press **Windows + R** → type `optionalfeatures` → press Enter
-2. In the list, expand **Internet Information Services** and check the box
-3. Also check **Internet Information Services → World Wide Web Services → Application Development Features → CGI** (required for proxy features)
-4. Click **OK** and wait for Windows to apply the changes
-5. Download and install these two IIS extensions:
-   - [URL Rewrite Module](https://www.iis.net/downloads/microsoft/url-rewrite)
-   - [Application Request Routing (ARR)](https://www.iis.net/downloads/microsoft/application-request-routing)
-
-### 5. Firewall & Network
-- Open **port 80** (HTTP) and **port 443** (HTTPS) in:
-  - Windows Firewall (Inbound Rules)
-  - Azure Network Security Group (NSG)
-- Port **3389** (RDP) should already be open for remote access
 
 ---
 
-## Access Required by Development Team
-
-- **RDP access** to the VM (IP address + credentials or Azure Bastion)
-- **Administrator privileges** on the VM (needed to configure IIS and Docker)
-- The VM's **public IP address** or **domain name** (for CORS and DNS configuration)
+## Firewall & Network
+- Open **port 80** (HTTP) and **port 443** (HTTPS) in:
+  - Windows Firewall (Inbound Rules)
+  - Azure Network Security Group (NSG)
 
 ---
 
 ## Pre-Handoff Checklist
 
-Before providing VM access to the development team, please verify:
-
-- [ ] VM provisioned with specs above (4 vCPUs, 16 GB RAM, 100 GB disk recommended)
-- [ ] WSL2 installed (`wsl --install`) and VM rebooted
-- [ ] Docker Desktop installed and running with WSL2 backend
+- [ ] Python 3.11 installed and on PATH
 - [ ] Git for Windows installed
-- [ ] IIS enabled with URL Rewrite and ARR modules installed
-- [ ] Ports 80 and 443 open in both Windows Firewall and Azure NSG
-- [ ] RDP access credentials ready for the development team
+- [ ] ffmpeg installed and on PATH
+- [ ] Tesseract installed and on PATH
+- [ ] Poppler installed and on PATH
+- [ ] NSSM installed (`nssm.exe` in System32)
+- [ ] IIS enabled with CGI, URL Rewrite, ARR modules
+- [ ] ARR proxy enabled in IIS Manager
+- [ ] `C:\cfcchat` folder created with Full Control for dev user
+- [ ] Ports 80 and 443 open in Windows Firewall and Azure NSG
+- [ ] RDP access credentials ready for dev team
