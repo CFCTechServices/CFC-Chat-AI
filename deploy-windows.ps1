@@ -91,7 +91,7 @@ Write-Host ""
 $gunicorn = "$ScriptDir\.venv\Scripts\gunicorn.exe"
 $args = "main:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000 --timeout 120 --log-level info"
 
-$existingService = nssm status $ServiceName 2>&1
+$existingService = (nssm status $ServiceName 2>&1) -join ""
 if ($existingService -match "SERVICE_RUNNING|SERVICE_STOPPED|SERVICE_PAUSED") {
     Write-Host "[3/4] Restarting existing Windows Service '$ServiceName'..."
     nssm restart $ServiceName
