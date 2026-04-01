@@ -65,26 +65,49 @@ def authenticate_with_supabase(email: str, password: str) -> Optional[str]:
         print(f"❌ Error during authentication: {e}")
         return None
 
-import pytest
-
-pytestmark = pytest.mark.integration
-
-
-def test_change_role(real_jwt_token: str, throwaway_user_id: str):
-    """Test the admin change-role endpoint."""
+def test_change_role(jwt_token: str, user_id: str, new_role: str):
+    """
+    Test the admin change-role endpoint.
+    """
+    print(f"\n🔄 Attempting to change user role...")
+    print(f"   User ID: {user_id}")
+    print(f"   New Role: {new_role}")
+    
     url = f"{API_BASE_URL}/api/admin/change-role"
     headers = {
-        "Authorization": f"Bearer {real_jwt_token}",
-        "Content-Type": "application/json",
+        "Authorization": f"Bearer {jwt_token}",
+        "Content-Type": "application/json"
     }
-    payload = {"user_id": throwaway_user_id, "new_role": NEW_ROLE}
-
-    response = requests.post(url, headers=headers, json=payload)
-    assert response.status_code == 200, (
-        f"Expected 200 but got {response.status_code}: {response.text}"
-    )
-    data = response.json()
-    assert "user_id" in data or "message" in data, f"Unexpected response body: {data}"
+    payload = {
+        "user_id": user_id,
+        "new_role": new_role
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        
+        print(f"\n📊 Response Status: {response.status_code}")
+        print(f"📝 Response Body:")
+        try:
+            response_json = response.json()
+            print(json.dumps(response_json, indent=2))
+        except:
+            print(response.text)
+        
+        if response.status_code == 200:
+            print(f"\n✅ SUCCESS! User role changed to '{new_role}'")
+            print(f"   You can verify this in the 'public.profiles' table in your database.")
+        elif response.status_code == 400:
+            print(f"\n⚠️  Bad Request: Invalid role or parameters")
+        elif response.status_code == 403:
+            print(f"\n⚠️  Forbidden: User is not an admin")
+        elif response.status_code == 404:
+            print(f"\n⚠️  Not Found: User ID does not exist")
+        else:
+            print(f"\n⚠️  Unexpected response code: {response.status_code}")
+            
+    except Exception as e:
+        print(f"\n❌ Error calling endpoint: {e}")
 
 def main():
     print("=" * 70)

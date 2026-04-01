@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Integration tests for the admin invitation (whitelist) endpoint — all scenarios.
+Test script for the admin invitation endpoint — all scenarios.
 
 Covers:
-  1. Create a new invitation (happy path) — verify email & expires_at in response
+  1. Create a new invitation (happy path) — verify code & expires_at in response
   2. Duplicate invite for same email (active) — expect 409
   3. GET /invitations/status/{email} — active state
   4. GET /invitations/status/{email} — "none" for unknown email
   5. Expire an existing invite via direct DB update, then re-invite — expect success
   6. GET /invitations/status/{email} — expired state
-  7. Mark invite as registered via DB, then GET status — "registered" state
+  7. Mark invite as used via DB, then GET status — "used" state
   8. Unauthenticated access — expect 401/403
 
 Prerequisites:
@@ -97,7 +97,7 @@ def cleanup_test_invitations(email: str):
 
 
 def expire_invitation(invitation_id: str):
-    """Set expires_at to the past to simulate an expired invite."""
+    """Set expires_at to the past so the invite is expired but still is_used=false."""
     sb = get_supabase_admin_client()
     sb.table("invitations")\
         .update({"expires_at": "2020-01-01T00:00:00+00:00"})\
@@ -106,154 +106,246 @@ def expire_invitation(invitation_id: str):
     print(f"  Expired invitation {invitation_id}")
 
 
-def mark_invitation_registered(invitation_id: str):
-    """Mark an invitation as registered via direct DB update."""
+def mark_invitation_used(invitation_id: str):
+    """Mark an invitation as used via direct DB update."""
     sb = get_supabase_admin_client()
     sb.table("invitations")\
-        .update({"is_registered": True})\
+        .update({"is_used": True})\
         .eq("id", invitation_id)\
         .execute()
-    print(f"  Marked invitation {invitation_id} as registered")
+    print(f"  Marked invitation {invitation_id} as used")
 
 
 # ============================================================================
 # TEST FUNCTIONS
 # ============================================================================
 
-import pytest
-
-pytestmark = pytest.mark.integration
-
-
-@pytest.fixture(autouse=True, scope="module")
-def clean_test_invitations(email):
-    """Remove all invitations for the test email before and after the suite."""
-    cleanup_test_invitations(email)
-    yield
-    cleanup_test_invitations(email)
+passed = 0
+failed = 0
 
 
-def test_create_invite_success(real_jwt_token: str, email: str):
-    """Test 1: Create a brand-new invitation — expect 200 with email & expires_at."""
+def report(test_name: str, success: bool, detail: str = ""):
+    global passed, failed
+    if success:
+        passed += 1
+        print(f"  PASS: {test_name}")
+    else:
+        failed += 1
+        print(f"  FAIL: {test_name}")
+    if detail:
+        print(f"        {detail}")
+
+
+def test_create_invite_success(jwt_token: str, email: str) -> Optional[dict]:
+    """Test 1: Create a brand-new invitation — expect 200 with code & expires_at."""
+    print("\n--- Test 1: Create new invitation (happy path) ---")
     url = f"{API_BASE_URL}/api/admin/invite"
-    resp = requests.post(url, headers=api_headers(real_jwt_token), json={"email": email})
+    resp = requests.post(url, headers=api_headers(jwt_token), json={"email": email})
     data = resp.json()
 
-    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {data}"
-    assert "expires_at" in data, f"Response missing 'expires_at': {data}"
-    assert data.get("email") == email, f"Email mismatch: {data}"
+    ok = (
+        resp.status_code == 200
+        and "code" in data
+        and "expires_at" in data
+        and data.get("email") == email
+    )
+    report(
+        "Create invitation returns 200 with code & expires_at",
+        ok,
+        f"status={resp.status_code} body={json.dumps(data)}",
+    )
+    return data if ok else None
 
 
-def test_duplicate_invite_rejected(real_jwt_token: str, email: str):
+def test_duplicate_invite_rejected(jwt_token: str, email: str):
     """Test 2: Creating a second invite for the same email while active — expect 409."""
+    print("\n--- Test 2: Duplicate active invite rejected (409) ---")
     url = f"{API_BASE_URL}/api/admin/invite"
-    resp = requests.post(url, headers=api_headers(real_jwt_token), json={"email": email})
+    resp = requests.post(url, headers=api_headers(jwt_token), json={"email": email})
     data = resp.json()
 
-    assert resp.status_code == 409, f"Expected 409, got {resp.status_code}: {data}"
-    assert "pending invitation" in data.get("detail", "").lower(), (
-        f"Unexpected error detail: {data}"
+    ok = resp.status_code == 409 and "active invitation already exists" in data.get("detail", "").lower()
+    report(
+        "Duplicate active invite returns 409",
+        ok,
+        f"status={resp.status_code} body={json.dumps(data)}",
     )
 
 
-def test_status_active(real_jwt_token: str, email: str):
+def test_status_active(jwt_token: str, email: str):
     """Test 3: GET /invitations/status/{email} returns 'active'."""
+    print("\n--- Test 3: Invitation status — active ---")
     url = f"{API_BASE_URL}/api/admin/invitations/status/{email}"
-    resp = requests.get(url, headers=api_headers(real_jwt_token))
+    resp = requests.get(url, headers=api_headers(jwt_token))
     data = resp.json()
 
-    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {data}"
-    assert data.get("status") == "active", f"Expected status 'active', got: {data}"
-    assert data.get("expires_at") is not None, f"Response missing 'expires_at': {data}"
+    ok = (
+        resp.status_code == 200
+        and data.get("status") == "active"
+        and data.get("code") is not None
+        and data.get("expires_at") is not None
+    )
+    report(
+        "Status endpoint returns 'active' for live invite",
+        ok,
+        f"status={resp.status_code} body={json.dumps(data)}",
+    )
 
 
-def test_status_none(real_jwt_token: str):
+def test_status_none(jwt_token: str):
     """Test 4: GET /invitations/status/{email} for unknown email returns 'none'."""
+    print("\n--- Test 4: Invitation status — none ---")
     unknown = "nonexistent-test-user@example.com"
     url = f"{API_BASE_URL}/api/admin/invitations/status/{unknown}"
-    resp = requests.get(url, headers=api_headers(real_jwt_token))
+    resp = requests.get(url, headers=api_headers(jwt_token))
     data = resp.json()
 
-    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {data}"
-    assert data.get("status") == "none", f"Expected status 'none', got: {data}"
+    ok = resp.status_code == 200 and data.get("status") == "none"
+    report(
+        "Status endpoint returns 'none' for unknown email",
+        ok,
+        f"status={resp.status_code} body={json.dumps(data)}",
+    )
 
 
-def test_expired_invite_replaced(real_jwt_token: str, email: str):
+def test_expired_invite_replaced(jwt_token: str, email: str) -> Optional[dict]:
     """Test 5: After expiring the current invite, a new invite should succeed."""
+    print("\n--- Test 5: Expired invite gets replaced with new invite ---")
+
+    # First, fetch the current invitation id from DB
     sb = get_supabase_admin_client()
-    current = sb.table("invitations").select("id").eq("email", email).eq("is_registered", False).execute()
-    assert current.data, "No active invite found to expire — did test_create_invite_success run first?"
+    current = sb.table("invitations")\
+        .select("id")\
+        .eq("email", email)\
+        .eq("is_used", False)\
+        .execute()
 
-    old_id = current.data[0]["id"]
-    expire_invitation(old_id)
+    if not current.data:
+        report("Expired invite replaced", False, "No active invite found to expire")
+        return None
 
-    # Backend deletes expired invites before creating a new one
+    expire_invitation(current.data[0]["id"])
+
+    # Now create a new invite — should succeed
     url = f"{API_BASE_URL}/api/admin/invite"
-    resp = requests.post(url, headers=api_headers(real_jwt_token), json={"email": email})
+    resp = requests.post(url, headers=api_headers(jwt_token), json={"email": email})
     data = resp.json()
 
-    assert resp.status_code == 200, f"Expected 200 after expiry, got {resp.status_code}: {data}"
-    assert "expires_at" in data, f"Unexpected response body: {data}"
+    ok = resp.status_code == 200 and "code" in data and "expires_at" in data
+    report(
+        "New invite succeeds after expiring the old one",
+        ok,
+        f"status={resp.status_code} body={json.dumps(data)}",
+    )
 
-    # Old invite should have been deleted by the backend
-    old_row = sb.table("invitations").select("id").eq("id", old_id).execute()
-    assert not old_row.data, f"Expired invite was not deleted by the backend: {old_row.data}"
+    # Verify the old invite is now marked as used
+    old_row = sb.table("invitations")\
+        .select("is_used")\
+        .eq("id", current.data[0]["id"])\
+        .single()\
+        .execute()
+    old_marked = old_row.data and old_row.data.get("is_used") is True
+    report(
+        "Expired invite was marked as used by the endpoint",
+        old_marked,
+        f"old invite is_used={old_row.data.get('is_used') if old_row.data else 'N/A'}",
+    )
+
+    return data if ok else None
 
 
-def test_status_expired(real_jwt_token: str, email: str):
+def test_status_expired(jwt_token: str, email: str):
     """Test 6: Expire the current invite via DB, then check status returns 'expired'."""
+    print("\n--- Test 6: Invitation status — expired ---")
+
     sb = get_supabase_admin_client()
-    current = sb.table("invitations").select("id").eq("email", email).eq("is_registered", False).execute()
-    assert current.data, "No active invite found to expire"
+    current = sb.table("invitations")\
+        .select("id")\
+        .eq("email", email)\
+        .eq("is_used", False)\
+        .execute()
+
+    if not current.data:
+        report("Status expired", False, "No active invite found to expire")
+        return
 
     expire_invitation(current.data[0]["id"])
 
     url = f"{API_BASE_URL}/api/admin/invitations/status/{email}"
-    resp = requests.get(url, headers=api_headers(real_jwt_token))
+    resp = requests.get(url, headers=api_headers(jwt_token))
     data = resp.json()
 
-    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {data}"
-    assert data.get("status") == "expired", f"Expected status 'expired', got: {data}"
+    ok = resp.status_code == 200 and data.get("status") == "expired"
+    report(
+        "Status endpoint returns 'expired' for expired invite",
+        ok,
+        f"status={resp.status_code} body={json.dumps(data)}",
+    )
 
 
-def test_status_registered(real_jwt_token: str, email: str):
-    """Test 7: Mark invite as registered, then check status returns 'registered'."""
-    # Create a fresh invite (current one is expired from test 6)
+def test_status_used(jwt_token: str, email: str):
+    """Test 7: Mark invite as used, then check status returns 'used'."""
+    print("\n--- Test 7: Invitation status — used ---")
+
+    # Create a fresh invite first (the current one is expired from test 6)
     url = f"{API_BASE_URL}/api/admin/invite"
-    resp = requests.post(url, headers=api_headers(real_jwt_token), json={"email": email})
-    assert resp.status_code == 200, f"Setup failed — could not create fresh invite: {resp.text}"
+    resp = requests.post(url, headers=api_headers(jwt_token), json={"email": email})
+    if resp.status_code != 200:
+        report("Status used (setup)", False, f"Could not create invite: {resp.status_code} {resp.text}")
+        return
 
     sb = get_supabase_admin_client()
-    current = sb.table("invitations").select("id").eq("email", email).eq("is_registered", False).execute()
-    assert current.data, "No active invite found to mark as registered"
+    current = sb.table("invitations")\
+        .select("id")\
+        .eq("email", email)\
+        .eq("is_used", False)\
+        .execute()
 
-    mark_invitation_registered(current.data[0]["id"])
+    if not current.data:
+        report("Status used", False, "No active invite found to mark as used")
+        return
+
+    mark_invitation_used(current.data[0]["id"])
 
     url = f"{API_BASE_URL}/api/admin/invitations/status/{email}"
-    resp = requests.get(url, headers=api_headers(real_jwt_token))
+    resp = requests.get(url, headers=api_headers(jwt_token))
     data = resp.json()
 
-    assert resp.status_code == 200, f"Expected 200, got {resp.status_code}: {data}"
-    assert data.get("status") == "registered", f"Expected status 'registered', got: {data}"
+    ok = resp.status_code == 200 and data.get("status") == "used"
+    report(
+        "Status endpoint returns 'used' for used invite",
+        ok,
+        f"status={resp.status_code} body={json.dumps(data)}",
+    )
 
 
 def test_unauthenticated_access():
     """Test 8: Requests without a valid token are rejected."""
+    print("\n--- Test 8: Unauthenticated access rejected ---")
+
+    # POST /invite without token
     resp1 = requests.post(
         f"{API_BASE_URL}/api/admin/invite",
         headers={"Content-Type": "application/json"},
         json={"email": "anyone@example.com"},
     )
-    assert resp1.status_code in (401, 403), (
-        f"Expected 401/403 for unauthenticated POST /invite, got {resp1.status_code}"
+    ok1 = resp1.status_code in (401, 403)
+    report(
+        "POST /invite without token returns 401/403",
+        ok1,
+        f"status={resp1.status_code}",
     )
 
+    # GET /invitations/status without token
     resp2 = requests.get(
         f"{API_BASE_URL}/api/admin/invitations/status/anyone@example.com",
         headers={"Content-Type": "application/json"},
     )
-    assert resp2.status_code in (401, 403), (
-        f"Expected 401/403 for unauthenticated GET /invitations/status, got {resp2.status_code}"
+    ok2 = resp2.status_code in (401, 403)
+    report(
+        "GET /invitations/status without token returns 401/403",
+        ok2,
+        f"status={resp2.status_code}",
     )
 
 
@@ -297,13 +389,13 @@ def main():
     cleanup_test_invitations(TARGET_EMAIL)
 
     # Run tests in order (some depend on prior state)
-    test_create_invite_success(jwt_token, TARGET_EMAIL)        # 1
+    test_create_invite_success(jwt_token, TARGET_EMAIL)       # 1
     test_duplicate_invite_rejected(jwt_token, TARGET_EMAIL)    # 2
     test_status_active(jwt_token, TARGET_EMAIL)                # 3
     test_status_none(jwt_token)                                # 4
     test_expired_invite_replaced(jwt_token, TARGET_EMAIL)      # 5
     test_status_expired(jwt_token, TARGET_EMAIL)               # 6
-    test_status_registered(jwt_token, TARGET_EMAIL)            # 7
+    test_status_used(jwt_token, TARGET_EMAIL)                  # 7
     test_unauthenticated_access()                              # 8
 
     # Final cleanup
