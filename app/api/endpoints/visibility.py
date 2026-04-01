@@ -15,14 +15,15 @@ async def get_vector_store_stats():
     """Expose basic Pinecone vector store statistics for visibility."""
     try:
         stats = vector_store.get_index_stats()
-        total_vectors = (
-            stats.get("total_vector_count")
-            or stats.get("totalVectorCount")
-            or sum(
+        if "total_vector_count" in stats:
+            total_vectors = stats["total_vector_count"]
+        elif "totalVectorCount" in stats:
+            total_vectors = stats["totalVectorCount"]
+        else:
+            total_vectors = sum(
                 namespace.get("vectorCount", 0)
                 for namespace in (stats.get("namespaces") or {}).values()
             )
-        )
 
         namespaces = [
             NamespaceStats(

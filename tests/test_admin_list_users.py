@@ -126,17 +126,17 @@ def test_list_users(jwt_token: str):
                 
                 # Verify sorting
                 print("\n🔍 Verification:")
-                active_count = sum(1 for u in users if u.get('status') == 'active')
-                inactive_count = sum(1 for u in users if u.get('status') == 'inactive')
-                deleted_count = sum(1 for u in users if u.get('status') == 'deleted')
+                active_count = sum(1 for user in users if user.get('status') == 'active')
+                inactive_count = sum(1 for user in users if user.get('status') == 'inactive')
+                deleted_count = sum(1 for user in users if user.get('status') == 'deleted')
                 
                 print(f"   Active users: {active_count}")
                 print(f"   Inactive users: {inactive_count}")
                 print(f"   Deleted users: {deleted_count}")
                 
                 # Check if active users appear first
-                first_active_idx = next((i for i, u in enumerate(users) if u.get('status') == 'active'), None)
-                first_inactive_idx = next((i for i, u in enumerate(users) if u.get('status') in ['inactive', 'deleted']), None)
+                first_active_idx = next((i for i, user in enumerate(users) if user.get('status') == 'active'), None)
+                first_inactive_idx = next((i for i, user in enumerate(users) if user.get('status') in ['inactive', 'deleted']), None)
                 
                 if first_active_idx is not None and first_inactive_idx is not None:
                     if first_active_idx < first_inactive_idx:
