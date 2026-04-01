@@ -88,16 +88,25 @@ Write-Host "      Done - frontend deployed."
 # Step 3: Install or restart Windows Service
 # ---------------------------------------------------------------------------
 Write-Host ""
-$gunicorn = "$ScriptDir\.venv\Scripts\gunicorn.exe"
-$args = "main:app --workers 2 --worker-class uvicorn.workers.UvicornWorker --bind 127.0.0.1:8000 --timeout 120 --log-level info"
+$uvicorn = "$ScriptDir\.venv\Scripts\uvicorn.exe"
+$svcArgs = "main:app --host 127.0.0.1 --port 8000 --workers 2 --log-level info"
 
-$existingService = (nssm status $ServiceName 2>&1) -join ""
-if ($existingService -match "SERVICE_RUNNING|SERVICE_STOPPED|SERVICE_PAUSED") {
+$serviceExists = $false
+try {
+    $serviceStatus = (nssm status $ServiceName 2>&1) -join ""
+    if ($serviceStatus -match "SERVICE_RUNNING|SERVICE_STOPPED|SERVICE_PAUSED") {
+        $serviceExists = $true
+    }
+} catch {
+    $serviceExists = $false
+}
+
+if ($serviceExists) {
     Write-Host "[3/4] Restarting existing Windows Service '$ServiceName'..."
     nssm restart $ServiceName
 } else {
     Write-Host "[3/4] Installing Windows Service '$ServiceName'..."
-    nssm install $ServiceName $gunicorn $args
+    nssm install $ServiceName $uvicorn $svcArgs
     nssm set $ServiceName AppDirectory $ScriptDir
     # Pass the .env file path so the service can load environment variables
     nssm set $ServiceName AppEnvironmentExtra "DOTENV_PATH=$ScriptDir\.env"
