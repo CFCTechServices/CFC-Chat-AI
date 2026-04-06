@@ -113,7 +113,7 @@ class ChatService:
             # If an LLM is configured, generate a grounded answer; otherwise use simple stub
             answer = ""
             image_positions = []
-            if settings.OPENAI_API_KEY or settings.GEMINI_API_KEY:
+            if settings.AZURE_OPENAI_API_KEY and settings.AZURE_OPENAI_ENDPOINT:
                 try:
                     answer, image_positions = self._generate_llm_answer(question, formatted_context, relevant_images, conversation_history)
                     # Remove image markers and chunk citations from answer text
@@ -148,8 +148,8 @@ class ChatService:
                                 'context_text': img_meta.get('context_text', ''),
                             })
                 else:
-                    # No positions from LLM - Gemini determined images aren't relevant
-                    # Don't show any images (respect Gemini's decision)
+                    # No positions from LLM - it determined images aren't relevant
+                    # Don't show any images (respect the LLM's decision)
                     pass
 
             return {
@@ -419,7 +419,7 @@ class ChatService:
         return f"Focuses on {lower}."
 
     def _generate_llm_answer(self, question: str, formatted_context: str, available_images: List[Dict[str, Any]] = None, conversation_history: Optional[List[Dict[str, str]]] = None) -> Tuple[str, List[Dict[str, Any]]]:
-        """Use OpenAI or Gemini to generate a grounded answer from context.
+        """Use OpenAI GPT-4o-mini to generate a grounded answer from context.
         
         Args:
             question: User's question
@@ -469,17 +469,24 @@ class ChatService:
             "Answer:"
         )
 
-        if settings.OPENAI_API_KEY:
+        if settings.AZURE_OPENAI_API_KEY and settings.AZURE_OPENAI_ENDPOINT:
             try:
-                from openai import OpenAI  # type: ignore
+                from openai import AzureOpenAI  # type: ignore
             except Exception as exc:
                 raise RuntimeError(f"OpenAI SDK not available: {exc}")
 
-            client = OpenAI()
-            
+            client = AzureOpenAI(
+                api_key=settings.AZURE_OPENAI_API_KEY,
+                azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
+                api_version=settings.AZURE_OPENAI_API_VERSION,
+                timeout=30.0,    # seconds — prevents indefinite hang on slow deployments
+                max_retries=2,   # retry transient network errors before raising
+            )
+            model_name = settings.AZURE_OPENAI_DEPLOYMENT
+
             # Build messages array with conversation history
             messages = [{"role": "system", "content": system_prompt}]
-            
+
             # Add conversation history if provided
             if conversation_history:
                 for msg in conversation_history:
@@ -487,61 +494,27 @@ class ChatService:
                     content = msg.get("content", "")
                     if role in ["user", "assistant"] and content:
                         messages.append({"role": role, "content": content})
-            
+
             # Add current question
             messages.append({"role": "user", "content": user_prompt})
-            
+
             resp = client.chat.completions.create(
-                model=getattr(settings, "OPENAI_MODEL", "gpt-3.5-turbo"),
+                model=model_name,
                 messages=messages,
                 temperature=0.2,
                 max_tokens=500,
             )
             content = resp.choices[0].message.content if resp and resp.choices else None
             if not content:
-                raise RuntimeError("Empty response from OpenAI")
+                raise RuntimeError("Empty response from Azure OpenAI")
             answer_text = content.strip()
-            # Extract cited chunk IDs and use them to filter images
             cited_chunks = self._extract_cited_chunks(answer_text)
             image_positions = self._parse_image_references_by_chunks(answer_text, available_images or [], cited_chunks)
             return answer_text, image_positions
 
-        if settings.GEMINI_API_KEY:
-            try:
-                import google.generativeai as genai  # type: ignore
-            except Exception as exc:
-                raise RuntimeError(f"Gemini SDK not available: {exc}")
+        raise RuntimeError("Azure OpenAI API key and endpoint must both be configured")
 
-            genai.configure(api_key=settings.GEMINI_API_KEY)
-            model_name = getattr(settings, "GEMINI_MODEL", "gemini-2.0-flash")
-            model = genai.GenerativeModel(model_name)
-            
-            # Gemini models expect a single user message; fold system guidance and conversation history into the user content.
-            # Build conversation history text if provided
-            history_text = ""
-            if conversation_history:
-                history_lines = []
-                for msg in conversation_history:
-                    role = msg.get("role", "user")
-                    content = msg.get("content", "")
-                    if role in ["user", "assistant"] and content:
-                        role_label = "User" if role == "user" else "Assistant"
-                        history_lines.append(f"{role_label}: {content}")
-                if history_lines:
-                    history_text = "\n\nPrevious conversation:\n" + "\n".join(history_lines) + "\n"
-            
-            combined = f"{system_prompt}{history_text}\n\n{user_prompt}"
-            resp = model.generate_content([{"role": "user", "parts": [combined]}])
-            content = getattr(resp, "text", None)
-            if not content:
-                raise RuntimeError("Empty response from Gemini")
-            answer_text = content.strip()
-            # Extract cited chunk IDs and use them to filter images
-            cited_chunks = self._extract_cited_chunks(answer_text)
-            image_positions = self._parse_image_references_by_chunks(answer_text, available_images or [], cited_chunks)
-            return answer_text, image_positions
 
-        raise RuntimeError("No LLM API key configured")
     
     def _extract_cited_chunks(self, answer_text: str) -> set:
         """Extract chunk IDs from [CHUNKS_CITED: ...] marker in LLM response.
