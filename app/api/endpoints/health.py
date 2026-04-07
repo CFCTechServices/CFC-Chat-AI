@@ -50,11 +50,14 @@ async def detailed_health_check():
         logger.warning(f"Supabase health check failed: {e}")
         checks["supabase"] = {"status": "error", "detail": str(e)}
 
-    # 3. Gemini API key
-    if settings.GEMINI_API_KEY:
-        checks["gemini"] = {"status": "ok", "model": settings.GEMINI_MODEL}
+    # 3. Azure OpenAI
+    if settings.AZURE_OPENAI_API_KEY and settings.AZURE_OPENAI_ENDPOINT:
+        if settings.AZURE_OPENAI_DEPLOYMENT:
+            checks["azure_openai"] = {"status": "ok", "deployment": settings.AZURE_OPENAI_DEPLOYMENT}
+        else:
+            checks["azure_openai"] = {"status": "degraded", "detail": "AZURE_OPENAI_DEPLOYMENT not set — LLM disabled"}
     else:
-        checks["gemini"] = {"status": "not_configured", "detail": "GEMINI_API_KEY not set"}
+        checks["azure_openai"] = {"status": "not_configured", "detail": "AZURE_OPENAI_API_KEY or AZURE_OPENAI_ENDPOINT not set"}
 
     # 4. Embedding model (sentence-transformers package availability)
     try:

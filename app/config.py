@@ -68,7 +68,7 @@ class Settings:
     AZURE_OPENAI_DEPLOYMENT: Optional[str] = os.getenv("AZURE_OPENAI_DEPLOYMENT")
     AZURE_OPENAI_API_VERSION: str = os.getenv("AZURE_OPENAI_API_VERSION", "2024-08-01-preview")
 
-    def model_post_init(self, __context: object) -> None:
+    def _validate(self) -> None:
         if self.AZURE_OPENAI_API_KEY and self.AZURE_OPENAI_ENDPOINT and not self.AZURE_OPENAI_DEPLOYMENT:
             logger.warning(
                 "AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT are set but "
@@ -119,5 +119,7 @@ class Settings:
     FEEDBACK_SIM_THRESHOLD: float = float(os.getenv("FEEDBACK_SIM_THRESHOLD", "0.75"))
 
 settings = Settings()
+settings._validate()
+
 
 
