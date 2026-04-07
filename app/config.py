@@ -1,6 +1,9 @@
+import logging
 from pathlib import Path
 import os
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 class Settings:
     # Project paths
@@ -64,6 +67,14 @@ class Settings:
     AZURE_OPENAI_ENDPOINT: Optional[str] = os.getenv("AZURE_OPENAI_ENDPOINT")
     AZURE_OPENAI_DEPLOYMENT: Optional[str] = os.getenv("AZURE_OPENAI_DEPLOYMENT")
     AZURE_OPENAI_API_VERSION: str = os.getenv("AZURE_OPENAI_API_VERSION", "2024-08-01-preview")
+
+    def model_post_init(self, __context: object) -> None:
+        if self.AZURE_OPENAI_API_KEY and self.AZURE_OPENAI_ENDPOINT and not self.AZURE_OPENAI_DEPLOYMENT:
+            logger.warning(
+                "AZURE_OPENAI_API_KEY and AZURE_OPENAI_ENDPOINT are set but "
+                "AZURE_OPENAI_DEPLOYMENT is missing — LLM answers will be disabled "
+                "until AZURE_OPENAI_DEPLOYMENT is configured."
+            )
 
 
     # Resend API Configuration (for email invitations)

@@ -479,6 +479,8 @@ class ChatService:
                 api_key=settings.AZURE_OPENAI_API_KEY,
                 azure_endpoint=settings.AZURE_OPENAI_ENDPOINT,
                 api_version=settings.AZURE_OPENAI_API_VERSION,
+                timeout=30.0,    # seconds — prevents indefinite hang on slow deployments
+                max_retries=2,   # retry transient network errors before raising
             )
             model_name = settings.AZURE_OPENAI_DEPLOYMENT
 
