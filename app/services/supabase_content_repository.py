@@ -91,7 +91,24 @@ class SupabaseContentRepository:
         filename = image.get("suggested_name") or image.get("filename") or f"{image_id}.png"
         storage_path = f"docs/{doc_id}/images/{filename}"
         data: bytes = image["data"]
-        self.client.storage.from_(self.bucket).upload(storage_path, data, {"upsert": "true"})
+
+        # Derive MIME type from filename so Supabase stores the correct Content-Type.
+        # Without this the SDK defaults to application/octet-stream (or worse, text/html),
+        # which causes browsers to show a placeholder instead of rendering the image.
+        ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+        mime_map = {
+            "jpg": "image/jpeg",
+            "jpeg": "image/jpeg",
+            "png": "image/png",
+            "gif": "image/gif",
+            "webp": "image/webp",
+            "svg": "image/svg+xml",
+        }
+        content_type = mime_map.get(ext, "image/jpeg")
+
+        self.client.storage.from_(self.bucket).upload(
+            storage_path, data, {"upsert": "true", "contentType": content_type}
+        )
         return StoredImage(image_id, storage_path, self.public_url(storage_path))
 
     def store_images(self, doc_id: str, images: List[Dict]) -> Dict[str, StoredImage]:

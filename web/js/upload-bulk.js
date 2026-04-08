@@ -51,7 +51,7 @@ export function initBulkUpload({ bulkInputId, bulkStartId, bulkUploadsId }) {
             const form = new FormData();
             form.append('file', file);
             const xhr = new XMLHttpRequest();
-            xhr.open('POST', '/files/upload');
+            xhr.open('POST', '/api/files/upload');
             xhr.upload.addEventListener('progress', (e) => {
               if (e.lengthComputable) setProgress(el, Math.round((e.loaded / e.total) * 100));
             });

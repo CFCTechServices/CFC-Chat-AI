@@ -19,8 +19,7 @@ def test_split_into_chunks_respects_chunk_size_and_overlap():
     assert len(chunks) == 2
     assert chunks[0].startswith("Sentence one")
     assert chunks[0].endswith(".")
-    # Overlap snaps to word boundary — chunk 2 never starts mid-word.
-    assert chunks[1].split()[0].rstrip(".,!?") .isalpha()
+    assert chunks[1].startswith("Sentence two") or chunks[1].startswith("Sentence three")
     # Ensure overlap kept enough context between consecutive chunks.
     assert "Sentence two" in chunks[0] or "Sentence two" in chunks[1]
 
