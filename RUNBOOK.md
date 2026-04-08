@@ -57,7 +57,7 @@ Run this on the VM every time you push new code:
 cd C:\cfcchat
 
 # 1. Pull latest code from the deployment branch
-git pull origin deployment-test
+git pull origin <branch-name>
 
 # 2. Re-run deploy script
 #    - Updates Python packages if requirements.txt changed
