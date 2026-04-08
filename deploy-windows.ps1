@@ -99,23 +99,14 @@ Write-Host ""
 $uvicorn = "$ScriptDir\.venv\Scripts\uvicorn.exe"
 $svcArgs = "main:app --host 127.0.0.1 --port 8000 --workers 2 --log-level info"
 
-$serviceExists = $false
-try {
-    $serviceStatus = (nssm status $ServiceName 2>&1) -join ""
-    if ($serviceStatus -match "SERVICE_RUNNING|SERVICE_STOPPED|SERVICE_PAUSED") {
-        $serviceExists = $true
-    }
-} catch {
-    $serviceExists = $false
-}
+$serviceExists = $null -ne (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue)
 
 if ($serviceExists) {
     Write-Host "[3/4] Restarting existing Windows Service '$ServiceName'..."
-    # Stop the service first, then force-kill any lingering Python processes that
+    # Stop the service, then force-kill any lingering Python processes that
     # survived (nssm restart alone can leave stale workers holding port 8000).
     nssm stop $ServiceName 2>&1 | Out-Null
     Start-Sleep -Seconds 3
-    # Kill any python processes still bound to port 8000
     $stale = netstat -ano | Select-String ":8000\s.*LISTENING" | ForEach-Object {
         ($_ -split '\s+')[-1]
     } | Select-Object -Unique
