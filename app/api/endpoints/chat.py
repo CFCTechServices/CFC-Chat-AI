@@ -45,6 +45,7 @@ class ChatMessageResponse(BaseModel):
     role: str
     content: str
     citations: Optional[List[Dict[str, Any]]] = None
+    relevant_images: Optional[List[Dict[str, Any]]] = None
     created_at: str
 
 class FeedbackRequest(BaseModel):
@@ -100,17 +101,23 @@ async def send_message(request: ChatMessageRequest, user: Any = Depends(get_curr
         answer_text = result["answer"]
         citations = result.get("context_used", [])
         
-        # Convert citations (SearchResults) to Dicts if they aren't already
-        # chat_service.ask_question returns dicts in context_used for 'context_chunks'
-        # but let's double check what format we want to save in JSONB.
-        # usually just enough to display sources.
-        
+        # relevant_images: LLM-filtered images with position hints.
+        # These come from ask_question() which strips images whose chunks
+        # the LLM did not cite.  We persist them in metadata so reloads
+        # can reconstruct the same visual segments without re-running RAG.
+        relevant_images = result.get("relevant_images") or []
+
         # 5. Save Assistant Message
         assistant_msg = {
             "session_id": request.session_id,
             "role": "assistant",
             "content": answer_text,
-            "metadata": {"citations": citations} # storing citations in metadata/jsonb column
+            # Store both citations (for feedback re-ranking) and
+            # relevant_images (for UI reconstruction on reload).
+            "metadata": {
+                "citations": citations,
+                "relevant_images": relevant_images,
+            },
         }
         
         assistant_msg_res = supabase.table("chat_messages").insert(assistant_msg).execute()
@@ -122,6 +129,7 @@ async def send_message(request: ChatMessageRequest, user: Any = Depends(get_curr
             role="assistant",
             content=answer_text,
             citations=citations,
+            relevant_images=relevant_images,
             created_at=saved_msg["created_at"]
         )
 

@@ -122,10 +122,22 @@ class ChatService:
                     answer = re.sub(r'\[CHUNKS_CITED:[^\]]+\]', '', answer)
                     answer = answer.strip()
                 except Exception as llm_exc:
-                    logger.warning(f"LLM generation failed, falling back to stub: {llm_exc}")
-                    # Fallback to simple answer (handles empty chunks)
+                    # Log as ERROR (not WARNING) with full traceback so this is visible
+                    # in production logs on the Azure VM — silent fallback is the most
+                    # common reason users see raw chunk dumps instead of synthesised answers.
+                    logger.error(
+                        "LLM generation failed — falling back to raw chunk summary. "
+                        "Check AZURE_OPENAI_* env vars and network connectivity to the endpoint. "
+                        "Error: %s",
+                        llm_exc,
+                        exc_info=True,
+                    )
                     answer = self._generate_simple_answer(question, context_chunks, formatted_context)
             else:
+                logger.warning(
+                    "Azure OpenAI not configured (AZURE_OPENAI_API_KEY or AZURE_OPENAI_ENDPOINT missing). "
+                    "Returning raw chunk summary. Set these env vars to enable LLM synthesis."
+                )
                 answer = self._generate_simple_answer(question, context_chunks, formatted_context)
             
             # Build image references with positions
