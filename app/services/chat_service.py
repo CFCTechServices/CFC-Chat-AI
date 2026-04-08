@@ -110,9 +110,11 @@ class ChatService:
             # Format context (will be empty string if no chunks)
             formatted_context = self.document_rag_pipeline.format_context(context_chunks) if context_chunks else ""
 
-            # If an LLM is configured, generate a grounded answer; otherwise use simple stub
+            # If an LLM is configured, generate a grounded answer; otherwise use simple stub.
+            # Track whether the LLM actually ran so we can decide what to do with images below.
             answer = ""
             image_positions = []
+            llm_succeeded = False
             if settings.AZURE_OPENAI_API_KEY and settings.AZURE_OPENAI_ENDPOINT:
                 try:
                     answer, image_positions = self._generate_llm_answer(question, formatted_context, relevant_images, conversation_history)
@@ -121,10 +123,8 @@ class ChatService:
                     answer = re.sub(r'\[IMAGE:\s*[^\]]+\]', '', answer)
                     answer = re.sub(r'\[CHUNKS_CITED:[^\]]+\]', '', answer)
                     answer = answer.strip()
+                    llm_succeeded = True
                 except Exception as llm_exc:
-                    # Log as ERROR (not WARNING) with full traceback so this is visible
-                    # in production logs on the Azure VM — silent fallback is the most
-                    # common reason users see raw chunk dumps instead of synthesised answers.
                     logger.error(
                         "LLM generation failed — falling back to raw chunk summary. "
                         "Check AZURE_OPENAI_* env vars and network connectivity to the endpoint. "
@@ -139,15 +139,20 @@ class ChatService:
                     "Returning raw chunk summary. Set these env vars to enable LLM synthesis."
                 )
                 answer = self._generate_simple_answer(question, context_chunks, formatted_context)
-            
-            # Build image references with positions
+
+            # Build image references with positions.
+            #
+            # Three cases:
+            #   1. LLM ran AND returned image positions  -> use LLM-chosen positions (best)
+            #   2. LLM ran but chose no images           -> respect that decision, show nothing
+            #   3. LLM failed / not configured           -> fall back to top-ranked images
+            #      appended after the answer so users still see relevant document images
             image_references = []
             if relevant_images:
-                # Create a map of path to image metadata
                 image_map = {img['path']: img for img in relevant_images}
-                
-                # If we have positions from LLM, use them
+
                 if image_positions:
+                    # Case 1: LLM explicitly placed images -- use its positions
                     for pos_info in image_positions:
                         path = pos_info['path']
                         if path in image_map:
@@ -159,10 +164,18 @@ class ChatService:
                                 'relevance_score': img_meta.get('score'),
                                 'context_text': img_meta.get('context_text', ''),
                             })
-                else:
-                    # No positions from LLM - it determined images aren't relevant
-                    # Don't show any images (respect the LLM's decision)
-                    pass
+                elif not llm_succeeded:
+                    # Case 3: LLM never ran -- include top-ranked images without position
+                    # hints so they appear at the end of the answer.
+                    for img in relevant_images:
+                        image_references.append({
+                            'path': img['path'],
+                            'position': None,
+                            'alt_text': img.get('section_title', 'Document image'),
+                            'relevance_score': img.get('score'),
+                            'context_text': img.get('context_text', ''),
+                        })
+                # Case 2: llm_succeeded but image_positions empty -> LLM chose no images
 
             return {
                 "success": True,
