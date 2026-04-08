@@ -118,8 +118,7 @@ class ChatService:
             if settings.AZURE_OPENAI_API_KEY and settings.AZURE_OPENAI_ENDPOINT:
                 try:
                     answer, image_positions = self._generate_llm_answer(question, formatted_context, relevant_images, conversation_history)
-                    # Remove image markers and chunk citations from answer text
-                    import re
+                    # Strip [IMAGE: ...] markers and [CHUNKS_CITED: ...] annotations from the answer text
                     answer = re.sub(r'\[IMAGE:\s*[^\]]+\]', '', answer)
                     answer = re.sub(r'\[CHUNKS_CITED:[^\]]+\]', '', answer)
                     answer = answer.strip()

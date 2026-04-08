@@ -111,7 +111,22 @@ try {
 
 if ($serviceExists) {
     Write-Host "[3/4] Restarting existing Windows Service '$ServiceName'..."
-    nssm restart $ServiceName
+    # Stop the service first, then force-kill any lingering Python processes that
+    # survived (nssm restart alone can leave stale workers holding port 8000).
+    nssm stop $ServiceName 2>&1 | Out-Null
+    Start-Sleep -Seconds 3
+    # Kill any python processes still bound to port 8000
+    $stale = netstat -ano | Select-String ":8000\s.*LISTENING" | ForEach-Object {
+        ($_ -split '\s+')[-1]
+    } | Select-Object -Unique
+    foreach ($pid in $stale) {
+        if ($pid -match '^\d+$' -and $pid -ne '0') {
+            Write-Host "      Killing stale PID $pid on :8000..."
+            Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+        }
+    }
+    Start-Sleep -Seconds 2
+    nssm start $ServiceName
 } else {
     Write-Host "[3/4] Installing Windows Service '$ServiceName'..."
     nssm install $ServiceName $uvicorn $svcArgs
