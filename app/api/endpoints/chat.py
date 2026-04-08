@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any, Union
 import logging
@@ -544,8 +544,9 @@ async def serve_image(path: str):
     """Serve images from document storage.
     
     Path format: docs/{doc_id}/images/{filename}
-    For Supabase: Returns redirect to public URL
-    For local: Returns file from filesystem
+    For Supabase: Downloads bytes via SDK and streams them directly.
+                  (Avoids 302 redirects which IIS ARR intercepts.)
+    For local: Returns file from filesystem.
     
     Also handles legacy short paths (images/{id}.ext) by searching the content root.
     """
@@ -559,19 +560,40 @@ async def serve_image(path: str):
         # Handle Supabase storage
         if isinstance(_content_repository, SupabaseContentRepository):
             try:
+                from fastapi.responses import Response as FastAPIResponse
                 clean_path = path.lstrip("/")
-                try:
-                    signed_url = _content_repository.create_signed_url(
-                        clean_path,
-                        source_type="document",
-                        expires_in=3600,
-                    )
-                    return RedirectResponse(url=signed_url)
-                except Exception:
-                    public_url = _content_repository.public_url(clean_path)
-                    return RedirectResponse(url=public_url)
+
+                # Determine correct bucket (doc vs video)
+                bucket = _content_repository.doc_bucket
+
+                # Determine content-type from extension before downloading
+                ext = clean_path.rsplit(".", 1)[-1].lower() if "." in clean_path else ""
+                media_types = {
+                    "png": "image/png",
+                    "jpg": "image/jpeg",
+                    "jpeg": "image/jpeg",
+                    "gif": "image/gif",
+                    "webp": "image/webp",
+                    "svg": "image/svg+xml",
+                }
+                media_type = media_types.get(ext, "image/jpeg")
+
+                # Download bytes directly from Supabase storage SDK.
+                # This avoids issuing a 302 redirect, which IIS ARR intercepts
+                # and can fail to pass through to the browser correctly.
+                image_bytes = _content_repository.client.storage.from_(bucket).download(clean_path)
+
+                logger.info(f"Serving image via Supabase download: {clean_path} ({len(image_bytes)} bytes)")
+                return FastAPIResponse(
+                    content=image_bytes,
+                    media_type=media_type,
+                    headers={
+                        "Cache-Control": "public, max-age=3600",
+                        "Content-Disposition": f"inline; filename={clean_path.rsplit('/', 1)[-1]}",
+                    },
+                )
             except Exception as e:
-                logger.error(f"Error getting Supabase URL for {path}: {e}")
+                logger.error(f"Error downloading image from Supabase for {path}: {e}")
                 raise HTTPException(status_code=404, detail="Image not found in Supabase storage")
         
         # Handle local storage
