@@ -147,11 +147,11 @@ The next team should prioritize these areas for production readiness:
 | File | Purpose | Key Endpoints |
 |------|---------|---------------|
 | `app/api/endpoints/chat.py` | Search and Q&A endpoints | `/search`, `/ask`, `/recommendations` |
-| `app/api/endpoints/upload.py` | File upload endpoints | `/files/upload`, `/files/bulk` |
-| `app/api/endpoints/ingest.py` | Document ingestion | `/ingest/document`, `/ingest/bulk` |
+| `app/api/endpoints/upload.py` | File upload endpoints | `/api/files/upload` |
+| `app/api/endpoints/ingest.py` | Document ingestion | `/api/ingest/document`, `/api/ingest/bulk` |
 | `app/api/endpoints/videos.py` | Video processing | `/api/videos/upload` |
 | `app/api/endpoints/health.py` | Health checks | `/health` |
-| `app/api/endpoints/visibility.py` | System visibility | `/visibility/vector-store` |
+| `app/api/endpoints/visibility.py` | System visibility | `/api/visibility/vector-store` |
 
 ### Core Services
 
@@ -318,23 +318,23 @@ Then edit `.env` and add your credentials.
    ```
 
 6. **Access the application**
+   - **Web UI**: [http://localhost:8000](http://localhost:8000)
    - **API Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
-   - **Web UI**: [http://localhost:8000/ui](http://localhost:8000/ui)
-   - **Health Check**: [http://localhost:8000/health](http://localhost:8000/health)
+   - **Health Check**: [http://localhost:8000/api/health](http://localhost:8000/api/health)
 
 ### First Steps After Setup
 
 1. **Upload a document**:
-   - Use the web UI at `/ui` (drag & drop)
-   - Or use the API: `POST /files/upload`
+   - Use the admin panel in the web UI at `http://localhost:8000` (drag & drop)
+   - Or use the API: `POST /api/files/upload`
 
 2. **Verify ingestion**:
    - Check `data/processed/content_repository/<doc-slug>/` for processed files
-   - Check Pinecone index stats: `GET /visibility/vector-store`
+   - Check Pinecone index stats: `GET /api/visibility/vector-store`
 
 3. **Test search**:
-   - Use `/search` endpoint or the web UI
-   - Try `/ask` for AI-generated answers
+   - Use `/api/chat/search` endpoint or the web UI
+   - Try `/api/chat/ask` for AI-generated answers
 
 ---
 
@@ -420,27 +420,43 @@ User Query → ChatService.ask_question()
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/files/upload` | POST | Upload single file with auto-ingestion |
-| `/files/bulk` | POST | Upload multiple files |
-| `/ingest/document` | POST | Process document by filename |
-| `/ingest/bulk` | POST | Bulk process directory contents |
+| `/api/files/upload` | POST | Upload single file with auto-ingestion |
+| `/api/ingest/document` | POST | Process document by filename |
+| `/api/ingest/bulk` | POST | Bulk process directory contents |
 
 ### Search & Chat
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/search` | POST | Semantic document search (returns chunks) |
-| `/ask` | POST | Q&A with AI-generated answers |
-| `/ask/video` | POST | Video transcript-specific Q&A |
-| `/recommendations` | POST | Content recommendations based on query |
+| `/api/chat/search` | POST | Semantic document search (returns chunks) |
+| `/api/chat/ask` | POST | Q&A with AI-generated answers |
+| `/api/chat/ask/video` | POST | Video transcript-specific Q&A |
+| `/api/chat/recommendations` | POST | Content recommendations based on query |
+| `/api/chat/sessions` | GET/POST | Chat session management |
+
+### Auth & Profile
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/auth/config` | GET | Supabase config for client |
+| `/api/auth/forgot-password` | POST | Password reset |
+| `/api/profile/me` | GET/PATCH | User profile |
+
+### Admin
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/admin/users` | GET | List all users |
+| `/api/admin/invite` | POST | Generate invitation code |
+| `/api/admin/settings` | GET/PATCH | Admin settings |
+| `/api/admin/ingestion/stats` | GET | Ingestion statistics |
 
 ### System
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/health` | GET | Health check endpoint |
-| `/visibility/vector-store` | GET | Pinecone index statistics |
-| `/content/images/{path}` | GET | Image serving endpoint |
+| `/api/health` | GET | Health check |
+| `/api/visibility/vector-store` | GET | Pinecone index statistics |
 
 ### Video Processing
 
@@ -548,14 +564,14 @@ For other credentials (OpenAI, Gemini), you can create your own accounts or ask 
 - Review logs for specific error messages
 
 **No Search Results**:
-- Verify documents have been ingested (`/visibility/vector-store`)
+- Verify documents have been ingested (`/api/visibility/vector-store`)
 - Check Pinecone index has vectors
 - Try different query keywords
 
 **Frontend Not Loading**:
-- Ensure server is running on port 8000
+- Ensure server is running: `http://localhost:8000`
 - Check browser console for errors
-- Verify CORS settings if accessing from different origin
+- Verify `CORS_ORIGINS` in `.env` includes your domain in production
 
 ---
 

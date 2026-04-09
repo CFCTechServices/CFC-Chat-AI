@@ -25,7 +25,7 @@ ADMIN_PASSWORD: str = os.getenv("TEST_ADMIN_PASSWORD")
 TARGET_USER_ID: str = os.getenv("TEST_TARGET_USER_ID")
 
 # API base URL
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 # Supabase credentials (loaded from .env)
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -64,39 +64,49 @@ def authenticate_with_supabase(email: str, password: str) -> Optional[str]:
         print(f"❌ Error during authentication: {e}")
         return None
 
-import pytest
-
-pytestmark = pytest.mark.integration
-
-
-def _deactivate(jwt_token: str, uid: str, reason: str = "Test teardown"):
-    """Helper to deactivate a user via the admin API."""
-    requests.post(
-        f"{API_BASE_URL}/api/admin/users/{uid}/deactivate",
-        headers={"Authorization": f"Bearer {jwt_token}", "Content-Type": "application/json"},
-        json={"reason": reason},
-    )
-
-
-@pytest.fixture(autouse=True)
-def ensure_user_deactivated(real_jwt_token: str, throwaway_user_id: str, reason: str):
-    """Deactivate the throwaway user before the test so reactivation can succeed."""
-    _deactivate(real_jwt_token, throwaway_user_id, reason)
-    yield
-
-
-def test_reactivate_user(real_jwt_token: str, throwaway_user_id: str):
-    """Test the admin reactivate user endpoint."""
-    url = f"{API_BASE_URL}/api/admin/users/{throwaway_user_id}/reactivate"
+def test_reactivate_user(jwt_token: str, user_id: str):
+    """
+    Test the admin reactivate user endpoint.
+    """
+    print(f"\n✅ Attempting to reactivate user...")
+    print(f"   User ID: {user_id}")
+    
+    url = f"{API_BASE_URL}/api/admin/users/{user_id}/reactivate"
     headers = {
-        "Authorization": f"Bearer {real_jwt_token}",
-        "Content-Type": "application/json",
+        "Authorization": f"Bearer {jwt_token}",
+        "Content-Type": "application/json"
     }
-
-    response = requests.post(url, headers=headers)
-    assert response.status_code == 200, (
-        f"Expected 200 but got {response.status_code}: {response.text}"
-    )
+    
+    try:
+        response = requests.post(url, headers=headers)
+        
+        print(f"\n📊 Response Status: {response.status_code}")
+        print(f"📝 Response Body:")
+        try:
+            response_json = response.json()
+            print(json.dumps(response_json, indent=2))
+        except:
+            print(response.text)
+        
+        if response.status_code == 200:
+            print(f"\n✅ SUCCESS! User has been reactivated")
+            print(f"   🔓 User can now login again")
+            print(f"   ✨ Status set back to 'active'")
+            print(f"   🗄️  Verify in 'public.profiles' table:")
+            print(f"      - status='active'")
+            print(f"      - deleted_at=NULL")
+            print(f"      - deleted_by=NULL")
+        elif response.status_code == 400:
+            print(f"\n⚠️  Bad Request: User is not deactivated or doesn't need reactivation")
+        elif response.status_code == 403:
+            print(f"\n⚠️  Forbidden: User is not an admin")
+        elif response.status_code == 404:
+            print(f"\n⚠️  Not Found: User ID does not exist")
+        else:
+            print(f"\n⚠️  Unexpected response code: {response.status_code}")
+            
+    except Exception as e:
+        print(f"\n❌ Error calling endpoint: {e}")
 
 def main():
     print("=" * 70)

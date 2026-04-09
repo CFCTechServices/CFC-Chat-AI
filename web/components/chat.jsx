@@ -17,11 +17,22 @@
 
   // Convert DB message rows into the UI message shape
   function dbMsgToUI(msg) {
+    // Always start with a text segment for the message body
+    const segments = [{ type: 'text', text: msg.content }];
+
+    // Reconstruct image segments from metadata.relevant_images persisted at
+    // send time — this is what makes images survive a page reload.
+    const relevantImages = msg.metadata?.relevant_images || [];
+    if (relevantImages.length > 0) {
+      const imgSegs = buildImageSegmentsFromAnswer({ relevant_images: relevantImages });
+      segments.push(...imgSegs);
+    }
+
     return {
       id: msg.id,
       role: msg.role,
       text: msg.content,
-      segments: [{ type: 'text', text: msg.content }],
+      segments,
     };
   }
 
@@ -348,9 +359,16 @@
           prev.map((m) => (m.id === botId ? { ...m, id: realMsgId } : m)),
         );
 
-        // Build image/video segments from citations metadata if available
+        // relevant_images from the /message endpoint are the LLM-filtered
+        // images that the model decided to reference in its answer.
+        // Fall back to flatMapping all image_paths from citations only if
+        // the server didn't return relevant_images (older deployment).
+        const serverImages = data.relevant_images && data.relevant_images.length > 0
+          ? data.relevant_images
+          : (citations.flatMap(c => c.image_paths || []).map(p => ({ path: p })));
+
         const videoSegments = buildVideoSegmentsFromAnswer({ context_used: citations });
-        const answerImages = buildImageSegmentsFromAnswer({ relevant_images: citations.flatMap(c => c.image_paths || []).map(p => ({ path: p })) });
+        const answerImages = buildImageSegmentsFromAnswer({ relevant_images: serverImages });
         simulateStreaming(answer, realMsgId, [...answerImages, ...videoSegments]);
       } catch (err) {
         setMessages((prev) =>

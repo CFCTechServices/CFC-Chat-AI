@@ -28,7 +28,7 @@
     // Fetch health on mount
     useEffect(() => {
       const start = performance.now();
-      fetch('/health')
+      fetch('/api/health')
         .then(res => {
           const elapsed = Math.round(performance.now() - start);
           setResponseTime(elapsed);

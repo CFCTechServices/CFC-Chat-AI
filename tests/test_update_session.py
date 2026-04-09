@@ -28,7 +28,7 @@ SESSION_ID: Optional[str] = None  # TODO: Set session ID or leave None
 NEW_TITLE: str = "My Updated Chat Session"  # TODO: Set the new title
 
 # API base URL
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 # Supabase credentials (loaded from .env)
 SUPABASE_URL = os.getenv("SUPABASE_URL")

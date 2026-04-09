@@ -17,7 +17,7 @@ export function initSingleUpload({ dropzoneId, fileInputId, uploadsId }) {
       form.append('file', file);
 
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', '/files/upload');
+      xhr.open('POST', '/api/files/upload');
       xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable) {
           const pct = Math.round((e.loaded / e.total) * 100);

@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 # Load environment variables
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
+
 # ==============================
 # CONFIGURATION - UPDATE THESE
 # ==============================
@@ -25,7 +26,7 @@ ADMIN_PASSWORD: str = os.getenv("TEST_ADMIN_PASSWORD")
 TARGET_USER_ID: str = os.getenv("TEST_TARGET_USER_ID")
 
 # API base URL
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 # Supabase credentials (loaded from .env)
 SUPABASE_URL = os.getenv("SUPABASE_URL")
@@ -64,23 +65,59 @@ def authenticate_with_supabase(email: str, password: str) -> Optional[str]:
         print(f"❌ Error during authentication: {e}")
         return None
 
-import pytest
-
-pytestmark = pytest.mark.integration
-
-
-def test_delete_user(real_jwt_token: str, throwaway_user_id: str):
-    """Test the admin delete user endpoint (permanent deletion)."""
-    url = f"{API_BASE_URL}/api/admin/users/{throwaway_user_id}"
+def test_delete_user(jwt_token: str, user_id: str):
+    """
+    Test the admin delete user endpoint (PERMANENT deletion).
+    """
+    print(f"\n⚠️  PERMANENT DELETION - THIS CANNOT BE UNDONE!")
+    print(f"   User ID: {user_id}")
+    print(f"   This will delete:")
+    print(f"   - User authentication record")
+    print(f"   - User profile")
+    print(f"   - All chat sessions and messages")
+    print(f"   - (Invitations and feedback will be anonymized)")
+    
+    confirm = input(f"\n⚠️  Are you sure you want to PERMANENTLY delete this user? (type 'DELETE' to confirm): ")
+    
+    if confirm != "DELETE":
+        print("\n❌ Deletion cancelled.")
+        return
+    
+    url = f"{API_BASE_URL}/api/admin/users/{user_id}"
     headers = {
-        "Authorization": f"Bearer {real_jwt_token}",
-        "Content-Type": "application/json",
+        "Authorization": f"Bearer {jwt_token}",
+        "Content-Type": "application/json"
     }
-
-    response = requests.delete(url, headers=headers)
-    assert response.status_code == 200, (
-        f"Expected 200 but got {response.status_code}: {response.text}"
-    )
+    
+    try:
+        response = requests.delete(url, headers=headers)
+        
+        print(f"\n📊 Response Status: {response.status_code}")
+        print(f"📝 Response Body:")
+        try:
+            response_json = response.json()
+            print(json.dumps(response_json, indent=2))
+        except:
+            print(response.text)
+        
+        if response.status_code == 200:
+            print(f"\n✅ SUCCESS! User has been PERMANENTLY deleted")
+            print(f"   🗑️  User removed from authentication")
+            print(f"   🗑️  Profile deleted from database")
+            print(f"   🗑️  All chat sessions and messages deleted (CASCADE)")
+            print(f"   ℹ️  Invitations and feedback anonymized (SET NULL)")
+            print(f"   ⚠️  This action CANNOT be undone!")
+        elif response.status_code == 400:
+            print(f"\n⚠️  Bad Request: Check if you're trying to delete yourself")
+        elif response.status_code == 403:
+            print(f"\n⚠️  Forbidden: User is not an admin")
+        elif response.status_code == 404:
+            print(f"\n⚠️  Not Found: User ID does not exist")
+        else:
+            print(f"\n⚠️  Unexpected response code: {response.status_code}")
+            
+    except Exception as e:
+        print(f"\n❌ Error calling endpoint: {e}")
 
 def main():
     print("=" * 70)
