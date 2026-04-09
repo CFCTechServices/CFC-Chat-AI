@@ -9,11 +9,25 @@ class VectorStore:
     """Pinecone vector store management."""
     
     def __init__(self, index_name: Optional[str] = None, namespace: Optional[str] = None):
-        self.pc = Pinecone(api_key=settings.PINECONE_API_KEY)
+        self.api_key = settings.PINECONE_API_KEY
         self.index_name = index_name or settings.PINECONE_INDEX_NAME
         self.namespace = namespace if namespace is not None else getattr(settings, "PINECONE_NAMESPACE", None)
-        self.index = None
-        self._initialize_index()
+        self._pc = None
+        self._index = None
+    
+    @property
+    def pc(self):
+        if self._pc is None:
+            # Provide a fallback for tests without raising an error immediately
+            key = self.api_key or "dummy-key"
+            self._pc = Pinecone(api_key=key)
+        return self._pc
+        
+    @property
+    def index(self):
+        if self._index is None:
+            self._initialize_index()
+        return self._index
     
     def _initialize_index(self):
         """Initialize Pinecone index."""
@@ -31,7 +45,7 @@ class VectorStore:
                 )
                 logger.info(f"Created new Pinecone index: {self.index_name}")
             
-            self.index = self.pc.Index(self.index_name)
+            self._index = self.pc.Index(self.index_name)
             logger.info(f"Connected to Pinecone index: {self.index_name}")
             
         except Exception as e:

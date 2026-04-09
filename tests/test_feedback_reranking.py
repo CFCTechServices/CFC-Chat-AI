@@ -305,7 +305,7 @@ class TestCombinedReranking:
         # phase2_injected ensures at least one chunk has a query-aware signal,
         # triggering the full re-ranking path for all returned chunks
         assert phase2_injected["chunk_ids"], "Phase 2 events must be injected before this test"
-        reranked = rag.retrieve_context(SIMILAR_QUERY, top_k=5)
+        reranked = rag.retrieve_context(TEST_QUERY, top_k=5)
         for chunk in reranked:
             assert chunk.get("adjusted_score") is not None, (
                 f"chunk {chunk.get('chunk_id')} missing adjusted_score in combined re-ranking"
