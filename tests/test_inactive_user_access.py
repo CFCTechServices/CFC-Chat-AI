@@ -18,7 +18,7 @@ DEACTIVATED_USER_EMAIL: str = os.getenv("TEST_DEACTIVATED_USER_EMAIL", "ogxpsych
 DEACTIVATED_USER_PASSWORD: str = os.getenv("TEST_DEACTIVATED_USER_PASSWORD", "12345678")
 
 # API base URL
-API_BASE_URL = "http://localhost:8000"
+API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
 
 # Supabase credentials
 SUPABASE_URL = os.getenv("SUPABASE_URL")

@@ -62,7 +62,7 @@
     if (data.relevant_images && Array.isArray(data.relevant_images) && data.relevant_images.length > 0) {
       return data.relevant_images.map((img) => {
         const path = img.path || '';
-        const url = path.startsWith('http://') || path.startsWith('https://') ? path : `/content/images/${path}`;
+        const url = path.startsWith('http://') || path.startsWith('https://') ? path : `/api/chat/content/images/${path}`;
         return { type: 'image', url, alt: img.alt_text || 'Document image', position: img.position, path };
       });
     }

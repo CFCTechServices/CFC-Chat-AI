@@ -15,7 +15,10 @@ pytest
 coverage
 supabase>=2.0.0
 openai>=1.13.3
-resend
+google-generativeai>=0.8.3
+certifi
+requests
+scikit-learn
 email-validator
 pdfplumber>=0.11.0
 pymupdf>=1.23.0
