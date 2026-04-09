@@ -19,6 +19,12 @@ from app.core.embeddings import EmbeddingModel
 from app.core.feedback_service import FeedbackService
 from app.core.supabase_service import supabase
 
+# Skip this entire module if we are running in CI without the live credentials
+pytestmark = pytest.mark.skipif(
+    not settings.PINECONE_API_KEY or not settings.SUPABASE_SERVICE_ROLE_KEY,
+    reason="Integration tests require live Pinecone and Supabase credentials"
+)
+
 TEST_QUERY       = "What are the nutritional requirements for cattle feed?"
 SIMILAR_QUERY    = "How much protein should be in cattle feed?"
 DISSIMILAR_QUERY = "How do I reset my password?"
