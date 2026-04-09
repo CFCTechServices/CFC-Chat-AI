@@ -1,7 +1,7 @@
 // Simple in-app router context with browser history support
 (() => {
   const RouterContext = React.createContext(null);
-  const VALID_ROUTES = ['login', 'chat', 'admin', 'docs', 'transition', 'reset-password'];
+  const VALID_ROUTES = ['login', 'chat', 'admin', 'docs', 'transition', 'reset-password', 'settings', 'history'];
 
   function isValidRoute(route) {
     return VALID_ROUTES.includes(route);
