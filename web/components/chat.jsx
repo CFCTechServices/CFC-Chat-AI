@@ -351,7 +351,7 @@
         if (!res.ok) throw new Error(data.detail || 'Error from assistant');
 
         const answer = data.content || 'No answer available.';
-        const citations = data.citations || [];
+        const citations = data.context_used || [];
         const realMsgId = data.id || botId;
 
         // Replace temp ID with real DB ID so feedback works
@@ -367,7 +367,7 @@
           ? data.relevant_images
           : (citations.flatMap(c => c.image_paths || []).map(p => ({ path: p })));
 
-        const videoSegments = buildVideoSegmentsFromAnswer({ context_used: citations });
+        const videoSegments = buildVideoSegmentsFromAnswer(data);
         const answerImages = buildImageSegmentsFromAnswer({ relevant_images: serverImages });
         simulateStreaming(answer, realMsgId, [...answerImages, ...videoSegments]);
       } catch (err) {
