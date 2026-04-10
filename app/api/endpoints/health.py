@@ -11,7 +11,7 @@ router = APIRouter(tags=["health"])
 async def health_check():
     """Health check endpoint."""
     return HealthResponse(
-        # ok=True,
+        ok=True,
         message="CFC Animal Feed Software Chatbot API is running",
         version=settings.API_VERSION
     )
