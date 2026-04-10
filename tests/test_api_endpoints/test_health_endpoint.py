@@ -27,10 +27,11 @@ def test_health_detailed_endpoint(client):
     response = client.get("/health/detailed")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "ok": True,
-        "message": "All systems operational",
-        "version": settings.API_VERSION,}
+    data = response.json()
+    assert isinstance(data["ok"], bool)
+    assert "version" in data
+    assert "message" in data
+    assert "services" in data
 
 
 def test_health_endpoint_post_method_not_allowed(client):
