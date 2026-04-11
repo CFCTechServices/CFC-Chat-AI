@@ -59,8 +59,11 @@
   }
 
   function Layout({ children, fullWidth }) {
-    const { user, role, supabase } = useUser();
+    const { user, role, profile, supabase } = useUser();
     const { route, navigate, visualState } = useRouter();
+
+    const effectiveRole = role || profile?.role || 'user';
+    const isAdmin = ['admin', 'superuser'].includes(effectiveRole);
 
     const handleSignOut = async () => {
       const client = supabase || window.supabaseClient;
@@ -149,7 +152,7 @@
                   <circle cx="12" cy="12" r="3" />
                 </svg>
               </button>
-              {role === 'admin' && (
+              {isAdmin && (
                 <button
                   type="button"
                   className={`toolbar-btn ${route === 'admin' ? 'active' : ''}`}

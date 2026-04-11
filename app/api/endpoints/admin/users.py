@@ -91,6 +91,9 @@ async def change_user_role(request: ChangeRoleRequest, admin: dict = Depends(get
 
         current_role = user_check.data[0].get("role")
 
+        if current_role == "superuser":
+            raise HTTPException(status_code=400, detail="Cannot change the role of a superuser account")
+
         # Update the user's role
         update_response = supabase.table("profiles").update({
             "role": request.new_role
@@ -132,12 +135,15 @@ async def deactivate_user(
     try:
         # Check if user exists
         user_check = supabase.table("profiles")\
-            .select("id, status, deleted_at")\
+            .select("id, status, deleted_at, role")\
             .eq("id", user_id)\
             .execute()
 
         if not user_check.data:
             raise HTTPException(status_code=404, detail="User not found")
+
+        if user_check.data[0].get("role") == "superuser":
+            raise HTTPException(status_code=400, detail="Cannot deactivate a superuser account")
 
         # Check if already deactivated
         current_status = user_check.data[0].get("status")
@@ -315,12 +321,15 @@ async def delete_user(
     try:
         # Check if user exists
         user_check = supabase.table("profiles")\
-            .select("id")\
+            .select("id, role")\
             .eq("id", user_id)\
             .execute()
 
         if not user_check.data:
             raise HTTPException(status_code=404, detail="User not found")
+
+        if user_check.data[0].get("role") == "superuser":
+            raise HTTPException(status_code=400, detail="Cannot delete a superuser account")
 
         # Get user email before deletion
         try:
