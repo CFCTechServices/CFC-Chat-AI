@@ -149,7 +149,7 @@
                   <circle cx="12" cy="12" r="3" />
                 </svg>
               </button>
-              {role === 'admin' && (
+              {(role === 'admin' || role === 'superuser') && (
                 <button
                   type="button"
                   className={`toolbar-btn ${route === 'admin' ? 'active' : ''}`}
