@@ -25,7 +25,7 @@
 
     function getDefaultRouteForUser() {
       if (!user) return 'login';
-      if (role === 'admin') return 'admin';
+      if (role === 'admin' || role === 'superuser') return 'admin';
       return 'chat';
     }
 
@@ -119,7 +119,7 @@
         }
 
         // If route requires admin but user is not admin, redirect to their default
-        if (user && newRoute === 'admin' && role !== 'admin') {
+        if (user && newRoute === 'admin' && role !== 'admin' && role !== 'superuser') {
           const fallback = 'chat';
           window.history.replaceState({ route: fallback }, '', routeToPath(fallback));
           newRoute = fallback;

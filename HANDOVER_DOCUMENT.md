@@ -341,6 +341,15 @@ sequenceDiagram
 - No API-level authorization
 - All endpoints publicly accessible
 
+**Immutable Superuser Architecture:**
+A `superuser` role exists to guarantee permanent administrative access. To ensure this account is never accidentally or maliciously locked out, it is protected at multiple levels:
+1. **API Guardrails**: The backend endpoints in `app/api/endpoints/admin/users.py` catch modifying actions early. They identify if the target user has the `superuser` role and immediately return a clean HTTP 400 Bad Request error if a deletion, deactivation, or demotion is attempted.
+2. **Database Constraints**: Because backend admin operations run using the Supabase Service Role Key (which intrinsically bypasses standard Row Level Security), RLS alone cannot protect the user. Instead, a strict PostgreSQL Trigger (`protect_superuser_profile`) is deployed on `public.profiles`. This trigger operates at the lowest transaction layer, aborting any attempt to delete, deactivate, or demote the superuser—acting as the ultimate, unbreakable failsafe.
+3. **UI Guardrails**: The frontend dashboard (`web/components/admin/user.jsx`) proactively blocks interaction on superuser entries (the role is displayed as read-only, and action buttons are hidden).
+
+> **Important Handover Note:** 
+> The final handover package will physically contain the initial login credentials for the superuser account (both the application login credentials and the associated email inbox login). This guarantees you will always possess an irrevocable "master key" to administer the platform.
+
 ### Authentication & Session Flow
 
 ```mermaid
