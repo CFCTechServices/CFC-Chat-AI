@@ -167,6 +167,7 @@ def test_send_message_returns_assistant_message(client, monkeypatch):
 		"role": "assistant",
 		"content": "Kali and  Natri Sunfat.",
 		"citations": [{"source": "nutrition-guide.pdf"}],
+		"relevant_images": [],
 		"created_at": "2026-03-17T09:00:00Z",
 	}
 	assert captured["question"] == "What is beef nutrition?"
@@ -184,7 +185,7 @@ def test_send_message_returns_assistant_message(client, monkeypatch):
 		"session_id": "session-1",
 		"role": "assistant",
 		"content": "Kali and  Natri Sunfat.",
-		"metadata": {"citations": [{"source": "nutrition-guide.pdf"}]},
+		"metadata": {"citations": [{"source": "nutrition-guide.pdf"}], "relevant_images": []},
 	}
 	assert history_query.order_by == ("created_at", True)
 	assert history_query.limit_value == 10
@@ -728,10 +729,20 @@ class FakeSupabaseContentRepository(SupabaseContentRepository):
 		return self._public_url
 
 
-def test_serve_image_redirects_to_supabase_url(client, monkeypatch):
-	"""Test that serving an image redirects to the Supabase public URL (API_29)."""
-	public_url = "https://supabase.example.com/storage/v1/object/sign/cfc-docs/docs/doc123/images/feed.jpg"
-	fake_repo = FakeSupabaseContentRepository(signed_url=public_url)
+def test_serve_image_downloads_from_supabase(client, monkeypatch):
+	"""Test that serving an image streams it from Supabase SDK directly."""
+	class FakeStorageFrom:
+		def download(self, path):
+			return b"supabase-bytes"
+	class FakeStorage:
+		def from_(self, bucket):
+			return FakeStorageFrom()
+	class FakeClient:
+		storage = FakeStorage()
+
+	fake_repo = FakeSupabaseContentRepository()
+	fake_repo.client = FakeClient()
+	fake_repo.doc_bucket = "cfc-docs"
 	monkeypatch.setattr(chat, "_content_repository", fake_repo)
 
 	response = client.get(
@@ -739,38 +750,8 @@ def test_serve_image_redirects_to_supabase_url(client, monkeypatch):
 		follow_redirects=False,
 	)
 
-	assert response.status_code in (302, 307)
-	assert response.headers["location"] == public_url
-	assert fake_repo.last_signed_call == {
-		"storage_path": "docs/doc123/images/feed.jpg",
-		"source_type": "document",
-		"expires_in": 3600,
-	}
-	assert fake_repo.last_public_call is None
-
-
-def test_serve_image_falls_back_to_supabase_public_url(client, monkeypatch):
-	"""Test that serving an image falls back to public URL when signed URL generation fails."""
-	public_url = "https://supabase.example.com/storage/v1/object/public/cfc-docs/docs/doc123/images/feed.jpg"
-	fake_repo = FakeSupabaseContentRepository(
-		signed_error=RuntimeError("cannot sign"),
-		public_url=public_url,
-	)
-	monkeypatch.setattr(chat, "_content_repository", fake_repo)
-
-	response = client.get(
-		"/api/chat/content/images/docs/doc123/images/feed.jpg",
-		follow_redirects=False,
-	)
-
-	assert response.status_code in (302, 307)
-	assert response.headers["location"] == public_url
-	assert fake_repo.last_signed_call == {
-		"storage_path": "docs/doc123/images/feed.jpg",
-		"source_type": "document",
-		"expires_in": 3600,
-	}
-	assert fake_repo.last_public_call == "docs/doc123/images/feed.jpg"
+	assert response.status_code == 200
+	assert response.content == b"supabase-bytes"
 
 
 def test_serve_image_returns_404_when_supabase_public_url_fails(client, monkeypatch):
