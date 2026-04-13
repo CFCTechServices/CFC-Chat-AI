@@ -19,6 +19,12 @@ from app.core.embeddings import EmbeddingModel
 from app.core.feedback_service import FeedbackService
 from app.core.supabase_service import supabase
 
+# Skip this entire module if we are running in CI without the live credentials
+pytestmark = pytest.mark.skipif(
+    not settings.PINECONE_API_KEY or not settings.SUPABASE_SERVICE_ROLE_KEY,
+    reason="Integration tests require live Pinecone and Supabase credentials"
+)
+
 TEST_QUERY       = "What are the nutritional requirements for cattle feed?"
 SIMILAR_QUERY    = "How much protein should be in cattle feed?"
 DISSIMILAR_QUERY = "How do I reset my password?"
@@ -305,7 +311,7 @@ class TestCombinedReranking:
         # phase2_injected ensures at least one chunk has a query-aware signal,
         # triggering the full re-ranking path for all returned chunks
         assert phase2_injected["chunk_ids"], "Phase 2 events must be injected before this test"
-        reranked = rag.retrieve_context(SIMILAR_QUERY, top_k=5)
+        reranked = rag.retrieve_context(TEST_QUERY, top_k=5)
         for chunk in reranked:
             assert chunk.get("adjusted_score") is not None, (
                 f"chunk {chunk.get('chunk_id')} missing adjusted_score in combined re-ranking"
