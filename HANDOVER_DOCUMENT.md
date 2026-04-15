@@ -969,3 +969,22 @@ For questions or clarifications about this handover document, please refer to:
 **Project Version**: 1.0.0
 **Maintained By**: [Team Name]
 
+
+---
+
+## 11. Project De-cluttering & Technical Debt (Note for Future Teams)
+
+To ensure a clean development environment, the following files and patterns should be addressed. Note: These were preserved to avoid accidental data loss but are considered "artifacts."
+
+### Unnecessary Files (Marked for Archive/Deletion)
+The following files are redundant and should be moved to an `archive/` directory or deleted during the C# migration:
+- **Legacy Frontend:** `web/app_legacy.js`, `web/app_legacy.jsx`, `web/main_legacy.jsx`. The current entry point is `web/app.jsx`.
+- **Backup Code:** `backup/main_old.py`. Use Git history instead of local backups.
+- **Redundant Scripts:** `deploy.ps1` and `deploy-artifact.sh`. The primary deployment script is now `deploy-windows.ps1`.
+- **Test Artifacts:** `app/test_supabase.py`. This should be moved to the `tests/` folder or removed.
+
+### Critical Technical Debt
+1. **Ingestion Bottlenecks:** Document ingestion is currently synchronous. Large uploads can block the FastAPI event loop. A background task queue (Celery or .NET BackgroundService) is recommended.
+2. **Embeddings Cache:** Frequently asked questions are re-embedded every time. Implementing a Redis or SQL cache for common query embeddings will reduce latency and cost.
+3. **Superuser Protection:** A "Superuser" exists with a PostgreSQL trigger (`protect_superuser_profile`) in Supabase. This is a critical security fail-safe—do not remove the trigger during migration without implementing a C#-level equivalent.
+
