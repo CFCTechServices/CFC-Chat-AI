@@ -272,69 +272,35 @@ Then edit `.env` and add your credentials.
 <a id="quick-start-guide"></a>
 ## 🚀 Quick Start Guide
 
+For a comprehensive guide on local development, CI/CD, and deployment overview, please see [**DEVELOPMENT_SETUP.md**](./DEVELOPMENT_SETUP.md).
+
 ### Prerequisites
 
-- Python 3.8+ installed
-- Virtual environment support
-- Office/LibreOffice installed (for `.doc` file conversion on Windows)
+- Python 3.10+
+- Pinecone API Key (Required)
+- OpenAI or Gemini API Key (Required for AI answers)
 
-### Installation Steps
+### 3-Step Local Setup
 
-1. **Clone the repository** (if not already done)
+1. **Install Dependencies**:
    ```bash
-   git clone <repository-url>
-   cd Chat-Talk
-   ```
-
-2. **Create and activate virtual environment**
-   ```bash
-   # Windows
    python -m venv .venv
-   .venv\Scripts\activate
-
-   # macOS/Linux
-   python3 -m venv .venv
-   source .venv/bin/activate
-   ```
-
-3. **Install dependencies**
-   ```bash
+   source .venv/bin/activate  # macOS/Linux
+   # .venv\Scripts\activate   # Windows
    pip install -r requirements.txt
    ```
 
-4. **Configure environment variables**
+2. **Configure Environment**:
    ```bash
-   # Copy example file
-   copy .env.example .env  # Windows
-   # or
-   cp .env.example .env    # macOS/Linux
-
-   # Edit .env and add your credentials (see above)
+   cp .env.example .env
+   # Edit .env and add your PINECONE_API_KEY and OPENAI_API_KEY/GEMINI_API_KEY
    ```
 
-5. **Start the API server**
+3. **Run the App**:
    ```bash
    uvicorn main:app --reload
    ```
-
-6. **Access the application**
-   - **Web UI**: [http://localhost:8000](http://localhost:8000)
-   - **API Documentation**: [http://localhost:8000/docs](http://localhost:8000/docs)
-   - **Health Check**: [http://localhost:8000/api/health](http://localhost:8000/api/health)
-
-### First Steps After Setup
-
-1. **Upload a document**:
-   - Use the admin panel in the web UI at `http://localhost:8000` (drag & drop)
-   - Or use the API: `POST /api/files/upload`
-
-2. **Verify ingestion**:
-   - Check `data/processed/content_repository/<doc-slug>/` for processed files
-   - Check Pinecone index stats: `GET /api/visibility/vector-store`
-
-3. **Test search**:
-   - Use `/api/chat/search` endpoint or the web UI
-   - Try `/api/chat/ask` for AI-generated answers
+   Access the UI at [http://localhost:8000](http://localhost:8000).
 
 ---
 
