@@ -66,7 +66,30 @@ pdftoppm -v
 
 ---
 
-## Step 6 — Install NSSM (Windows Service Manager)
+## Step 6 — Install LibreOffice
+
+Required for converting legacy `.doc` files (Word 97-2003 format) into `.docx` so the ingestion pipeline can process them. Without this, `.doc` uploads will fail on the VM.
+
+> **Why not Microsoft Word?** Word COM automation requires a paid Microsoft Office licence installed on the server, which is not standard on Azure VMs. LibreOffice provides equivalent headless conversion for free.
+
+1. Install via winget (run as Administrator):
+```powershell
+winget install TheDocumentFoundation.LibreOffice
+```
+2. Verify the binary exists at the default path:
+```powershell
+Get-Item "C:\Program Files\LibreOffice\program\soffice.com"
+```
+3. **Important:** Add `SOFFICE_PATH` to the application's `.env` file (see `DEPLOYMENT.md` → Environment Variables). LibreOffice is typically **not** on the system PATH on Windows Server, so the application needs an explicit path:
+```
+SOFFICE_PATH=C:\Program Files\LibreOffice\program\soffice.com
+```
+
+> **Local dev note:** Developers running the code locally on Mac (`brew install libreoffice`) or Windows with LibreOffice already on PATH do **not** need to set `SOFFICE_PATH` — it only needs to be set on the VM.
+
+---
+
+## Step 7 — Install NSSM (Windows Service Manager)
 
 NSSM runs the Python application as a Windows Service so it auto-starts and keeps running.
 
@@ -80,7 +103,7 @@ nssm version
 
 ---
 
-## Step 7 — Enable IIS
+## Step 8 — Enable IIS
 
 1. Press **Win + R** → type `optionalfeatures` → Enter
 2. Check **Internet Information Services** (top-level box)
@@ -89,14 +112,14 @@ nssm version
 
 ---
 
-## Step 8 — Install IIS URL Rewrite Module
+## Step 9 — Install IIS URL Rewrite Module
 
 1. Download from: https://www.iis.net/downloads/microsoft/url-rewrite
 2. Run installer with default settings
 
 ---
 
-## Step 9 — Install IIS ARR and Enable Proxy
+## Step 10 — Install IIS ARR and Enable Proxy
 
 1. Download from: https://www.iis.net/downloads/microsoft/application-request-routing
 2. Run installer
@@ -108,7 +131,7 @@ nssm version
 
 ---
 
-## Step 10 — Create App Folder and Grant Dev Access
+## Step 11 — Create App Folder and Grant Dev Access
 
 ```powershell
 New-Item -ItemType Directory -Force -Path C:\cfcchat
@@ -120,7 +143,7 @@ Grant the dev user **Full Control** over `C:\cfcchat`:
 
 ---
 
-## Step 11 — Open Firewall Ports
+## Step 12 — Open Firewall Ports
 
 - Open **port 80** (HTTP) and **port 443** (HTTPS) in:
   - Windows Firewall (Inbound Rules)
@@ -135,6 +158,8 @@ Grant the dev user **Full Control** over `C:\cfcchat`:
 - [ ] ffmpeg installed and on PATH (`ffmpeg -version` works)
 - [ ] Tesseract installed and on PATH (`tesseract --version` works)
 - [ ] Poppler installed and on PATH (`pdftoppm -v` works)
+- [ ] LibreOffice installed (`Get-Item "C:\Program Files\LibreOffice\program\soffice.com"` succeeds)
+- [ ] `SOFFICE_PATH` added to `.env` (required for `.doc` file ingestion on the VM)
 - [ ] NSSM installed (`nssm version` works)
 - [ ] IIS enabled (with CGI checked)
 - [ ] IIS URL Rewrite module installed
