@@ -14,6 +14,40 @@ A Retrieval-Augmented Generation (RAG) chatbot system for CFC Technologies' anim
 - [Next Steps & Improvements](#next-steps--improvements)
 - [Support & Contact](#support--contact)
 - [Project Status](#project-status)
+---
+
+<a id="quick-start-guide"></a>
+## 🚀 Quick Start Guide
+
+For a comprehensive guide on local development, CI/CD, and deployment overview, please see [**DEVELOPMENT_SETUP.md**](./DEVELOPMENT_SETUP.md).
+
+### Prerequisites
+
+- Python 3.10+
+- Pinecone API Key (Required)
+- OpenAI or Gemini API Key (Required for AI answers)
+
+### 3-Step Local Setup
+
+1. **Install Dependencies**:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # macOS/Linux
+   # .venv\Scripts\activate   # Windows
+   pip install -r requirements.txt
+   ```
+
+2. **Configure Environment**:
+   ```bash
+   cp .env.example .env
+   # Edit .env and add your PINECONE_API_KEY and OPENAI_API_KEY/GEMINI_API_KEY
+   ```
+
+3. **Run the App**:
+   ```bash
+   uvicorn main:app --reload
+   ```
+   Access the UI at [http://localhost:8000](http://localhost:8000).
 
 ---
 
@@ -41,117 +75,10 @@ A Retrieval-Augmented Generation (RAG) chatbot system for CFC Technologies' anim
 - **Storage**: Local filesystem + optional Supabase
 - **Video Transcription**: OpenAI Whisper
 
----
-
-<a id="key-components--focus-areas"></a>
-## 🔧 Key Components & Focus Areas
-
-The next team should prioritize these areas for production readiness:
-
-### 1. **Authentication & Security** 🔐 (HIGH PRIORITY)
-**Status**: Not implemented - Frontend-only role detection  
-**Focus Files**:
-- `app/auth/` - **Needs to be created** - JWT authentication, RBAC
-- `main.py` (lines 47-53) - CORS configuration (currently allows all origins)
-- `app/rate_limit/` - Rate limiting middleware
-
-**What to Build**:
-- JWT-based authentication system
-- Role-based access control (Admin, Developer, User)
-- API endpoint protection
-- Secure session management
-- Rate limiting per user/IP
-
-### 2. **Chat History & Persistence** 💬 (HIGH PRIORITY)
-**Status**: Messages only stored in React state (lost on refresh)  
-**Focus Files**:
-- `app/services/chat_history_service.py` - **Needs to be created**
-- `app/api/endpoints/sessions.py` - **Needs to be created**
-- `web/app.jsx` (lines 1321-1515) - ChatPage component
-
-**What to Build**:
-- Database schema for chat sessions and messages
-- Backend API for session management
-- Persistent chat history with user-specific retrieval
-- Frontend integration for loading/saving conversations
-
-### 3. **Feedback & Rating System** ⭐ (MEDIUM PRIORITY)
-**Status**: Not implemented  
-**Focus Files**:
-- `app/api/endpoints/feedback.py` - **Needs to be created**
-- `app/services/feedback_service.py` - **Needs to be created**
-- `web/app.jsx` (lines 1097-1210) - ChatMessage component
-
-**What to Build**:
-- Thumbs up/down rating system
-- Comment collection for feedback
-- Analytics endpoint for admin dashboard
-- Export functionality for ML training data
-
-### 4. **RAG Quality Improvements** 🧠 (MEDIUM PRIORITY)
-**Status**: Basic implementation - needs enhancement  
-**Focus Files**:
-- `app/core/rag.py` - Core RAG pipeline (lines 21-100)
-- `app/services/chat_service.py` - Business logic (lines 81-165)
-- `app/core/vector_store.py` - Vector search implementation
-- `app/utils/text_processing.py` - Chunking strategies
-
-**What to Improve**:
-- Hybrid search (vector + keyword/BM25)
-- Re-ranking with cross-encoder models
-- Semantic chunking (sentence-aware, paragraph boundaries)
-- Source citation with page/section numbers
-- Query expansion and reformulation
-
-### 5. **Testing & Observability** 📊 (MEDIUM PRIORITY)
-**Status**: Basic unit tests only  
-**Focus Files**:
-- `tests/` - Expand test coverage
-- `app/core/logging.py` - **Needs to be created** - Structured logging
-- `app/core/metrics.py` - **Needs to be created** - Prometheus metrics
-- `app/api/endpoints/health.py` - Enhance health checks
-
-**What to Build**:
-- Comprehensive test suite (unit + integration + E2E)
-- Structured logging (JSON format)
-- Application metrics (Prometheus)
-- Error tracking (Sentry)
-- Performance monitoring
-
-### 6. **CFC System Integration** 🔗 (LOW PRIORITY)
-**Status**: Not implemented  
-**Focus Files**:
-- `app/services/cfc_analytics_service.py` - **Needs to be created**
-
-**What to Build**:
-- Integration with CFC analytics platform
-- Webhook/API calls for chat interactions
-- Batch export of feedback data
-- Usage metrics dashboard
-
----
-
-<a id="important-files-to-review"></a>
-## 📁 Important Files to Review
-
-### Core Application Files
-
-| File | Purpose | Key Lines |
-|------|---------|-----------|
-| `main.py` | Application entry point, router registration | 1-98 |
-| `app/config.py` | Centralized configuration (API keys, paths, settings) | 1-59 |
-| `requirements.txt` | Python dependencies | All |
 
 ### API Endpoints
 
-| File | Purpose | Key Endpoints |
-|------|---------|---------------|
-| `app/api/endpoints/chat.py` | Search and Q&A endpoints | `/search`, `/ask`, `/recommendations` |
-| `app/api/endpoints/upload.py` | File upload endpoints | `/api/files/upload` |
-| `app/api/endpoints/ingest.py` | Document ingestion | `/api/ingest/document`, `/api/ingest/bulk` |
-| `app/api/endpoints/videos.py` | Video processing | `/api/videos/upload` |
-| `app/api/endpoints/health.py` | Health checks | `/health` |
-| `app/api/endpoints/visibility.py` | System visibility | `/api/visibility/vector-store` |
+Please refer to https://mnscu-my.sharepoint.com/:w:/r/personal/lm1263ei_go_minnstate_edu/Documents/CFC/Design%20Docs/Test%20Plan.docx?d=w660fa584e60b4c429a24b61283d471cc&csf=1&web=1&e=8Nj2SB for more details.  
 
 ### Core Services
 
@@ -267,57 +194,42 @@ cp .env.example .env
 
 Then edit `.env` and add your credentials.
 
----
-
-<a id="quick-start-guide"></a>
-## 🚀 Quick Start Guide
-
-For a comprehensive guide on local development, CI/CD, and deployment overview, please see [**DEVELOPMENT_SETUP.md**](./DEVELOPMENT_SETUP.md).
-
-### Prerequisites
-
-- Python 3.10+
-- Pinecone API Key (Required)
-- OpenAI or Gemini API Key (Required for AI answers)
-
-### 3-Step Local Setup
-
-1. **Install Dependencies**:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # macOS/Linux
-   # .venv\Scripts\activate   # Windows
-   pip install -r requirements.txt
-   ```
-
-2. **Configure Environment**:
-   ```bash
-   cp .env.example .env
-   # Edit .env and add your PINECONE_API_KEY and OPENAI_API_KEY/GEMINI_API_KEY
-   ```
-
-3. **Run the App**:
-   ```bash
-   uvicorn main:app --reload
-   ```
-   Access the UI at [http://localhost:8000](http://localhost:8000).
-
----
-
 <a id="architecture-overview"></a>
 ## 🏗️ Architecture Overview
 
-### System Flow
+### System Flow: The RAG Loop
 
+```mermaid
+sequenceDiagram
+    participant User
+    participant API as FastAPI (Backend)
+    participant Pinecone as Pinecone (Vector DB)
+    participant Supabase as Supabase (PostgreSQL)
+    participant LLM as Azure OpenAI / Gemini
+
+    User->>API: Asks Question
+    API->>API: Generate Query Embedding
+    API->>Pinecone: Semantic Search (Top-K)
+    Pinecone-->>API: Match IDs + Scores
+    API->>Supabase: Fetch Full Content & Metadata by IDs
+    Supabase-->>API: Document Chunks + Image Paths
+    API->>API: Optional: Feedback-based Re-ranking
+    API->>LLM: Send Prompt (Question + Grounded Context)
+    LLM-->>API: Generated Answer with Citations
+    API-->>User: Final Response (Text + Images/Videos)
 ```
-User Query → FastAPI → ChatService → RAGPipeline → VectorStore (Pinecone)
-                                                      ↓
-                                              Retrieved Chunks
-                                                      ↓
-                                              LLM (OpenAI/Gemini)
-                                                      ↓
-                                              Formatted Answer
-```
+
+<a id="important-files-to-review"></a>
+## 📁 Important Files to Review
+
+### Core Application Files
+
+| File | Purpose | Key Logic |
+|------|---------|-----------|
+| `main.py` | Application entry point and router registration | App lifecycle & CORS |
+| `app/config.py` | Centralized configuration (API keys, paths, settings) | Env var management |
+| `app/core/rag.py` | Core RAG logic: retrieval and context formatting | **Metadata fetch from Supabase** |
+| `app/services/chat_service.py` | Main orchestration for chat and search | Image ranking & LLM prompts |
 
 ### Component Architecture
 
@@ -335,47 +247,39 @@ User Query → FastAPI → ChatService → RAGPipeline → VectorStore (Pinecone
 │  │ - upload.py  │  │ - doc_proc   │  │ - embeddings│     │
 │  │ - ingest.py  │  │ - content_repo│ │ - vector_db  │     │
 │  └──────────────┘  └──────────────┘  └──────────────┘     │
-└───────────────────────┬─────────────────────────────────────┘
-                        │
-        ┌───────────────┼───────────────┐
-        │               │               │
-┌───────▼────┐  ┌───────▼────┐  ┌───────▼────┐
-│  Pinecone  │  │  Local FS  │  │  Supabase  │
-│ Vector DB  │  │  Storage   │  │  (Optional)│
-└────────────┘  └────────────┘  └────────────┘
+└───────────────────────┬───────────────────────┬─────────────┘
+                        │                       │
+        ┌───────────────▼──────────────┐  ┌─────▼──────────────┐
+        │       Vector Search          │  │  Relational/Auth   │
+        │  Pinecone (Vector DB)        │  │  Supabase (Postgres)│
+        └──────────────────────────────┘  └────────────────────┘
 ```
 
 ### Data Flow: Document Ingestion
 
 ```
-Document Upload → DocumentProcessor → Chunking → Embeddings
-                                              ↓
-                                    VectorStore.upsert()
-                                              ↓
-                                    Pinecone Index
-                                              ↓
-                                    ContentRepository.save()
-                                              ↓
-                                    Local FS / Supabase
+Document Upload → DocumentProcessor → Text Cleaning → Chunking
+                                                         ↓
+                                              Generate Embeddings
+                                                         ↓
+    ┌────────────────────────────────────────────────────┴────────────────────────────────────┐
+    │                                                    │                                    │
+    ▼                                                    ▼                                    ▼
+Pinecone Index                              Supabase (PostgreSQL)                    Local FS / Storage
+(Vectors + IDs)                             (Content + Full Metadata)                (Originals + Images)
 ```
 
 ### Data Flow: Query Processing
 
-```
-User Query → ChatService.ask_question()
-                ↓
-        RAGPipeline.retrieve_context()
-                ↓
-        VectorStore.query() → Pinecone
-                ↓
-        Retrieved Chunks (top-k)
-                ↓
-        RAGPipeline.format_context()
-                ↓
-        LLM.generate_answer() → OpenAI/Gemini
-                ↓
-        Formatted Response with Sources
-```
+1. **User Query**: Received via `POST /api/chat/ask`.
+2. **Retrieval**: 
+   - Query is embedded using `all-MiniLM-L6-v2`.
+   - **Pinecone** returns IDs of the top 5-10 most similar chunks.
+   - **Supabase** is queried to fetch the actual text content and image paths for those specific IDs.
+3. **Synthesis**:
+   - `RAGPipeline` formats the context with `[CHUNK_ID]` markers for citation.
+   - **Azure OpenAI** (primary) or Gemini generates a grounded response.
+4. **Response**: Answer is returned with clickable citations and relevant document images.
 
 ---
 
