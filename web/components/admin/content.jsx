@@ -11,6 +11,9 @@
   function ContentTab() {
     const { session } = useUser();
     const [documents, setDocuments] = useState([]);
+    const [search, setSearch] = useState('');
+    const [page, setPage] = useState(1);
+    const PAGE_SIZE = 20;
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
@@ -25,6 +28,7 @@
     const fetchDocuments = useCallback(() => {
       setLoading(true);
       setError(null);
+      setPage(1);
       fetch('/api/admin/documents', { headers: authHeaders() })
         .then(res => {
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -35,7 +39,16 @@
         .finally(() => setLoading(false));
     }, [session]);
 
+    const filteredDocuments = documents.filter(doc => {
+      if (!search.trim()) return true;
+      const q = search.toLowerCase();
+      return basename(doc.source).toLowerCase().includes(q) || doc.doc_id.toLowerCase().includes(q);
+    });
+    const totalPages = Math.max(1, Math.ceil(filteredDocuments.length / PAGE_SIZE));
+    const pagedDocuments = filteredDocuments.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
     useEffect(() => { fetchDocuments(); }, [fetchDocuments]);
+    useEffect(() => { setPage(1); }, [search]);
 
     const setDocAction = (docId, patch) =>
       setActionState(prev => ({ ...prev, [docId]: { ...(prev[docId] || {}), ...patch } }));
@@ -169,9 +182,26 @@
             <h2>Content Library</h2>
             <p className="muted">Documents currently in the knowledge base</p>
           </div>
-          <button className="btn btn-secondary" onClick={fetchDocuments} disabled={loading}>
-            {loading ? 'Loading...' : 'Refresh'}
-          </button>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <input
+              type="text"
+              placeholder="Search documents..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{
+                padding: '6px 12px',
+                borderRadius: '6px',
+                border: '1px solid var(--color-border, #334155)',
+                backgroundColor: 'var(--color-surface, #1e293b)',
+                color: 'var(--color-text, #e2e8f0)',
+                fontSize: '0.9rem',
+                width: '220px',
+              }}
+            />
+            <button className="btn btn-secondary" onClick={fetchDocuments} disabled={loading}>
+              {loading ? 'Loading...' : 'Refresh'}
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -202,7 +232,7 @@
 
         {!loading && documents.length > 0 && (
           <div className="user-list">
-            {documents.map((doc) => {
+            {pagedDocuments.map((doc) => {
               const state = actionState[doc.doc_id] || {};
               return (
                 <Card key={doc.doc_id} className="user-card">
@@ -278,6 +308,28 @@
                 </Card>
               );
             })}
+          </div>
+        )}
+
+        {!loading && totalPages > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px', marginTop: '16px' }}>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+            >
+              Previous
+            </button>
+            <span style={{ fontSize: '0.9rem', color: 'var(--color-text-muted)' }}>
+              Page {page} of {totalPages} &nbsp;·&nbsp; {filteredDocuments.length} documents
+            </span>
+            <button
+              className="btn btn-secondary"
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+            >
+              Next
+            </button>
           </div>
         )}
       </div>
