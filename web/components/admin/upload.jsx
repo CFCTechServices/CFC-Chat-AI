@@ -111,9 +111,13 @@
       try {
         const data = await uploadSingleFile(singleFile, setSingleProgress);
         const isVideo = isVideoFile(singleFile);
+        const storageWarning = data?.supabase?.warning || null;
+        if (storageWarning) window.CFC.toast(storageWarning, 'warning', 10000);
         setSingleStatus({
-          state: 'done',
-          message: isVideo ? 'Video uploaded and transcribed.' : 'Document uploaded and ingested.',
+          state: storageWarning ? 'warning' : 'done',
+          message: storageWarning
+            ? storageWarning
+            : isVideo ? 'Video uploaded and transcribed.' : 'Document uploaded and ingested.',
           data,
         });
       } catch (err) {
@@ -166,10 +170,14 @@
         try {
           const data = await uploadSingleFile(file, (pct) => updateItem(i, { progress: pct }));
           const isVideo = isVideoFile(file);
+          const storageWarning = data?.supabase?.warning || null;
+          if (storageWarning) window.CFC.toast(storageWarning, 'warning', 10000);
           updateItem(i, {
-            status: 'done',
+            status: storageWarning ? 'warning' : 'done',
             progress: 100,
-            detail: isVideo ? 'Video uploaded and transcribed.' : 'Document uploaded and ingested.',
+            detail: storageWarning
+              ? storageWarning
+              : isVideo ? 'Video uploaded and transcribed.' : 'Document uploaded and ingested.',
             data,
           });
         } catch (err) {
@@ -267,6 +275,7 @@
                     {item.status === 'ready' && 'Ready'}
                     {item.status === 'uploading' && 'Uploading…'}
                     {item.status === 'done' && 'Ingested'}
+                    {item.status === 'warning' && 'Ingested (no download)'}
                     {item.status === 'error' && 'Error'}
                   </span>
                 </div>
