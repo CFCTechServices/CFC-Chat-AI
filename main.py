@@ -126,7 +126,11 @@ async def serve_spa(full_path: str):
     """Serve index.html for client-side routes so page reloads work."""
     first_segment = full_path.strip("/").split("/")[0]
     if first_segment in _SPA_ROUTES:
-        return FileResponse(WEB_DIR / "index.html")
+        response = FileResponse(WEB_DIR / "index.html")
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
     raise HTTPException(status_code=404, detail="Not Found")
 
 

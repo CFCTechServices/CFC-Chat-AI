@@ -264,23 +264,27 @@
                   <div className="user-name-row">
                     <h3 className="user-name">{getDisplayName(u)}</h3>
                     <span className={`status-badge ${getStatusClass(u.status)}`}>{u.status}</span>
-                    <select
-                      value={u.role}
-                      onChange={(e) => handleChangeRole(u.id, e.target.value)}
-                      style={{
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        border: '1px solid var(--color-border)',
-                        fontSize: '0.8rem',
-                        backgroundColor: 'var(--color-surface)',
-                        color: 'var(--color-text)',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {ROLES.map(r => (
-                        <option key={r} value={r}>{r}</option>
-                      ))}
-                    </select>
+                    {u.role === 'superuser' ? (
+                      <span style={{ fontSize: '0.8rem', color: 'var(--color-primary, #6366f1)', fontWeight: '600', padding: '2px 6px', border: '1px solid currentColor', borderRadius: '4px' }}>Superuser</span>
+                    ) : (
+                      <select
+                        value={u.role}
+                        onChange={(e) => handleChangeRole(u.id, e.target.value)}
+                        style={{
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          border: '1px solid var(--color-border)',
+                          fontSize: '0.8rem',
+                          backgroundColor: 'var(--color-surface)',
+                          color: 'var(--color-text)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {ROLES.map(r => (
+                          <option key={r} value={r}>{r}</option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                   <div className="user-email">{u.email}</div>
                   <div className="user-last-active">
@@ -289,17 +293,21 @@
                   </div>
                 </div>
                 <div className="user-actions">
-                  <span title={u.status === 'active' ? 'Deactivate user' : 'Activate user'}>
-                    <Toggle
-                      checked={u.status === 'active'}
-                      onChange={() => handleToggleSuspend(u)}
-                    />
-                  </span>
-                  <button className="btn-delete" title="Delete user" onClick={() => setDeleteTarget(u)} aria-label={`Delete ${u.email}`}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  </button>
+                  {u.role !== 'superuser' && (
+                    <>
+                      <span title={u.status === 'active' ? 'Deactivate user' : 'Activate user'}>
+                        <Toggle
+                          checked={u.status === 'active'}
+                          onChange={() => handleToggleSuspend(u)}
+                        />
+                      </span>
+                      <button className="btn-delete" title="Delete user" onClick={() => setDeleteTarget(u)} aria-label={`Delete ${u.email}`}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                    </>
+                  )}
                 </div>
               </Card>
             ))}

@@ -341,6 +341,15 @@ sequenceDiagram
 - No API-level authorization
 - All endpoints publicly accessible
 
+**Immutable Superuser Architecture:**
+A `superuser` role exists to guarantee permanent administrative access. To ensure this account is never accidentally or maliciously locked out, it is protected at multiple levels:
+1. **API Guardrails**: The backend endpoints in `app/api/endpoints/admin/users.py` catch modifying actions early. They identify if the target user has the `superuser` role and immediately return a clean HTTP 400 Bad Request error if a deletion, deactivation, or demotion is attempted.
+2. **Database Constraints**: Because backend admin operations run using the Supabase Service Role Key (which intrinsically bypasses standard Row Level Security), RLS alone cannot protect the user. Instead, a strict PostgreSQL Trigger (`protect_superuser_profile`) is deployed on `public.profiles`. This trigger operates at the lowest transaction layer, aborting any attempt to delete, deactivate, or demote the superuser—acting as the ultimate, unbreakable failsafe.
+3. **UI Guardrails**: The frontend dashboard (`web/components/admin/user.jsx`) proactively blocks interaction on superuser entries (the role is displayed as read-only, and action buttons are hidden).
+
+> **Important Handover Note:** 
+> The final handover package will physically contain the initial login credentials for the superuser account (both the application login credentials and the associated email inbox login). This guarantees you will always possess an irrevocable "master key" to administer the platform.
+
 ### Authentication & Session Flow
 
 ```mermaid
@@ -959,4 +968,23 @@ For questions or clarifications about this handover document, please refer to:
 **Last Updated**: [Current Date]
 **Project Version**: 1.0.0
 **Maintained By**: [Team Name]
+
+
+---
+
+## 11. Project De-cluttering & Technical Debt (Note for Future Teams)
+
+To ensure a clean development environment, the following files and patterns should be addressed. Note: These were preserved to avoid accidental data loss but are considered "artifacts."
+
+### Unnecessary Files (Marked for Archive/Deletion)
+The following files are redundant and should be moved to an `archive/` directory or deleted during the C# migration:
+- **Legacy Frontend:** `web/app_legacy.js`, `web/app_legacy.jsx`, `web/main_legacy.jsx`. The current entry point is `web/app.jsx`.
+- **Backup Code:** `backup/main_old.py`. Use Git history instead of local backups.
+- **Redundant Scripts:** `deploy.ps1` and `deploy-artifact.sh`. The primary deployment script is now `deploy-windows.ps1`.
+- **Test Artifacts:** `app/test_supabase.py`. This should be moved to the `tests/` folder or removed.
+
+### Critical Technical Debt
+1. **Ingestion Bottlenecks:** Document ingestion is currently synchronous. Large uploads can block the FastAPI event loop. A background task queue (Celery or .NET BackgroundService) is recommended.
+2. **Embeddings Cache:** Frequently asked questions are re-embedded every time. Implementing a Redis or SQL cache for common query embeddings will reduce latency and cost.
+3. **Superuser Protection:** A "Superuser" exists with a PostgreSQL trigger (`protect_superuser_profile`) in Supabase. This is a critical security fail-safe—do not remove the trigger during migration without implementing a C#-level equivalent.
 
