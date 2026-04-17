@@ -76,18 +76,42 @@ def client(monkeypatch):
 
 def _patch_supabase(monkeypatch, rows: list[dict]) -> None:
     """Replace the module-level ``supabase`` client in documents.py with a
-    lightweight fake that returns ``rows`` for any ``.select().execute()``
-    chain."""
+    lightweight fake that correctly handles the paginated query chain:
+
+        .select(...).range(start, end).execute()
+
+    The endpoint (post master pull) pages through document_chunks in batches
+    of 1 000 rows. The fake slices ``rows`` on each ``.range()`` call so that
+    the while-loop in the endpoint terminates correctly after the first
+    (and only) batch when the total row count is below the page size.
+    """
+
+    all_rows = rows  # capture in closure
 
     class _FakeResult:
-        data = rows
+        def __init__(self, data):
+            self.data = data
 
     class _FakeQuery:
+        def __init__(self):
+            self._start = 0
+            self._end = None  # inclusive
+
         def select(self, *_):
             return self
 
+        def range(self, start: int, end: int):
+            self._start = start
+            self._end = end  # inclusive upper bound
+            return self
+
         def execute(self):
-            return _FakeResult()
+            if self._end is not None:
+                # Supabase .range(start, end) is inclusive on both sides
+                sliced = all_rows[self._start : self._end + 1]
+            else:
+                sliced = all_rows[self._start :]
+            return _FakeResult(sliced)
 
     class _FakeSupabase:
         def table(self, _name):
