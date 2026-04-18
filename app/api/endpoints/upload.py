@@ -79,7 +79,7 @@ async def upload_file(file: UploadFile = File(...)):
             sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
             res = sb.storage.from_(SUPABASE_BUCKET).upload(storage_path, contents, {"upsert": "true"})
             sup_path = getattr(res, "path", None) if res is not None else None
-            supabase_info = {"path": sup_path}
+            supabase_info = {"path": sup_path, "stored": True}
         except Exception as sb_exc:
             supabase_info = {"error": str(sb_exc)}
 
