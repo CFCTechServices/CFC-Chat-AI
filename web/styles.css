@@ -788,6 +788,11 @@ html.dark-mode .notes-card {
   color: var(--color-error-text);
 }
 
+.status-warning {
+  background: rgba(234, 179, 8, 0.15);
+  color: #ca8a04;
+}
+
 .bulk-list {
   margin-top: 12px;
   max-height: 260px;
@@ -841,6 +846,11 @@ html.dark-mode .notes-card {
 .bulk-error {
   background: var(--color-error-light);
   color: var(--color-error-text);
+}
+
+.bulk-warning {
+  background: rgba(234, 179, 8, 0.15);
+  color: #ca8a04;
 }
 
 .bulk-detail {

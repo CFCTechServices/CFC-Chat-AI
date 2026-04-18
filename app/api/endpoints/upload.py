@@ -72,16 +72,25 @@ async def upload_file(file: UploadFile = File(...)):
 
     # Optionally upload to Supabase (do not fail the request if this part errors)
     supabase_info = None
+    SUPABASE_MAX_BYTES = 50 * 1024 * 1024  # 50 MB free-tier limit
     if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY and SUPABASE_BUCKET:
-        try:
-            doc_id = _doc_id_from_filename(file.filename)
-            storage_path = f"docs/{doc_id}/original/{file.filename}"
-            sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-            res = sb.storage.from_(SUPABASE_BUCKET).upload(storage_path, contents, {"upsert": "true"})
-            sup_path = getattr(res, "path", None) if res is not None else None
-            supabase_info = {"path": sup_path, "stored": True}
-        except Exception as sb_exc:
-            supabase_info = {"error": str(sb_exc)}
+        if len(contents) > SUPABASE_MAX_BYTES:
+            size_mb = round(len(contents) / (1024 * 1024), 1)
+            logger.warning("Skipping Supabase Storage upload for %s (%.1f MB) — exceeds 50 MB free-tier limit", file.filename, size_mb)
+            supabase_info = {
+                "warning": f"File is {size_mb} MB and exceeds the 50 MB storage limit. The document content has been processed and is searchable, but the original file will not be available for download.",
+                "stored": False,
+            }
+        else:
+            try:
+                doc_id = _doc_id_from_filename(file.filename)
+                storage_path = f"docs/{doc_id}/original/{file.filename}"
+                sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+                res = sb.storage.from_(SUPABASE_BUCKET).upload(storage_path, contents, {"upsert": "true"})
+                sup_path = getattr(res, "path", None) if res is not None else None
+                supabase_info = {"path": sup_path, "stored": True}
+            except Exception as sb_exc:
+                supabase_info = {"error": str(sb_exc), "stored": False}
 
     # Trigger ingestion using the existing endpoint logic
     ingestion_data = None
@@ -151,14 +160,23 @@ async def bulk_upload(files: List[UploadFile] = File(...)) -> Dict[str, Any]:
                 f.write(contents)
 
             # Optional Supabase mirror
+            SUPABASE_MAX_BYTES = 50 * 1024 * 1024  # 50 MB free-tier limit
             if sb is not None:
-                try:
-                    doc_id = _doc_id_from_filename(original_filename)
-                    storage_path = f"docs/{doc_id}/original/{original_filename}"
-                    res = sb.storage.from_(SUPABASE_BUCKET).upload(storage_path, contents, {"upsert": "true"})
-                    item["supabase"] = {"path": getattr(res, "path", None) if res is not None else None}
-                except Exception as sb_exc:
-                    item["supabase"] = {"error": str(sb_exc)}
+                if len(contents) > SUPABASE_MAX_BYTES:
+                    size_mb = round(len(contents) / (1024 * 1024), 1)
+                    logger.warning("Skipping Supabase Storage upload for %s (%.1f MB) — exceeds 50 MB free-tier limit", original_filename, size_mb)
+                    item["supabase"] = {
+                        "warning": f"File is {size_mb} MB and exceeds the 50 MB storage limit. Content will be processed but the original file will not be available for download.",
+                        "stored": False,
+                    }
+                else:
+                    try:
+                        doc_id = _doc_id_from_filename(original_filename)
+                        storage_path = f"docs/{doc_id}/original/{original_filename}"
+                        res = sb.storage.from_(SUPABASE_BUCKET).upload(storage_path, contents, {"upsert": "true"})
+                        item["supabase"] = {"path": getattr(res, "path", None) if res is not None else None, "stored": True}
+                    except Exception as sb_exc:
+                        item["supabase"] = {"error": str(sb_exc), "stored": False}
 
             # Ingest
             try:
