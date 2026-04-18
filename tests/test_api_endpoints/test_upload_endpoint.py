@@ -115,7 +115,7 @@ def test_upload_single_file_returns_expected_response(client, temp_documents_dir
 
     body = response.json()
     assert body["message"] == "File uploaded and ingestion triggered"
-    assert body["supabase"] == {"path": expected_storage_path}
+    assert body["supabase"] == {"path": expected_storage_path, "stored": True}
     assert body["ingestion"] == {"success": True, "filename": test_filename}
 
     assert captured["url"] == SUPABASE_URL
