@@ -82,6 +82,8 @@ Copy `.env.example` to `.env` and fill in all values. Never commit `.env` to ver
 | `ADMIN_SECRET` | Yes | Secret key for admin operations |
 | `API_HOST` | No | Host to bind to (default: `0.0.0.0`) |
 | `API_PORT` | No | Port to bind to (default: `8000`) |
+| `SOFFICE_PATH` | No* | Absolute path to the LibreOffice `soffice.com` binary. **Required on the VM** for `.doc` file ingestion. Not needed locally if LibreOffice is on PATH. Example: `C:\Program Files\LibreOffice\program\soffice.com` |
+| `TESSERACT_CMD` | No* | Absolute path to the Tesseract binary. **Required on the VM** if Tesseract is not on system PATH. Example: `C:\Program Files\Tesseract-OCR\tesseract.exe` |
 
 > If `AZURE_OPENAI_DEPLOYMENT` points to a deprecated model, the chatbot will fall back to raw chunk summaries without LLM synthesis. Update the deployment name in `.env` and restart the service.
 
@@ -202,6 +204,27 @@ Get-ChildItem C:\cfcchat -Directory | ForEach-Object {
     "{0,10} MB  {1}" -f ([math]::Round((Get-ChildItem $_.FullName -Recurse -ErrorAction SilentlyContinue | 
     Measure-Object -Property Length -Sum).Sum / 1MB, 1)), $_.Name 
 }
+```
+
+### `.doc` File Ingestion (Legacy Word Format)
+
+The application supports two conversion paths for `.doc` files:
+
+1. **Word COM** (Windows only, tried first) — uses the `win32com` library to call Microsoft Word directly. Only works if Microsoft Office is installed on the machine, which is **not** the case on the VM.
+2. **LibreOffice headless** (fallback) — calls `soffice --headless` to convert `.doc` → `.docx`. This is the active path on the VM.
+
+**Known limitation:** LibreOffice's `.doc` conversion is high-fidelity for most documents but may occasionally produce minor formatting differences compared to Word. Text content and images are preserved correctly for the purposes of RAG ingestion.
+
+If `.doc` uploads fail silently on the VM, check:
+```powershell
+# Confirm LibreOffice is present
+Get-Item "C:\Program Files\LibreOffice\program\soffice.com"
+
+# Confirm SOFFICE_PATH is set in .env
+Get-Content C:\cfcchat\.env | Select-String "SOFFICE_PATH"
+
+# Check the application log for the conversion step
+Get-Content C:\cfcchat\logs\stderr.log -Tail 50 | Select-String -Pattern "soffice|LibreOffice|doc"
 ```
 
 ### Azure OpenAI Model Deprecation

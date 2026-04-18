@@ -695,8 +695,9 @@ class DocumentProcessor:
     def _convert_with_libreoffice(self, doc_path: Path) -> Path:
         tmp_dir = Path(tempfile.mkdtemp(suffix="__doc_conv"))
         try:
+            soffice_bin = os.getenv("SOFFICE_PATH", "soffice")
             cmd = [
-                "soffice",
+                soffice_bin,
                 "--headless",
                 "--convert-to",
                 "docx",

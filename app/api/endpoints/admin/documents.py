@@ -40,8 +40,21 @@ class ListDocumentsResponse(BaseModel):
 @router.get("/documents", response_model=ListDocumentsResponse)
 async def list_documents(admin: dict = Depends(get_current_admin)):
     try:
-        resp = supabase.table("document_chunks").select("doc_id, source, source_type").execute()
-        rows = getattr(resp, "data", []) or []
+        rows: list = []
+        page_size = 1000
+        offset = 0
+        while True:
+            resp = (
+                supabase.table("document_chunks")
+                .select("doc_id, source, source_type")
+                .range(offset, offset + page_size - 1)
+                .execute()
+            )
+            batch = getattr(resp, "data", []) or []
+            rows.extend(batch)
+            if len(batch) < page_size:
+                break
+            offset += page_size
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to fetch documents: {exc}")
 

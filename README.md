@@ -194,6 +194,43 @@ cp .env.example .env
 
 Then edit `.env` and add your credentials.
 
+---
+
+<a id="quick-start-guide"></a>
+## 🚀 Quick Start Guide
+
+For a comprehensive guide on local development, CI/CD, and deployment overview, please see [**DEVELOPMENT_SETUP.md**](./DEVELOPMENT_SETUP.md).
+
+### Prerequisites
+
+- Python 3.10+
+- Pinecone API Key (Required)
+- OpenAI or Gemini API Key (Required for AI answers)
+
+### 3-Step Local Setup
+
+1. **Install Dependencies**:
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # macOS/Linux
+   # .venv\Scripts\activate   # Windows
+   pip install -r requirements.txt
+   ```
+
+2. **Configure Environment**:
+   ```bash
+   cp .env.example .env
+   # Edit .env and add your PINECONE_API_KEY and OPENAI_API_KEY/GEMINI_API_KEY
+   ```
+
+3. **Run the App**:
+   ```bash
+   uvicorn main:app --reload
+   ```
+   Access the UI at [http://localhost:8000](http://localhost:8000).
+
+---
+
 <a id="architecture-overview"></a>
 ## 🏗️ Architecture Overview
 
