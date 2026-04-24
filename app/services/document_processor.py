@@ -133,6 +133,20 @@ def _strip_html(html_text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def _fix_ocr_spacing(text: str) -> str:
+    """Collapse OCR artefact where each character is separated by a space.
+
+    Tesseract sometimes produces "A l g o r i t h m" for "Algorithm" when
+    reading low-resolution or kerned text.  Three or more consecutive
+    single-letter tokens joined by single spaces are merged into one word.
+    """
+    return re.sub(
+        r'(?<!\w)([A-Za-z])(?: ([A-Za-z])){2,}(?!\w)',
+        lambda m: re.sub(r' ', '', m.group(0)),
+        text,
+    )
+
+
 def _hash_bytes(b: bytes) -> str:
     return hashlib.sha1(b).hexdigest()
 
@@ -454,7 +468,7 @@ class DocumentProcessor:
 
             if not all_sizes:
                 # Scanned / image-only PDF — hand off to OCR fallback
-                fitz_doc.close()
+                # (fitz_doc is closed by the finally block below)
                 return self._process_pdf_ocr_fallback(pdf_path, doc_id=doc_id)
 
             all_sizes.sort()
@@ -610,7 +624,7 @@ class DocumentProcessor:
                                     import io as _io
                                     _configure_tesseract_from_env()
                                     pil_img = _PILImage.open(_io.BytesIO(img_bytes))
-                                    ocr_text = pytesseract.image_to_string(pil_img).strip()
+                                    ocr_text = _fix_ocr_spacing(pytesseract.image_to_string(pil_img).strip())
                                     if ocr_text:
                                         _ensure_section()["blocks"].append({"type": "text", "text": ocr_text})
                                         logger.info(
@@ -641,7 +655,7 @@ class DocumentProcessor:
                             _configure_tesseract_from_env()
                             pix = fitz_page.get_pixmap(dpi=150)
                             pil_img = _PILImage.frombytes("RGB", [pix.width, pix.height], pix.samples)
-                            ocr_text = pytesseract.image_to_string(pil_img).strip()
+                            ocr_text = _fix_ocr_spacing(pytesseract.image_to_string(pil_img).strip())
                             if len(ocr_text) > structured_text_len + 100:
                                 _ensure_section()["blocks"].append({"type": "text", "text": ocr_text})
                                 logger.info(
