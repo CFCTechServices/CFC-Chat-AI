@@ -115,10 +115,15 @@ async def download_document(doc_id: str, admin: dict = Depends(get_current_admin
         except Exception:
             raise HTTPException(status_code=404, detail="Original video not found in storage. Re-upload to enable downloads.")
     else:
-        filename = Path(raw_source).name if raw_source else ""
-        if not filename:
-            raise HTTPException(status_code=404, detail="Could not determine filename for this document.")
-        storage_path = f"docs/{doc_id}/original/{filename}"
+        prefix = f"docs/{doc_id}/original"
+        try:
+            items = _content_repository.list_storage(prefix, source_type="document")
+            if not items:
+                raise ValueError("No original file found")
+            filename = items[0]["name"]
+            storage_path = f"{prefix}/{filename}"
+        except Exception:
+            raise HTTPException(status_code=404, detail="Original file not found in storage. Re-upload to enable downloads.")
 
     try:
         signed_url = _content_repository.create_signed_url(storage_path, source_type=source_type, expires_in=300)

@@ -28,7 +28,21 @@ UPLOAD_DIR = Path(__file__).parent.parent.parent / "data" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Supported file types for upload
-ALLOWED_EXTENSIONS = {".pdf", ".doc", ".docx", ".txt", ".md", ".mp4", ".mov", ".m4v", ".mkv", ".webm"}
+ALLOWED_EXTENSIONS = {".pdf", ".doc", ".docx", ".txt", ".md", ".eml", ".mp4", ".mov", ".m4v", ".mkv", ".webm"}
+
+_MIME_MAP = {
+    ".pdf": "application/pdf",
+    ".eml": "message/rfc822",
+    ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".txt": "text/plain",
+    ".md": "text/plain",
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".m4v": "video/x-m4v",
+    ".mkv": "video/x-matroska",
+    ".webm": "video/webm",
+}
 
 
 def _doc_id_from_filename(filename: str) -> str:
@@ -84,9 +98,15 @@ async def upload_file(file: UploadFile = File(...)):
         else:
             try:
                 doc_id = _doc_id_from_filename(file.filename)
-                storage_path = f"docs/{doc_id}/original/{file.filename}"
+                # Use doc_id as the storage filename to avoid non-ASCII chars
+                # (e.g. em dashes) that Supabase storage rejects in paths.
+                safe_name = doc_id + ext
+                storage_path = f"docs/{doc_id}/original/{safe_name}"
                 sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-                res = sb.storage.from_(SUPABASE_BUCKET).upload(storage_path, contents, {"upsert": "true"})
+                content_type = _MIME_MAP.get(ext, "application/octet-stream")
+                res = sb.storage.from_(SUPABASE_BUCKET).upload(
+                    storage_path, contents, {"upsert": "true", "content-type": content_type}
+                )
                 sup_path = getattr(res, "path", None) if res is not None else None
                 supabase_info = {"path": sup_path, "stored": True}
             except Exception as sb_exc:
@@ -172,8 +192,13 @@ async def bulk_upload(files: List[UploadFile] = File(...)) -> Dict[str, Any]:
                 else:
                     try:
                         doc_id = _doc_id_from_filename(original_filename)
-                        storage_path = f"docs/{doc_id}/original/{original_filename}"
-                        res = sb.storage.from_(SUPABASE_BUCKET).upload(storage_path, contents, {"upsert": "true"})
+                        bulk_ext = Path(original_filename).suffix.lower()
+                        safe_name = doc_id + bulk_ext
+                        storage_path = f"docs/{doc_id}/original/{safe_name}"
+                        bulk_content_type = _MIME_MAP.get(bulk_ext, "application/octet-stream")
+                        res = sb.storage.from_(SUPABASE_BUCKET).upload(
+                            storage_path, contents, {"upsert": "true", "content-type": bulk_content_type}
+                        )
                         item["supabase"] = {"path": getattr(res, "path", None) if res is not None else None, "stored": True}
                     except Exception as sb_exc:
                         item["supabase"] = {"error": str(sb_exc), "stored": False}

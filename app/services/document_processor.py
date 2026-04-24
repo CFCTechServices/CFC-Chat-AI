@@ -67,6 +67,9 @@ def _configure_tesseract_from_env() -> None:
     tesseract_cmd = os.getenv("TESSERACT_CMD")
     if tesseract_cmd:
         pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+        logger.info("Tesseract cmd set from env: %s", tesseract_cmd)
+    else:
+        logger.info("TESSERACT_CMD not set; using system PATH for tesseract")
 
 # Optional Windows COM for high-fidelity DOC->DOCX
 try:
@@ -121,6 +124,14 @@ def _norm_text(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").strip())
 
 
+def _strip_html(html_text: str) -> str:
+    """Remove HTML tags and decode entities to plain text."""
+    import html as _html_lib
+    text = re.sub(r"<[^>]+>", " ", html_text)
+    text = _html_lib.unescape(text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
 def _hash_bytes(b: bytes) -> str:
     return hashlib.sha1(b).hexdigest()
 
@@ -146,9 +157,15 @@ def _extract_pdf_text_with_ocr(pdf_path: Path) -> str:
 
     _configure_tesseract_from_env()
 
+    poppler_path = os.getenv("POPPLER_PATH") or None
+    if poppler_path:
+        logger.info("Poppler path set from env: %s", poppler_path)
+    else:
+        logger.info("POPPLER_PATH not set; using system PATH for poppler")
+
     # Determine total page count first (cheap — no rendering involved)
     try:
-        info = pdfinfo_from_path(str(pdf_path))
+        info = pdfinfo_from_path(str(pdf_path), poppler_path=poppler_path)
         total_pages = info.get("Pages", 0)
     except Exception:
         logger.exception("Could not read page count for OCR: %s", pdf_path)
@@ -159,7 +176,7 @@ def _extract_pdf_text_with_ocr(pdf_path: Path) -> str:
     if total_pages is None:
         # Unknown page count: render all at once (last resort fallback)
         try:
-            pages = convert_from_path(str(pdf_path), dpi=200)
+            pages = convert_from_path(str(pdf_path), dpi=200, poppler_path=poppler_path)
         except Exception:
             logger.exception("Failed to render PDF pages for OCR: %s", pdf_path)
             return ""
@@ -181,6 +198,7 @@ def _extract_pdf_text_with_ocr(pdf_path: Path) -> str:
                     dpi=200,
                     first_page=page_num,
                     last_page=page_num,
+                    poppler_path=poppler_path,
                 )
             except Exception:
                 logger.exception(
@@ -272,6 +290,10 @@ class DocumentProcessor:
             doc_slug = _slugify(file_path.stem)
             doc_id = doc_slug or str(uuid.uuid4())
 
+            # EML support
+            if ext == ".eml":
+                return self._process_eml(file_path, doc_id=doc_id)
+
             # PDF support
             if ext == ".pdf":
                 if not _HAS_PDFPLUMBER:
@@ -306,6 +328,92 @@ class DocumentProcessor:
         except Exception as e:
             logger.exception("process_document failed")
             return {"success": False, "error": str(e), "source": str(file_path)}
+
+    def _process_eml(self, eml_path: Path, doc_id: Optional[str] = None) -> Dict[str, Any]:
+        """Parse a .eml file and return sections/chunks with full email content."""
+        import email as _email_lib
+        import email.header as _email_header
+
+        doc_slug = _slugify(eml_path.stem)
+        doc_id = doc_id or doc_slug
+
+        try:
+            with eml_path.open("rb") as f:
+                msg = _email_lib.message_from_bytes(f.read())
+        except Exception as e:
+            return {"success": False, "error": f"Failed to parse .eml: {e}", "source": str(eml_path)}
+
+        def _decode_field(value: str) -> str:
+            if not value:
+                return ""
+            parts = _email_header.decode_header(value)
+            out = []
+            for part, charset in parts:
+                if isinstance(part, bytes):
+                    out.append(part.decode(charset or "utf-8", errors="replace"))
+                else:
+                    out.append(part)
+            return " ".join(out).strip()
+
+        subject = _decode_field(msg.get("Subject", ""))
+        from_addr = _decode_field(msg.get("From", ""))
+        to_addr = _decode_field(msg.get("To", ""))
+        date = _decode_field(msg.get("Date", ""))
+
+        # Prefer text/plain; fall back to stripped text/html
+        body_text = ""
+        parts_to_check = list(msg.walk()) if msg.is_multipart() else [msg]
+        for part in parts_to_check:
+            if part.get_content_type() == "text/plain" and not body_text:
+                raw = part.get_payload(decode=True)
+                if raw:
+                    charset = part.get_content_charset() or "utf-8"
+                    body_text = raw.decode(charset, errors="replace")
+        if not body_text:
+            for part in parts_to_check:
+                if part.get_content_type() == "text/html":
+                    raw = part.get_payload(decode=True)
+                    if raw:
+                        charset = part.get_content_charset() or "utf-8"
+                        body_text = _strip_html(raw.decode(charset, errors="replace"))
+                        break
+
+        header_block = "\n".join(filter(None, [
+            f"Subject: {subject}" if subject else "",
+            f"From: {from_addr}" if from_addr else "",
+            f"To: {to_addr}" if to_addr else "",
+            f"Date: {date}" if date else "",
+        ]))
+        full_text = _norm_text(f"{header_block}\n\n{body_text.strip()}" if body_text.strip() else header_block)
+
+        if not full_text:
+            return {"success": False, "error": "No content found in .eml file.", "source": str(eml_path)}
+
+        section_id = str(uuid.uuid4())
+        section = {
+            "section_id": section_id,
+            "title": subject or "Email",
+            "level": 1,
+            "blocks": [{"type": "text", "text": full_text}],
+            "suggested_name": f"{doc_slug}__sec001_email.json",
+            "doc_slug": doc_slug,
+            "index": 1,
+        }
+
+        chunks = self._build_chunks([section])
+        if not chunks:
+            return {"success": False, "error": "No chunks produced from .eml file.", "source": str(eml_path)}
+
+        logger.info("EML extraction: 1 section, %d chunks — %s", len(chunks), eml_path.name)
+        return {
+            "success": True,
+            "doc_id": doc_id,
+            "source": str(eml_path),
+            "doc_slug": doc_slug,
+            "sections": [section],
+            "images": [],
+            "chunks": chunks,
+        }
 
     def _process_pdf(self, pdf_path: Path, doc_id: Optional[str] = None) -> Dict[str, Any]:
         """
