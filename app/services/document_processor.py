@@ -625,6 +625,34 @@ class DocumentProcessor:
                                 xref, page_idx, pdf_path,
                             )
 
+                    # ── Full-page OCR for pages where body is a form XObject ──
+                    # Outlook web PDFs embed the email body as a form XObject
+                    # which fitz.get_images() cannot see (0 images reported).
+                    # Render the full page to a pixmap and OCR it; only add the
+                    # result when OCR yields substantially more text than the
+                    # structured extraction already found.
+                    if _HAS_PDF_OCR:
+                        structured_text_len = sum(
+                            len(data.get("text", ""))
+                            for _, btype, data in ordered
+                            if btype == "text"
+                        )
+                        try:
+                            _configure_tesseract_from_env()
+                            pix = fitz_page.get_pixmap(dpi=150)
+                            pil_img = _PILImage.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                            ocr_text = pytesseract.image_to_string(pil_img).strip()
+                            if len(ocr_text) > structured_text_len + 100:
+                                _ensure_section()["blocks"].append({"type": "text", "text": ocr_text})
+                                logger.info(
+                                    "Full-page OCR added %d chars (structured had %d) for page %d of %s",
+                                    len(ocr_text), structured_text_len, page_idx, pdf_path.name,
+                                )
+                        except Exception:
+                            logger.warning(
+                                "Full-page OCR failed for page %d of %s", page_idx, pdf_path.name
+                            )
+
         finally:
             fitz_doc.close()
 
