@@ -38,6 +38,7 @@ except ImportError:
 try:
     import pytesseract
     from pdf2image import convert_from_path, pdfinfo_from_path
+    from PIL import Image as _PILImage
     _HAS_PDF_OCR = True
 except ImportError:
     _HAS_PDF_OCR = False
@@ -597,6 +598,27 @@ class DocumentProcessor:
                             )
                             images.append(rec)
                             _ensure_section()["blocks"].append({"type": "image", "path": rec.placeholder_path})
+
+                            # OCR large embedded images to recover text rendered as raster
+                            # (e.g. Outlook email bodies printed to PDF from a browser).
+                            if (
+                                _HAS_PDF_OCR
+                                and rec.width_px and rec.height_px
+                                and rec.width_px > 300 and rec.height_px > 100
+                            ):
+                                try:
+                                    import io as _io
+                                    _configure_tesseract_from_env()
+                                    pil_img = _PILImage.open(_io.BytesIO(img_bytes))
+                                    ocr_text = pytesseract.image_to_string(pil_img).strip()
+                                    if ocr_text:
+                                        _ensure_section()["blocks"].append({"type": "text", "text": ocr_text})
+                                        logger.info(
+                                            "Per-image OCR extracted %d chars from image %s in %s",
+                                            len(ocr_text), img_id, pdf_path.name,
+                                        )
+                                except Exception:
+                                    logger.warning("Per-image OCR failed for image %s in %s", img_id, pdf_path.name)
                         except Exception:
                             logger.warning(
                                 "Failed to extract image xref=%d on page %d of %s",
