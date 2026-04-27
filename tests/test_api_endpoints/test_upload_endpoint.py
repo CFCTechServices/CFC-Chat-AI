@@ -109,7 +109,8 @@ def test_upload_single_file_returns_expected_response(client, temp_documents_dir
 
     assert response.status_code == 200
 
-    expected_storage_path = f"docs/beef-nutrition/original/{test_filename}"
+    sanitized_filename = test_filename.replace(" ", "-")
+    expected_storage_path = f"docs/beef-nutrition/original/{sanitized_filename}"
     assert expected_storage_path in fake_supabase.files
     assert fake_supabase.files[expected_storage_path] == test_content
 
@@ -121,7 +122,7 @@ def test_upload_single_file_returns_expected_response(client, temp_documents_dir
     assert captured["url"] == SUPABASE_URL
     assert captured["key"] == SUPABASE_SERVICE_ROLE_KEY
     assert captured["bucket"] == SUPABASE_BUCKET
-    assert captured["options"] == {"upsert": "true"}
+    assert captured["options"] == {"upsert": "true", "content-type": "text/plain"}
     assert ingest_calls == [test_filename]
 
 def test_upload_file_with_no_file(client):
