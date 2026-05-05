@@ -1,4 +1,4 @@
-// User Settings page with Profile and Preferences tabs
+﻿// User Settings page with Profile and Preferences tabs
 (() => {
   const { Layout } = window.CFC.Layout;
   const { Card, PrimaryButton, TextInput } = window.CFC.Primitives;
@@ -7,31 +7,21 @@
   function SettingsPage() {
     const { user, session, profile, setProfile, setUser, supabase } = useUser();
 
-    const [activeTab, setActiveTab] = React.useState('profile'); // 'profile' | 'preferences'
+    const [activeTab, setActiveTab] = React.useState('profile'); // 'profile' | 'security'
     const [saving, setSaving] = React.useState(false);
     const [saveMsg, setSaveMsg] = React.useState('');
 
-    // Profile state — initialize from profile data fetched via Supabase
+    // Profile state ΓÇö initialize from profile data fetched via Supabase
     const [fullName, setFullName] = React.useState(profile?.full_name || user?.name || '');
     const [email] = React.useState(user?.email || '');
     const [role] = React.useState(profile?.role || 'user');
     const [avatar, setAvatar] = React.useState(profile?.avatar_url || '');
+    const originalFullName = (profile?.full_name || user?.name || '').trim();
+    const originalAvatar = profile?.avatar_url || '';
+    const hasUnsavedProfileChanges =
+      fullName.trim() !== originalFullName || avatar !== originalAvatar;
 
-    // Preferences state
-    const [startingPage, setStartingPage] = React.useState(() => {
-      try {
-        return window.localStorage.getItem('cfc-starting-page') || 'chat';
-      } catch {
-        return 'chat';
-      }
-    });
-    const [notificationsEnabled, setNotificationsEnabled] = React.useState(() => {
-      try {
-        return window.localStorage.getItem('cfc-notifications') === 'on';
-      } catch {
-        return true;
-      }
-    });
+    // Display preferences state
     const [textSize, setTextSize] = React.useState(() => {
       try { return window.localStorage.getItem('cfc-text-size') || 'medium'; } catch { return 'medium'; }
     });
@@ -72,13 +62,7 @@
       }
     };
 
-    const savePreferences = () => {
-      try {
-        window.localStorage.setItem('cfc-starting-page', startingPage);
-        window.localStorage.setItem('cfc-notifications', notificationsEnabled ? 'on' : 'off');
-      } catch {}
-      alert('Preferences saved (placeholder).');
-    };
+
 
     const CP = window.CFC && window.CFC.ChangePasswordPlaceholder;
     return (
@@ -97,21 +81,21 @@
               className={`tab-button ${activeTab === 'profile' ? 'active' : ''}`}
               onClick={() => setActiveTab('profile')}
             >
-              <span className="tab-icon">👤</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               Profile
             </button>
             <button
               type="button"
-              className={`tab-button ${activeTab === 'preferences' ? 'active' : ''}`}
-              onClick={() => setActiveTab('preferences')}
+              className={`tab-button ${activeTab === 'security' ? 'active' : ''}`}
+              onClick={() => setActiveTab('security')}
             >
-              <span className="tab-icon">⚙️</span>
-              Preferences
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              Security
             </button>
           </div>
 
           {activeTab === 'profile' && (
-            <div className="tab-content">
+          <div className="tab-content">
               <Card className="settings-card">
                 <h2>Profile Information</h2>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
@@ -144,6 +128,21 @@
                   </label>
                 </div>
 
+                {hasUnsavedProfileChanges && (
+                  <div
+                    style={{
+                      marginTop: '10px',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      fontSize: '0.9rem',
+                      backgroundColor: 'var(--color-error-bg, #fef2f2)',
+                      color: 'var(--color-error, #dc2626)',
+                    }}
+                  >
+                    You have unsaved profile changes. Click "Save Profile" or your updates will not be stored.
+                  </div>
+                )}
+
                 {saveMsg && (
                   <div style={{ marginTop: '10px', padding: '8px 12px', borderRadius: '8px', fontSize: '0.9rem',
                     backgroundColor: saveMsg.includes('success') ? 'var(--color-info-bg, #eff6ff)' : 'var(--color-error-bg, #fef2f2)',
@@ -152,61 +151,13 @@
                   </div>
                 )}
                 <div style={{ marginTop: '14px' }}>
-                  <PrimaryButton onClick={saveProfile} disabled={saving}>
+                  <PrimaryButton onClick={saveProfile} disabled={saving || !hasUnsavedProfileChanges}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M19 21H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11l5 5v9a2 2 0 0 1-2 2z" />
                       <polyline points="17 21 17 13 7 13 7 21" />
                       <polyline points="7 3 7 8 15 8" />
                     </svg>
                     {saving ? 'Saving...' : 'Save Profile'}
-                  </PrimaryButton>
-                </div>
-              </Card>
-
-              <Card className="settings-card" style={{ marginTop: '18px' }}>
-                <h2>Security</h2>
-                <p className="muted">Update your account password.</p>
-                {CP ? <CP /> : null}
-              </Card>
-            </div>
-          )}
-
-          {activeTab === 'preferences' && (
-            <div className="tab-content">
-              <Card className="settings-card" style={{ marginTop: '18px' }}>
-                <h2>Default Page</h2>
-                <p className="muted">The page you'll see first when logging in</p>
-                <div style={{ marginTop: '8px' }}>
-                  <select
-                    className="field-input"
-                    value={startingPage}
-                    onChange={(e) => setStartingPage(e.target.value)}
-                    style={{ borderRadius: '10px' }}
-                  >
-                    <option value="chat">Chat Interface</option>
-                    <option value="docs">Developer Docs</option>
-                    <option value="admin">Admin Dashboard</option>
-                    <option value="history">Conversation History</option>
-                  </select>
-                </div>
-              </Card>
-
-              <Card className="settings-card" style={{ marginTop: '18px' }}>
-                <h2>Notifications</h2>
-                <p className="muted">Receive alerts for new messages and updates</p>
-                <div style={{ marginTop: '8px' }}>
-                  <button type="button" className={`toggle ${notificationsEnabled ? 'checked' : ''}`} onClick={() => setNotificationsEnabled((v) => !v)} aria-label="Toggle notifications">
-                    <span className="toggle-track"></span>
-                    <span className="toggle-thumb"></span>
-                  </button>
-                </div>
-
-                <div style={{ marginTop: '16px' }}>
-                  <PrimaryButton onClick={savePreferences}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                    Save Preferences
                   </PrimaryButton>
                 </div>
               </Card>
@@ -236,8 +187,16 @@
                   </label>
                 </div>
               </Card>
+            </div>
+          )}
 
-              
+          {activeTab === 'security' && (
+            <div className="tab-content">
+              <Card className="settings-card" style={{ marginTop: '18px' }}>
+                <h2>Security</h2>
+                <p className="muted">Update your account password.</p>
+                {CP ? <CP /> : null}
+              </Card>
             </div>
           )}
         </div>
@@ -250,7 +209,7 @@
   window.CFC.Pages.SettingsPage = SettingsPage;
 })();
 
-// Change Password modal — uses Supabase auth.updateUser
+// Change Password modal ΓÇö uses Supabase auth.updateUser
 (() => {
   const { useUser } = window.CFC.UserContext;
 
@@ -380,3 +339,4 @@
   window.CFC = window.CFC || {};
   window.CFC.ChangePasswordPlaceholder = ChangePasswordPlaceholder;
 })();
+

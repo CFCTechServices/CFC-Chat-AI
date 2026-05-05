@@ -44,17 +44,6 @@
     );
   };
 
-const SettingsTab = AdminNS.SettingsTab || function SettingsFallback() {
-    return (
-      <div className="tab-content">
-        <Card className="admin-card">
-          <h2>Settings</h2>
-          <p className="muted">Settings tab component not found. Ensure /ui/components/admin/settings.jsx is loaded.</p>
-        </Card>
-      </div>
-    );
-  };
-
   function AdminPage() {
     const [activeTab, setActiveTab] = React.useState('users');
 
@@ -64,7 +53,7 @@ const SettingsTab = AdminNS.SettingsTab || function SettingsFallback() {
           <div className="page-header-row">
             <div>
               <h1>Admin Console</h1>
-              <p>Manage users, uploads, and system settings</p>
+              <p>Manage users, uploads, and content</p>
             </div>
           </div>
 
@@ -72,13 +61,11 @@ const SettingsTab = AdminNS.SettingsTab || function SettingsFallback() {
             <TabButton active={activeTab === 'users'} onClick={() => setActiveTab('users')} icon="👥" label="Users" />
             <TabButton active={activeTab === 'upload'} onClick={() => setActiveTab('upload')} icon="📤" label="Upload" />
             <TabButton active={activeTab === 'content'} onClick={() => setActiveTab('content')} icon="📄" label="Content" />
-            <TabButton active={activeTab === 'settings'} onClick={() => setActiveTab('settings')} icon="⚙️" label="Settings" />
           </div>
 
           {activeTab === 'upload' && <UploadTab />}
           {activeTab === 'users' && <UsersTab />}
           {activeTab === 'content' && <ContentTab />}
-          {activeTab === 'settings' && <SettingsTab />}
         </div>
       </Layout>
     );
