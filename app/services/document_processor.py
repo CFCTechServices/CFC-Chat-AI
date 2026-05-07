@@ -38,6 +38,7 @@ except ImportError:
 try:
     import pytesseract
     from pdf2image import convert_from_path, pdfinfo_from_path
+    from PIL import Image as _PILImage
     _HAS_PDF_OCR = True
 except ImportError:
     _HAS_PDF_OCR = False
@@ -67,6 +68,9 @@ def _configure_tesseract_from_env() -> None:
     tesseract_cmd = os.getenv("TESSERACT_CMD")
     if tesseract_cmd:
         pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
+        logger.info("Tesseract cmd set from env: %s", tesseract_cmd)
+    else:
+        logger.info("TESSERACT_CMD not set; using system PATH for tesseract")
 
 # Optional Windows COM for high-fidelity DOC->DOCX
 try:
@@ -121,6 +125,28 @@ def _norm_text(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").strip())
 
 
+def _strip_html(html_text: str) -> str:
+    """Remove HTML tags and decode entities to plain text."""
+    import html as _html_lib
+    text = re.sub(r"<[^>]+>", " ", html_text)
+    text = _html_lib.unescape(text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _fix_ocr_spacing(text: str) -> str:
+    """Collapse OCR artefact where each character is separated by a space.
+
+    Tesseract sometimes produces "A l g o r i t h m" for "Algorithm" when
+    reading low-resolution or kerned text.  Three or more consecutive
+    single-letter tokens joined by single spaces are merged into one word.
+    """
+    return re.sub(
+        r'(?<!\w)([A-Za-z])(?: ([A-Za-z])){2,}(?!\w)',
+        lambda m: re.sub(r' ', '', m.group(0)),
+        text,
+    )
+
+
 def _hash_bytes(b: bytes) -> str:
     return hashlib.sha1(b).hexdigest()
 
@@ -146,9 +172,15 @@ def _extract_pdf_text_with_ocr(pdf_path: Path) -> str:
 
     _configure_tesseract_from_env()
 
+    poppler_path = os.getenv("POPPLER_PATH") or None
+    if poppler_path:
+        logger.info("Poppler path set from env: %s", poppler_path)
+    else:
+        logger.info("POPPLER_PATH not set; using system PATH for poppler")
+
     # Determine total page count first (cheap — no rendering involved)
     try:
-        info = pdfinfo_from_path(str(pdf_path))
+        info = pdfinfo_from_path(str(pdf_path), poppler_path=poppler_path)
         total_pages = info.get("Pages", 0)
     except Exception:
         logger.exception("Could not read page count for OCR: %s", pdf_path)
@@ -159,7 +191,7 @@ def _extract_pdf_text_with_ocr(pdf_path: Path) -> str:
     if total_pages is None:
         # Unknown page count: render all at once (last resort fallback)
         try:
-            pages = convert_from_path(str(pdf_path), dpi=200)
+            pages = convert_from_path(str(pdf_path), dpi=200, poppler_path=poppler_path)
         except Exception:
             logger.exception("Failed to render PDF pages for OCR: %s", pdf_path)
             return ""
@@ -181,6 +213,7 @@ def _extract_pdf_text_with_ocr(pdf_path: Path) -> str:
                     dpi=200,
                     first_page=page_num,
                     last_page=page_num,
+                    poppler_path=poppler_path,
                 )
             except Exception:
                 logger.exception(
@@ -272,6 +305,10 @@ class DocumentProcessor:
             doc_slug = _slugify(file_path.stem)
             doc_id = doc_slug or str(uuid.uuid4())
 
+            # EML support
+            if ext == ".eml":
+                return self._process_eml(file_path, doc_id=doc_id)
+
             # PDF support
             if ext == ".pdf":
                 if not _HAS_PDFPLUMBER:
@@ -306,6 +343,92 @@ class DocumentProcessor:
         except Exception as e:
             logger.exception("process_document failed")
             return {"success": False, "error": str(e), "source": str(file_path)}
+
+    def _process_eml(self, eml_path: Path, doc_id: Optional[str] = None) -> Dict[str, Any]:
+        """Parse a .eml file and return sections/chunks with full email content."""
+        import email as _email_lib
+        import email.header as _email_header
+
+        doc_slug = _slugify(eml_path.stem)
+        doc_id = doc_id or doc_slug
+
+        try:
+            with eml_path.open("rb") as f:
+                msg = _email_lib.message_from_bytes(f.read())
+        except Exception as e:
+            return {"success": False, "error": f"Failed to parse .eml: {e}", "source": str(eml_path)}
+
+        def _decode_field(value: str) -> str:
+            if not value:
+                return ""
+            parts = _email_header.decode_header(value)
+            out = []
+            for part, charset in parts:
+                if isinstance(part, bytes):
+                    out.append(part.decode(charset or "utf-8", errors="replace"))
+                else:
+                    out.append(part)
+            return " ".join(out).strip()
+
+        subject = _decode_field(msg.get("Subject", ""))
+        from_addr = _decode_field(msg.get("From", ""))
+        to_addr = _decode_field(msg.get("To", ""))
+        date = _decode_field(msg.get("Date", ""))
+
+        # Prefer text/plain; fall back to stripped text/html
+        body_text = ""
+        parts_to_check = list(msg.walk()) if msg.is_multipart() else [msg]
+        for part in parts_to_check:
+            if part.get_content_type() == "text/plain" and not body_text:
+                raw = part.get_payload(decode=True)
+                if raw:
+                    charset = part.get_content_charset() or "utf-8"
+                    body_text = raw.decode(charset, errors="replace")
+        if not body_text:
+            for part in parts_to_check:
+                if part.get_content_type() == "text/html":
+                    raw = part.get_payload(decode=True)
+                    if raw:
+                        charset = part.get_content_charset() or "utf-8"
+                        body_text = _strip_html(raw.decode(charset, errors="replace"))
+                        break
+
+        header_block = "\n".join(filter(None, [
+            f"Subject: {subject}" if subject else "",
+            f"From: {from_addr}" if from_addr else "",
+            f"To: {to_addr}" if to_addr else "",
+            f"Date: {date}" if date else "",
+        ]))
+        full_text = _norm_text(f"{header_block}\n\n{body_text.strip()}" if body_text.strip() else header_block)
+
+        if not full_text:
+            return {"success": False, "error": "No content found in .eml file.", "source": str(eml_path)}
+
+        section_id = str(uuid.uuid4())
+        section = {
+            "section_id": section_id,
+            "title": subject or "Email",
+            "level": 1,
+            "blocks": [{"type": "text", "text": full_text}],
+            "suggested_name": f"{doc_slug}__sec001_email.json",
+            "doc_slug": doc_slug,
+            "index": 1,
+        }
+
+        chunks = self._build_chunks([section])
+        if not chunks:
+            return {"success": False, "error": "No chunks produced from .eml file.", "source": str(eml_path)}
+
+        logger.info("EML extraction: 1 section, %d chunks — %s", len(chunks), eml_path.name)
+        return {
+            "success": True,
+            "doc_id": doc_id,
+            "source": str(eml_path),
+            "doc_slug": doc_slug,
+            "sections": [section],
+            "images": [],
+            "chunks": chunks,
+        }
 
     def _process_pdf(self, pdf_path: Path, doc_id: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -345,7 +468,7 @@ class DocumentProcessor:
 
             if not all_sizes:
                 # Scanned / image-only PDF — hand off to OCR fallback
-                fitz_doc.close()
+                # (fitz_doc is closed by the finally block below)
                 return self._process_pdf_ocr_fallback(pdf_path, doc_id=doc_id)
 
             all_sizes.sort()
@@ -489,10 +612,59 @@ class DocumentProcessor:
                             )
                             images.append(rec)
                             _ensure_section()["blocks"].append({"type": "image", "path": rec.placeholder_path})
+
+                            # OCR large embedded images to recover text rendered as raster
+                            # (e.g. Outlook email bodies printed to PDF from a browser).
+                            if (
+                                _HAS_PDF_OCR
+                                and rec.width_px and rec.height_px
+                                and rec.width_px > 300 and rec.height_px > 100
+                            ):
+                                try:
+                                    import io as _io
+                                    _configure_tesseract_from_env()
+                                    pil_img = _PILImage.open(_io.BytesIO(img_bytes))
+                                    ocr_text = _fix_ocr_spacing(pytesseract.image_to_string(pil_img).strip())
+                                    if ocr_text:
+                                        _ensure_section()["blocks"].append({"type": "text", "text": ocr_text})
+                                        logger.info(
+                                            "Per-image OCR extracted %d chars from image %s in %s",
+                                            len(ocr_text), img_id, pdf_path.name,
+                                        )
+                                except Exception:
+                                    logger.warning("Per-image OCR failed for image %s in %s", img_id, pdf_path.name)
                         except Exception:
                             logger.warning(
                                 "Failed to extract image xref=%d on page %d of %s",
                                 xref, page_idx, pdf_path,
+                            )
+
+                    # ── Full-page OCR for pages where body is a form XObject ──
+                    # Outlook web PDFs embed the email body as a form XObject
+                    # which fitz.get_images() cannot see (0 images reported).
+                    # Render the full page to a pixmap and OCR it; only add the
+                    # result when OCR yields substantially more text than the
+                    # structured extraction already found.
+                    if _HAS_PDF_OCR:
+                        structured_text_len = sum(
+                            len(data.get("text", ""))
+                            for _, btype, data in ordered
+                            if btype == "text"
+                        )
+                        try:
+                            _configure_tesseract_from_env()
+                            pix = fitz_page.get_pixmap(dpi=150)
+                            pil_img = _PILImage.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                            ocr_text = _fix_ocr_spacing(pytesseract.image_to_string(pil_img).strip())
+                            if len(ocr_text) > structured_text_len + 100:
+                                _ensure_section()["blocks"].append({"type": "text", "text": ocr_text})
+                                logger.info(
+                                    "Full-page OCR added %d chars (structured had %d) for page %d of %s",
+                                    len(ocr_text), structured_text_len, page_idx, pdf_path.name,
+                                )
+                        except Exception:
+                            logger.warning(
+                                "Full-page OCR failed for page %d of %s", page_idx, pdf_path.name
                             )
 
         finally:
@@ -695,8 +867,9 @@ class DocumentProcessor:
     def _convert_with_libreoffice(self, doc_path: Path) -> Path:
         tmp_dir = Path(tempfile.mkdtemp(suffix="__doc_conv"))
         try:
+            soffice_bin = os.getenv("SOFFICE_PATH", "soffice")
             cmd = [
-                "soffice",
+                soffice_bin,
                 "--headless",
                 "--convert-to",
                 "docx",

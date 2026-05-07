@@ -28,7 +28,21 @@ UPLOAD_DIR = Path(__file__).parent.parent.parent / "data" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Supported file types for upload
-ALLOWED_EXTENSIONS = {".pdf", ".doc", ".docx", ".txt", ".md", ".mp4", ".mov", ".m4v", ".mkv", ".webm"}
+ALLOWED_EXTENSIONS = {".pdf", ".doc", ".docx", ".txt", ".md", ".eml", ".mp4", ".mov", ".m4v", ".mkv", ".webm"}
+
+_MIME_MAP = {
+    ".pdf": "application/pdf",
+    ".eml": "message/rfc822",
+    ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".txt": "text/plain",
+    ".md": "text/plain",
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".m4v": "video/x-m4v",
+    ".mkv": "video/x-matroska",
+    ".webm": "video/webm",
+}
 
 
 def _doc_id_from_filename(filename: str) -> str:
@@ -72,16 +86,31 @@ async def upload_file(file: UploadFile = File(...)):
 
     # Optionally upload to Supabase (do not fail the request if this part errors)
     supabase_info = None
+    SUPABASE_MAX_BYTES = 50 * 1024 * 1024  # 50 MB free-tier limit
     if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY and SUPABASE_BUCKET:
-        try:
-            doc_id = _doc_id_from_filename(file.filename)
-            storage_path = f"docs/{doc_id}/original/{file.filename}"
-            sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-            res = sb.storage.from_(SUPABASE_BUCKET).upload(storage_path, contents, {"upsert": "true"})
-            sup_path = getattr(res, "path", None) if res is not None else None
-            supabase_info = {"path": sup_path}
-        except Exception as sb_exc:
-            supabase_info = {"error": str(sb_exc)}
+        if len(contents) > SUPABASE_MAX_BYTES:
+            size_mb = round(len(contents) / (1024 * 1024), 1)
+            logger.warning("Skipping Supabase Storage upload for %s (%.1f MB) — exceeds 50 MB free-tier limit", file.filename, size_mb)
+            supabase_info = {
+                "warning": f"File is {size_mb} MB and exceeds the 50 MB storage limit. The document content has been processed and is searchable, but the original file will not be available for download.",
+                "stored": False,
+            }
+        else:
+            try:
+                doc_id = _doc_id_from_filename(file.filename)
+                # Use doc_id as the storage filename to avoid non-ASCII chars
+                # (e.g. em dashes) that Supabase storage rejects in paths.
+                safe_name = doc_id + ext
+                storage_path = f"docs/{doc_id}/original/{safe_name}"
+                sb = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+                content_type = _MIME_MAP.get(ext, "application/octet-stream")
+                res = sb.storage.from_(SUPABASE_BUCKET).upload(
+                    storage_path, contents, {"upsert": "true", "content-type": content_type}
+                )
+                sup_path = getattr(res, "path", None) if res is not None else None
+                supabase_info = {"path": sup_path, "stored": True}
+            except Exception as sb_exc:
+                supabase_info = {"error": str(sb_exc), "stored": False}
 
     # Trigger ingestion using the existing endpoint logic
     ingestion_data = None
@@ -151,14 +180,28 @@ async def bulk_upload(files: List[UploadFile] = File(...)) -> Dict[str, Any]:
                 f.write(contents)
 
             # Optional Supabase mirror
+            SUPABASE_MAX_BYTES = 50 * 1024 * 1024  # 50 MB free-tier limit
             if sb is not None:
-                try:
-                    doc_id = _doc_id_from_filename(original_filename)
-                    storage_path = f"docs/{doc_id}/original/{original_filename}"
-                    res = sb.storage.from_(SUPABASE_BUCKET).upload(storage_path, contents, {"upsert": "true"})
-                    item["supabase"] = {"path": getattr(res, "path", None) if res is not None else None}
-                except Exception as sb_exc:
-                    item["supabase"] = {"error": str(sb_exc)}
+                if len(contents) > SUPABASE_MAX_BYTES:
+                    size_mb = round(len(contents) / (1024 * 1024), 1)
+                    logger.warning("Skipping Supabase Storage upload for %s (%.1f MB) — exceeds 50 MB free-tier limit", original_filename, size_mb)
+                    item["supabase"] = {
+                        "warning": f"File is {size_mb} MB and exceeds the 50 MB storage limit. Content will be processed but the original file will not be available for download.",
+                        "stored": False,
+                    }
+                else:
+                    try:
+                        doc_id = _doc_id_from_filename(original_filename)
+                        bulk_ext = Path(original_filename).suffix.lower()
+                        safe_name = doc_id + bulk_ext
+                        storage_path = f"docs/{doc_id}/original/{safe_name}"
+                        bulk_content_type = _MIME_MAP.get(bulk_ext, "application/octet-stream")
+                        res = sb.storage.from_(SUPABASE_BUCKET).upload(
+                            storage_path, contents, {"upsert": "true", "content-type": bulk_content_type}
+                        )
+                        item["supabase"] = {"path": getattr(res, "path", None) if res is not None else None, "stored": True}
+                    except Exception as sb_exc:
+                        item["supabase"] = {"error": str(sb_exc), "stored": False}
 
             # Ingest
             try:

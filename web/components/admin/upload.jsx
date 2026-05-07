@@ -4,6 +4,7 @@
   const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.m4v', '.mkv', '.webm'];
   const NON_PDF_UPLOAD_ACCEPT = '.doc,.docx,.txt,.md,.mp4,.mov,.m4v,.mkv,.webm';
   const EMAIL_PDF_ACCEPT = '.pdf,application/pdf';
+  const EML_ACCEPT = '.eml,message/rfc822';
 
   function isVideoFile(file) {
     if (!file) return false;
@@ -81,6 +82,10 @@
     const [emailStatus, setEmailStatus] = React.useState(null);
     const [emailProgress, setEmailProgress] = React.useState(0);
 
+    const [emlFile, setEmlFile] = React.useState(null);
+    const [emlStatus, setEmlStatus] = React.useState(null);
+    const [emlProgress, setEmlProgress] = React.useState(0);
+
     const [bulkFiles, setBulkFiles] = React.useState([]);
     const [bulkItems, setBulkItems] = React.useState([]);
     const [bulkBusy, setBulkBusy] = React.useState(false);
@@ -111,9 +116,13 @@
       try {
         const data = await uploadSingleFile(singleFile, setSingleProgress);
         const isVideo = isVideoFile(singleFile);
+        const storageWarning = data?.supabase?.warning || null;
+        if (storageWarning) window.CFC.toast(storageWarning, 'warning', 10000);
         setSingleStatus({
-          state: 'done',
-          message: isVideo ? 'Video uploaded and transcribed.' : 'Document uploaded and ingested.',
+          state: storageWarning ? 'warning' : 'done',
+          message: storageWarning
+            ? storageWarning
+            : isVideo ? 'Video uploaded and transcribed.' : 'Document uploaded and ingested.',
           data,
         });
       } catch (err) {
@@ -166,10 +175,14 @@
         try {
           const data = await uploadSingleFile(file, (pct) => updateItem(i, { progress: pct }));
           const isVideo = isVideoFile(file);
+          const storageWarning = data?.supabase?.warning || null;
+          if (storageWarning) window.CFC.toast(storageWarning, 'warning', 10000);
           updateItem(i, {
-            status: 'done',
+            status: storageWarning ? 'warning' : 'done',
             progress: 100,
-            detail: isVideo ? 'Video uploaded and transcribed.' : 'Document uploaded and ingested.',
+            detail: storageWarning
+              ? storageWarning
+              : isVideo ? 'Video uploaded and transcribed.' : 'Document uploaded and ingested.',
             data,
           });
         } catch (err) {
@@ -178,6 +191,31 @@
       }
 
       setBulkBusy(false);
+    };
+
+    const handleEmlChange = (e) => {
+      const file = e.target.files?.[0] || null;
+      if (file && !file.name.toLowerCase().endsWith('.eml')) {
+        setEmlFile(null);
+        setEmlStatus({ state: 'error', message: 'Email Upload (.eml) only accepts .eml files.' });
+        setEmlProgress(0);
+        e.target.value = '';
+        return;
+      }
+      setEmlFile(file);
+      setEmlStatus(null);
+      setEmlProgress(0);
+    };
+
+    const handleEmlUpload = async () => {
+      if (!emlFile) return;
+      setEmlStatus({ state: 'uploading', message: 'Uploading .eml file…' });
+      try {
+        const data = await uploadSingleFile(emlFile, setEmlProgress);
+        setEmlStatus({ state: 'done', message: 'Email uploaded and ingested.', data });
+      } catch (err) {
+        setEmlStatus({ state: 'error', message: err.message || String(err) });
+      }
     };
 
     const handleEmailChange = (e) => {
@@ -267,6 +305,7 @@
                     {item.status === 'ready' && 'Ready'}
                     {item.status === 'uploading' && 'Uploading…'}
                     {item.status === 'done' && 'Ingested'}
+                    {item.status === 'warning' && 'Ingested (no download)'}
                     {item.status === 'error' && 'Error'}
                   </span>
                 </div>
@@ -280,7 +319,36 @@
         </Card>
 
         <Card className="admin-card">
-          <h2>Email Upload</h2>
+          <h2>Email Upload (.eml)</h2>
+          <p className="muted">Upload a raw .eml email file exported from Outlook or any mail client. Extracts subject, sender, recipients, date, and full body text.</p>
+          <div className="file-picker">
+            <input type="file" accept={EML_ACCEPT} onChange={handleEmlChange} className="file-input" />
+            {emlFile && (
+              <div className="file-chip">
+                <span>{emlFile.name}</span>
+                <span className="file-chip-kind">Email (.eml)</span>
+              </div>
+            )}
+          </div>
+          {emlProgress > 0 && (
+            <div className="progress-bar">
+              <div className="progress-fill" style={{ width: `${emlProgress}%` }} />
+            </div>
+          )}
+          <div className="admin-actions">
+            <PrimaryButton type="button" onClick={handleEmlUpload} disabled={!emlFile}>
+              Upload Email
+            </PrimaryButton>
+          </div>
+          {emlStatus && (
+            <div className={`status-pill status-${emlStatus.state || 'info'}`}>
+              {emlStatus.message}
+            </div>
+          )}
+        </Card>
+
+        <Card className="admin-card">
+          <h2>Email Upload (PDF)</h2>
           <p className="muted">Upload email exports as PDF. This is the only upload dropbox that supports PDF files.</p>
           <div className="file-picker">
             <input type="file" accept={EMAIL_PDF_ACCEPT} onChange={handleEmailChange} className="file-input" />
