@@ -4,6 +4,20 @@
   const { Card } = window.CFC.Primitives;
   const { useUser } = window.CFC.UserContext;
   const { useRouter } = window.CFC.RouterContext;
+  const CHAT_META_KEY = 'cfc-chat-sidebar-meta';
+
+  function loadFavoriteIds() {
+    try {
+      const meta = JSON.parse(window.localStorage.getItem(CHAT_META_KEY) || '{}');
+      return new Set(
+        Object.entries(meta)
+          .filter(([, value]) => Boolean(value?.favorite))
+          .map(([sessionId]) => sessionId),
+      );
+    } catch {
+      return new Set();
+    }
+  }
 
   function formatRelative(dateStr) {
     const diff = Date.now() - new Date(dateStr).getTime();
@@ -29,6 +43,7 @@
       })
         .then(res => res.ok ? res.json() : [])
         .then(data => {
+          const favoriteIds = loadFavoriteIds();
           const mapped = data.map(s => ({
             id: s.id,
             title: s.title || 'Untitled Chat',
@@ -36,7 +51,7 @@
             messageCount: s.message_count || 0,
             updatedAt: s.created_at,
           }));
-          setItems(mapped);
+          setItems(mapped.filter((item) => favoriteIds.has(item.id)));
         })
         .catch(() => setItems([]))
         .finally(() => setLoading(false));
@@ -143,8 +158,8 @@
         <div className="page history-page">
           <div className="page-header-row">
             <div>
-              <h1>Chat History</h1>
-              <p>Manage your conversations – search, rename, export, or delete</p>
+              <h1>Favorites</h1>
+              <p>Your starred chats are stored here for quick access.</p>
             </div>
           </div>
 
@@ -162,12 +177,10 @@
                   <div className="empty-state-content">
                     <div className="empty-state-icon">
                       <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="9" />
-                        <line x1="9" y1="9" x2="15" y2="15" />
-                        <line x1="15" y1="9" x2="9" y2="15" />
+                        <path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
                       </svg>
                     </div>
-                    <p className="empty-state-text">No conversations match your filters.</p>
+                    <p className="empty-state-text">No favorited chats match your filters.</p>
                   </div>
                 </div>
               ) : (
