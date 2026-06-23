@@ -1,6 +1,36 @@
 // Chat sidebar – manages chat history list and new-chat action
 (() => {
-  function ChatSidebar({ chatHistory, activeChatId, onNewChat, onSelectChat, onDeleteChat }) {
+  function ChatSidebar({
+    chatHistory,
+    activeChatId,
+    onNewChat,
+    onSelectChat,
+    onDeleteChat,
+    onTogglePin,
+    onToggleFavorite,
+  }) {
+    const [openMenuId, setOpenMenuId] = React.useState(null);
+
+    React.useEffect(() => {
+      const close = (event) => {
+        if (!event.target.closest('.sidebar-chat-actions')) {
+          setOpenMenuId(null);
+        }
+      };
+      window.addEventListener('click', close);
+      return () => window.removeEventListener('click', close);
+    }, []);
+
+    const orderedChats = React.useMemo(() => {
+      return [...chatHistory].sort((a, b) => {
+        const pinRank = Number(Boolean(b.pinned)) - Number(Boolean(a.pinned));
+        if (pinRank !== 0) return pinRank;
+        const favRank = Number(Boolean(b.favorite)) - Number(Boolean(a.favorite));
+        if (favRank !== 0) return favRank;
+        return 0;
+      });
+    }, [chatHistory]);
+
     return (
       <aside className="chat-sidebar">
         <button type="button" className="btn-primary sidebar-new-chat" onClick={onNewChat}>
@@ -11,7 +41,7 @@
           New Chat
         </button>
         <div className="sidebar-history">
-          {chatHistory.map((chat) => (
+          {orderedChats.map((chat) => (
             <div
               key={chat.id}
               className={`sidebar-chat-item ${chat.id === activeChatId ? 'active' : ''}`}
@@ -23,21 +53,63 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
-              <span className="sidebar-chat-title">{chat.title}</span>
-              <button
-                type="button"
-                className="sidebar-chat-delete"
-                title="Delete chat"
-                onClick={(e) => { e.stopPropagation(); onDeleteChat(chat.id); }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="3 6 5 6 21 6" />
-                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                  <path d="M10 11v6" />
-                  <path d="M14 11v6" />
-                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
-                </svg>
-              </button>
+              <span className="sidebar-chat-title">
+                {chat.pinned ? '📌 ' : ''}
+                {chat.favorite ? '★ ' : ''}
+                {chat.title}
+              </span>
+              <div className="sidebar-chat-actions" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  className="sidebar-chat-menu-trigger"
+                  title="Chat options"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpenMenuId((prev) => (prev === chat.id ? null : chat.id));
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <circle cx="12" cy="5" r="2" />
+                    <circle cx="12" cy="12" r="2" />
+                    <circle cx="12" cy="19" r="2" />
+                  </svg>
+                </button>
+
+                {openMenuId === chat.id && (
+                  <div className="sidebar-chat-menu" role="menu">
+                    <button
+                      type="button"
+                      className="sidebar-chat-menu-item"
+                      onClick={() => {
+                        if (onTogglePin) onTogglePin(chat.id);
+                        setOpenMenuId(null);
+                      }}
+                    >
+                      {chat.pinned ? 'Unpin' : 'Pin'}
+                    </button>
+                    <button
+                      type="button"
+                      className="sidebar-chat-menu-item"
+                      onClick={() => {
+                        if (onToggleFavorite) onToggleFavorite(chat.id);
+                        setOpenMenuId(null);
+                      }}
+                    >
+                      {chat.favorite ? 'Unfavorite' : 'Favorite'}
+                    </button>
+                    <button
+                      type="button"
+                      className="sidebar-chat-menu-item danger"
+                      onClick={() => {
+                        onDeleteChat(chat.id);
+                        setOpenMenuId(null);
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           ))}
         </div>
