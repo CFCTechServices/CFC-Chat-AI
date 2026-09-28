@@ -1,6 +1,5 @@
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
-using Microsoft.ML.Tokenizers;
 
 namespace CFC.Rag;
 
@@ -15,12 +14,12 @@ public sealed class OnnxEmbeddingModel : IDisposable
     private const int MaxTokens = 256; // models max sequence length
     
     private readonly InferenceSession _session;
-    private readonly BertTokenizer _tokenizer;
+    private readonly WordPieceTokenizer _tokenizer;
 
     public OnnxEmbeddingModel(string modelPath, string vocabPath)
     {
         _session = new InferenceSession(modelPath);
-        _tokenizer = BertTokenizer.Create(vocabPath, new BertOptions { LowerCaseBeforeTokenization = true });
+        _tokenizer = new WordPieceTokenizer(vocabPath);
     }
 
     /// <summary> Equivalent of Python encode_query().</summary>
@@ -33,16 +32,7 @@ public sealed class OnnxEmbeddingModel : IDisposable
     {
         // Tokenize; make sure the sequence is wrapped in [CLS] ... [SEP]
         // (done manually so it works regardless of tokenizer version defaults)
-        var ids = _tokenizer.EncodeToIds(text).ToList();
-        int cls = _tokenizer.ClassificationTokenId;
-        int sep = _tokenizer.SeparatorTokenId;
-        if (ids.Count == 0 || ids[0] != cls) ids.Insert(0, cls);
-        if (ids[^1] != sep) ids.Add(sep);
-        if (ids.Count > MaxTokens )
-        {
-            ids = ids.Take(MaxTokens - 1).ToList();
-            ids.Add(sep);
-        }
+        var ids = _tokenizer.Encode(text, MaxTokens);
 
         int n = ids.Count;
         int [] shape = [1, n];
@@ -63,7 +53,7 @@ public sealed class OnnxEmbeddingModel : IDisposable
             };
             inputs.Add(NamedOnnxValue.CreateFromTensor(name, new DenseTensor<long>(data, shape)));
         }
-        
+
         using var results = _session.Run(inputs);
         var hidden = results.First().AsTensor<float>(); // [1, tokens, 384]
         int dim = hidden.Dimensions[2];
