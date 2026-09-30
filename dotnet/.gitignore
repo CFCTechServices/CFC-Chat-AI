@@ -482,3 +482,6 @@ $RECYCLE.BIN/
 *.swp
 
 models/
+
+# Parity test data (root .gitignore ignores *.json)
+!tests/CFC.Rag.Tests/TestData/*.json
