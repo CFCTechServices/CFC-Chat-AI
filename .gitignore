@@ -84,3 +84,6 @@ data/videos/meta/*.whisper.json
 *.docx
 *.pdf
 __pycache__/main.cpython-312.pyc
+
+# Local
+local/
