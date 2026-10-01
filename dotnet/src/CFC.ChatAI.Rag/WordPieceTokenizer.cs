@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text;
 
-namespace CFC.Rag;
+namespace CFC.ChatAI.Rag;
 
 /// <summary>
 /// Exact port of Hugging Face's uncased BERT tokenizer

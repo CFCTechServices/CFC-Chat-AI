@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\CFC.Rag\CFC.Rag.csproj" />
+    <ProjectReference Include="..\..\src\CFC.ChatAI.Rag\CFC.ChatAI.Rag.csproj" />
   </ItemGroup>
 
 </Project>

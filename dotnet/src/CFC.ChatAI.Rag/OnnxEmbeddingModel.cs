@@ -1,7 +1,7 @@
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 
-namespace CFC.Rag;
+namespace CFC.ChatAI.Rag;
 
 /// <summary>
 /// C# port of app/core/embeddings.py: all-MiniLM-L6-v2 run via ONNX Runtime.

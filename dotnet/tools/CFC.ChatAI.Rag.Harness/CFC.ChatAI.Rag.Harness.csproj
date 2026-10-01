@@ -1,7 +1,7 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\CFC.Rag\CFC.Rag.csproj" />
+    <ProjectReference Include="..\..\src\CFC.ChatAI.Rag\CFC.ChatAI.Rag.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -1,4 +1,4 @@
-﻿namespace CFC.Rag.Tests;
+namespace CFC.ChatAI.Rag.Tests;
 
 public class UnitTest1
 {

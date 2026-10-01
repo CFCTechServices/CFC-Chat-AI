@@ -484,4 +484,4 @@ $RECYCLE.BIN/
 models/
 
 # Parity test data (root .gitignore ignores *.json)
-!tests/CFC.Rag.Tests/TestData/*.json
+!tests/CFC.ChatAI.Rag.Tests/TestData/*.json

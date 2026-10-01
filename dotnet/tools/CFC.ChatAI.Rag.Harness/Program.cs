@@ -1,9 +1,9 @@
-﻿using System.Text.Json;
-using CFC.Rag;
+using System.Text.Json;
+using CFC.ChatAI.Rag;
 
 using var model = new OnnxEmbeddingModel("models/model.onnx", "models/vocab.txt");
 
-var json = File.ReadAllText("tests/CFC.Rag.Tests/TestData/reference_embeddings.json");
+var json = File.ReadAllText("tests/CFC.ChatAI.Rag.Tests/TestData/reference_embeddings.json");
 var refs = JsonSerializer.Deserialize<List<ReferenceEmbedding>>(
     json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
 

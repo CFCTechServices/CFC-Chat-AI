@@ -22,7 +22,7 @@ texts = [
 model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
 embeddings = model.encode(texts)
 
-out_path = Path(__file__).parent.parent / "tests" / "CFC.Rag.Tests" / "TestData" / "reference_embeddings.json"
+out_path = Path(__file__).parent.parent / "tests" / "CFC.ChatAI.Rag.Tests" / "TestData" / "reference_embeddings.json"
 out_path.parent.mkdir(parents=True, exist_ok=True)
 out_path.write_text(json.dumps(
     [{"text": t, "embedding": e.tolist()} for t, e in zip(texts, embeddings)],
