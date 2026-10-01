@@ -3,7 +3,7 @@ import os
 import logging
 
 import requests
-from sentence_transformers import sentence_transformers
+from sentence_transformers import SentenceTransformer
 
 from app.config import settings
 
@@ -53,7 +53,7 @@ class EmbeddingModel:
             except Exception as e:
                 print(f"[embed-parity] C# service call failed: {e}", flush=True)
             
-            return embeddings
+        return embeddings
         
     def encode_query(self, query: str) -> List[float]:
         return self.encode([query])[0]
@@ -67,12 +67,12 @@ class EmbeddingModel:
         return resp.json()["embeddings"]
     
     @staticmethod
-    def _print_parity(texts, py_vector, cs_vecs) -> None:
+    def _print_parity(texts, py_vecs, cs_vecs) -> None:
         for text, a, b in zip(texts, py_vecs, cs_vecs):
             dot = sum(x * y for x, y in zip(a,b))
             norm = (sum(x*x for x in a) ** 0.5) * (sum(y*y for y in b) ** 0.5)
             cos = dot / norm
             status = "PASS" if cos >= 0.9999 else "FAIL"
-            print(f"[embed-parity] {status} cosine{cos:.6f} text={text[:80]!r}", flush = True)
+            print(f"[embed-parity] {status} cosine={cos:.6f} text={text[:80]!r}", flush = True)
 
     
