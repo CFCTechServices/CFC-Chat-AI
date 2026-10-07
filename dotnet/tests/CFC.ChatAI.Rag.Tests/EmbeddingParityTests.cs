@@ -39,6 +39,12 @@ public sealed class EmbeddingModelFixture : IDisposable
 public class EmbeddingParityTests : IClassFixture<EmbeddingModelFixture>
 {
     private const double MIN_COSINE = 0.9999;
+    // mirrors app/config.py from Python; FEEDBACK_SIM_TRHESHOLD and tests/test_feedback_reranking.py
+    private const double FEEDBACK_SIM_THRESHOLD = 0.75;
+    private const string FEEDBACK_SEED_QUERY = "What are the nutritional requirements for cattle feed?";
+    private const string FEEDBACK_SIMILAR_QUERY = "How much protein should be in cattle feed?";
+    private const string FEEDBACK_DISSIMILAR_QUERY = "How do I reset my password?";
+
     private readonly EmbeddingModelFixture _fixture;
 
     public EmbeddingParityTests(EmbeddingModelFixture fixture) => _fixture = fixture;
@@ -101,5 +107,27 @@ public class EmbeddingParityTests : IClassFixture<EmbeddingModelFixture>
             normB += b[i] * b[i];
         }
         return dot / (Math.Sqrt(normA) * Math.Sqrt(normB));
+    }
+
+    [Fact]
+    public void Similar_query_meets_feedback_threshold()
+    {
+        var seed = _fixture.Model.EncodeQuery(FEEDBACK_SEED_QUERY);
+        var similar = _fixture.Model.EncodeQuery(FEEDBACK_SIMILAR_QUERY);
+        var sim = Cosine(seed, similar);
+
+        Assert.True(sim >= FEEDBACK_SIM_THRESHOLD,
+            $"Similar query cosine {sim:F4} is below threshold {FEEDBACK_SIM_THRESHOLD}");   
+    }
+
+    [Fact]
+    public void Dissimilar_query_below_feedback_threshold()
+    {
+        var seed = _fixture.Model.EncodeQuery(FEEDBACK_SEED_QUERY);
+        var dissimilar = _fixture.Model.EncodeQuery(FEEDBACK_DISSIMILAR_QUERY);
+        var sim = Cosine(seed, dissimilar);
+
+        Assert.True(sim < FEEDBACK_SIM_THRESHOLD,
+            $"Dissimilar query cosine {sim:F4} unexpectedly meets threshold {FEEDBACK_SIM_THRESHOLD}");
     }
 }
