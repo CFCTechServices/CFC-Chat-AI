@@ -16,7 +16,10 @@
 param(
     [switch]$Update = $false,
     [string]$WebRoot = "C:\inetpub\cfcchat",
-    [string]$ServiceName = "CFC-ChatAI"
+    [string]$ServiceName = "CFC-ChatAI",
+    [string]$DotNetServiceName = "CFC-ChatAI-DotNet",
+    [string]$DotNetPort = "5000",
+    [string]$DotNetPublishDir = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -32,11 +35,15 @@ Write-Host "============================================================"
 # Pre-flight checks
 # ---------------------------------------------------------------------------
 Write-Host ""
-Write-Host "[0/4] Running pre-flight checks..."
+Write-Host "[0/5] Running pre-flight checks..."
 
-foreach ($cmd in @("python", "pip", "ffmpeg", "nssm")) {
+foreach ($cmd in @("python", "pip", "ffmpeg", "nssm", "dotnet")) {
     if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
-        Write-Host "ERROR: '$cmd' not found on PATH. See ADMIN_SETUP_GUIDE.md." -ForegroundColor Red
+        if ($cmd -eq "dotnet") {
+            Write-Host "ERROR: 'dotnet' not found on PATH. Install the .NET 10 SDK from https://dotnet.microsoft.com/download" -ForegroundColor Red
+        } else {
+            Write-Host "ERROR: '$cmd' not found on PATH. See ADMIN_SETUP_GUIDE.md." -ForegroundColor Red
+        }
         exit 1
     }
 }
@@ -51,7 +58,7 @@ Write-Host "      All checks passed."
 # Step 1: Create/update Python virtual environment
 # ---------------------------------------------------------------------------
 Write-Host ""
-Write-Host "[1/4] Setting up Python virtual environment..."
+Write-Host "[1/5] Setting up Python virtual environment..."
 
 if (-not (Test-Path "$ScriptDir\.venv")) {
     python -m venv "$ScriptDir\.venv"
@@ -76,7 +83,7 @@ Write-Host "      Done - Python environment ready."
 # Step 2: Deploy static frontend files to IIS web root
 # ---------------------------------------------------------------------------
 Write-Host ""
-Write-Host "[2/4] Copying frontend static files to $WebRoot\ui\..."
+Write-Host "[2/5] Copying frontend static files to $WebRoot\ui\..."
 if (-not (Test-Path $WebRoot)) {
     New-Item -ItemType Directory -Force -Path $WebRoot | Out-Null
 }
@@ -93,16 +100,16 @@ Copy-Item -Path "$ScriptDir\deployment\iis-web.config" -Destination "$WebRoot\we
 Write-Host "      Done - frontend deployed to $uiRoot"
 
 # ---------------------------------------------------------------------------
-# Step 3: Install or restart Windows Service
+# Step 3: Install or restart Python Windows Service
 # ---------------------------------------------------------------------------
-Write-Host ""
+Write-Host "[3/5] Installing/restarting Python backend service..."
 $uvicorn = "$ScriptDir\.venv\Scripts\uvicorn.exe"
 $svcArgs = "main:app --host 127.0.0.1 --port 8000 --workers 2 --log-level info"
 
 $serviceExists = $null -ne (Get-Service -Name $ServiceName -ErrorAction SilentlyContinue)
 
 if ($serviceExists) {
-    Write-Host "[3/4] Restarting existing Windows Service '$ServiceName'..."
+    Write-Host "[3/5] Restarting existing Windows Service '$ServiceName'..."
     # Stop the service, then force-kill any lingering Python processes that
     # survived (nssm restart alone can leave stale workers holding port 8000).
     nssm stop $ServiceName 2>&1 | Out-Null
@@ -119,27 +126,106 @@ if ($serviceExists) {
     Start-Sleep -Seconds 2
     nssm start $ServiceName
 } else {
-    Write-Host "[3/4] Installing Windows Service '$ServiceName'..."
+    Write-Host "[3/5] Installing Windows Service '$ServiceName'..."
     nssm install $ServiceName $uvicorn $svcArgs
     nssm set $ServiceName AppDirectory $ScriptDir
     # Pass the .env file path so the service can load environment variables
     nssm set $ServiceName AppEnvironmentExtra "DOTENV_PATH=$ScriptDir\.env"
     nssm start $ServiceName
 }
-Write-Host "      Done - service running."
+Write-Host "      Done - Python service running."
 
 # ---------------------------------------------------------------------------
-# Step 4: Verify
+# Step 4: Publish and install/restart .NET (C#) API service
 # ---------------------------------------------------------------------------
 Write-Host ""
-Write-Host "[4/4] Verifying backend health..."
-Start-Sleep -Seconds 5
-try {
-    $health = Invoke-RestMethod "http://127.0.0.1:8000/api/health" -ErrorAction Stop
-    Write-Host "      Health check: OK" -ForegroundColor Green
-} catch {
-    Write-Host "      WARNING: Health check failed. Check logs: nssm status $ServiceName" -ForegroundColor Yellow
+Write-Host "[4/5] Publishing .NET API..."
+if ([string]::IsNullOrWhiteSpace($DotNetPublishDir)) {
+    $DotNetPublishDir = "$ScriptDir\dotnet-publish"
 }
+$dotNetProject = "$ScriptDir\dotnet\src\CFC.ChatAI.Api\CFC.ChatAI.Api.csproj"
+if (-not (Test-Path $dotNetProject)) {
+    Write-Host "ERROR: .NET API project not found at $dotNetProject" -ForegroundColor Red
+    exit 1
+}
+& dotnet publish $dotNetProject -c Release -o $DotNetPublishDir
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "ERROR: 'dotnet publish' failed." -ForegroundColor Red
+    exit 1
+}
+Write-Host "      Done - published to $DotNetPublishDir"
+
+Write-Host ""
+Write-Host "[4/5] Installing/restarting .NET API service '$DotNetServiceName' (:$DotNetPort)..."
+$dotNetExe = "$DotNetPublishDir\CFC.ChatAI.Api.exe"
+if (-not (Test-Path $dotNetExe)) {
+    Write-Host "ERROR: Expected $dotNetExe after publish." -ForegroundColor Red
+    exit 1
+}
+$dotNetEnv = "ASPNETCORE_URLS=http://127.0.0.1:$DotNetPort", "DOTNET_ENVIRONMENT=Production"
+$dotNetLogDir = "$DotNetPublishDir\logs"
+if (-not (Test-Path $dotNetLogDir)) {
+    New-Item -ItemType Directory -Force -Path $dotNetLogDir | Out-Null
+}
+
+$dotNetExists = $null -ne (Get-Service -Name $DotNetServiceName -ErrorAction SilentlyContinue)
+
+if ($dotNetExists) {
+    Write-Host "      Restarting existing Windows Service '$DotNetServiceName'..."
+    nssm stop $DotNetServiceName 2>&1 | Out-Null
+    Start-Sleep -Seconds 3
+    $staleDotNet = netstat -ano | Select-String ":$DotNetPort\s.*LISTENING" | ForEach-Object {
+        ($_ -split '\s+')[-1]
+    } | Select-Object -Unique
+    foreach ($pid in $staleDotNet) {
+        if ($pid -match '^\d+$' -and $pid -ne '0') {
+            Write-Host "      Killing stale PID $pid on :$DotNetPort..."
+            Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+        }
+    }
+    Start-Sleep -Seconds 2
+    nssm set $DotNetServiceName Application $dotNetExe
+    nssm set $DotNetServiceName AppDirectory $DotNetPublishDir
+    nssm set $DotNetServiceName AppEnvironmentExtra ($dotNetEnv -join ' ')
+    nssm set $DotNetServiceName AppStdout "$dotNetLogDir\stdout.log"
+    nssm set $DotNetServiceName AppStderr "$dotNetLogDir\stderr.log"
+    nssm set $DotNetServiceName AppRotateFiles 1
+    nssm set $DotNetServiceName AppRotateOnline 1
+    nssm start $DotNetServiceName
+} else {
+    Write-Host "      Installing Windows Service '$DotNetServiceName'..."
+    nssm install $DotNetServiceName $dotNetExe
+    nssm set $DotNetServiceName AppDirectory $DotNetPublishDir
+    nssm set $DotNetServiceName AppEnvironmentExtra ($dotNetEnv -join ' ')
+    nssm set $DotNetServiceName AppStdout "$dotNetLogDir\stdout.log"
+    nssm set $DotNetServiceName AppStderr "$dotNetLogDir\stderr.log"
+    nssm set $DotNetServiceName AppRotateFiles 1
+    nssm set $DotNetServiceName AppRotateOnline 1
+    nssm start $DotNetServiceName
+}
+Write-Host "      Done - .NET service running."
+
+# ---------------------------------------------------------------------------
+# Step 5: Verify
+# ---------------------------------------------------------------------------
+Write-Host ""
+Write-Host "[5/5] Verifying backend health (polling up to ~90s, services cold-start)..."
+function Wait-Health($Url, $Label, $Svc) {
+    for ($i = 1; $i -le 18; $i++) {
+        try {
+            $r = Invoke-RestMethod $Url -TimeoutSec 5 -ErrorAction Stop
+            Write-Host "      ${Label}: OK (attempt $i)" -ForegroundColor Green
+            return $r
+        } catch {
+            Write-Host "      ${Label}: waiting... (attempt $i/18)"
+            Start-Sleep -Seconds 5
+        }
+    }
+    Write-Host "      WARNING: ${Label} failed. Check logs: nssm status $Svc" -ForegroundColor Yellow
+    return $null
+}
+Wait-Health "http://127.0.0.1:8000/api/health" "Python health check (:8000)" $ServiceName | Out-Null
+Wait-Health "http://127.0.0.1:$DotNetPort/api/health" ".NET health check (:$DotNetPort)" $DotNetServiceName | Out-Null
 
 # ---------------------------------------------------------------------------
 # Summary
@@ -148,9 +234,12 @@ Write-Host ""
 Write-Host "============================================================"
 Write-Host " Deployment complete!"
 Write-Host ""
-Write-Host "  Backend API (internal): http://127.0.0.1:8000"
-Write-Host "  Health check:           Invoke-RestMethod http://127.0.0.1:8000/api/health"
-Write-Host "  Service logs:           nssm status $ServiceName"
+Write-Host "  Backend API - Python (internal): http://127.0.0.1:8000"
+Write-Host "  Backend API - .NET (internal):   http://127.0.0.1:$DotNetPort"
+Write-Host "  Health checks:                  Invoke-RestMethod http://127.0.0.1:8000/api/health"
+Write-Host "                                  Invoke-RestMethod http://127.0.0.1:$DotNetPort/api/health"
+Write-Host "  Service logs:                   nssm status $ServiceName"
+Write-Host "                                  nssm status $DotNetServiceName"
 Write-Host "  Event logs:             Get-EventLog -LogName Application -Source $ServiceName -Newest 20"
 Write-Host ""
 Write-Host "  Frontend files:         $WebRoot"

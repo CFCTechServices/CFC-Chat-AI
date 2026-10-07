@@ -87,3 +87,6 @@ __pycache__/main.cpython-312.pyc
 
 # Local
 local/
+
+# .NET publish output (deploy-windows.ps1 target)
+dotnet-publish/
