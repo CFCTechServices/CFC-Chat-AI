@@ -1,8 +1,10 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/CFC.ChatAI.Api/CFC.ChatAI.Api.csproj" />
     <Project Path="src/CFC.ChatAI.Rag/CFC.ChatAI.Rag.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/CFC.ChatAI.Api.Tests/CFC.ChatAI.Api.Tests.csproj" />
     <Project Path="tests/CFC.ChatAI.Rag.Tests/CFC.ChatAI.Rag.Tests.csproj" />
   </Folder>
   <Folder Name="/tools/">
