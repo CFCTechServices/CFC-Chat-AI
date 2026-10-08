@@ -121,4 +121,4 @@ Found during the bridge test and reported to the team and client:
 - [ ] Argument validation on public methods (CFC standards)
 - [ ] Align formatting with CFC Programming Standards (tabs, `ID` casing, constants)
 - [ ] Batch embedding with padding for faster ingestion (optimization)
-- [ ] Recommend index deduplication to the client (stretch goal)
+- [ ] Recommend index deduplication  (stretch goal)
