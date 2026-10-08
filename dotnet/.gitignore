@@ -483,5 +483,8 @@ $RECYCLE.BIN/
 
 models/
 
+# Public API defaults only; environment-specific settings and secrets remain ignored.
+!src/CFC.ChatAI.Api/appsettings.json
+
 # Parity test data (root .gitignore ignores *.json)
 !tests/CFC.ChatAI.Rag.Tests/TestData/*.json

@@ -322,7 +322,7 @@ if (-not $SkipDotNet) {
         -Arguments "--urls http://127.0.0.1:$DotNetPort" `
         -AppDir $DotNetPublishDir `
         -Port ([int]$DotNetPort) `
-        -EnvironmentExtra "DOTNET_ENVIRONMENT=Production" `
+        -EnvironmentExtra "DOTNET_ENVIRONMENT=Production`nDOTENV_PATH=$ScriptDir\.env" `
         -LogPrefix "dotnet"
 
     Write-Host "      Done - .NET service running."

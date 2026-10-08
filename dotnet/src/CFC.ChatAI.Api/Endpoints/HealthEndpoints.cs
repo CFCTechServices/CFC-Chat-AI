@@ -1,4 +1,5 @@
 using CFC.ChatAI.Api.Contracts;
+using CFC.ChatAI.Api.Services;
 
 namespace CFC.ChatAI.Api.Endpoints;
 
@@ -13,6 +14,10 @@ public static class HealthEndpoints
                 Ok: true,
                 Message: "CFC Animal Feed Software Chatbot API is running (C#)",
                 Version: info.Version))
+            .WithTags("health");
+
+        app.MapGet("/api/health/detailed", (RuntimeDiagnostics diagnostics, ApiInfo info, CancellationToken ct) =>
+            diagnostics.GetHealthAsync(info.Version, ct))
             .WithTags("health");
     }
 }

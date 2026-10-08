@@ -193,31 +193,6 @@ public sealed class PineconeService : IPineconeService
         }
     }
 
-    public async Task<ChunkDeleteResult> DeleteDocumentAsync(ChunkCollection collection, string documentId, CancellationToken cancellationToken = default)
-    {
-        var target = Target(collection);
-        ValidateIds([documentId]);
-        if (!InScope(documentId)) throw PineconeMetadataMapper.Invalid("Document is outside the trusted scope.");
-        cancellationToken.ThrowIfCancellationRequested();
-        var filter = Filter(collection, [documentId]);
-        if (DeletePayloadSize(target, filter) > _options.MaxPayloadBytes) throw PineconeMetadataMapper.Invalid("Delete filter exceeds payload budget.");
-        await _transport.EnsureReadyAsync(target, false, cancellationToken);
-        var operationId = Guid.NewGuid().ToString("N");
-        var timer = Stopwatch.StartNew();
-        cancellationToken.ThrowIfCancellationRequested();
-        try { await _transport.DeleteAsync(target, filter, cancellationToken); }
-        catch (Exception ex) when (ex is not OutOfMemoryException)
-        {
-            Log("delete_document_failed", operationId, 0, timer.ElapsedMilliseconds);
-            throw new ChunkOperationException(PineconeErrorCategory.PartialDelete, [], [], true, ex is OperationCanceledException, operationId, documentId,
-                ex is PineconeServiceException domainError ? domainError.Category : null);
-        }
-        // Zero below is acknowledged chunk IDs, not an affected-record count.
-        Log("delete_document", operationId, 0, timer.ElapsedMilliseconds);
-        // Filter deletion cannot provide an exact affected count.
-        return new(ChunkOperationStatus.Acknowledged, Array.Empty<string>(), null);
-    }
-
     public async Task<PineconeHealth> GetHealthAsync(CancellationToken cancellationToken = default)
     {
         var modelReady = await _encoder.IsReadyAsync(cancellationToken);

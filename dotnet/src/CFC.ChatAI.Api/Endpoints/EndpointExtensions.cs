@@ -11,5 +11,6 @@ public static class EndpointExtensions
     public static void MapAllEndpoints(this WebApplication app)
     {
         app.MapHealth();
+        app.MapRuntimeConfiguration();
     }
 }

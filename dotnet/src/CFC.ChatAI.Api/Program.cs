@@ -1,21 +1,36 @@
 using System.Text.Json;
 using CFC.ChatAI.Api.Endpoints;
+using CFC.ChatAI.Api.Configuration;
+using CFC.ChatAI.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddProjectDotEnv(builder.Environment.ContentRootPath,
+    Environment.GetEnvironmentVariable("DOTENV_PATH"));
 
 // Mirror app/config.py — version comes from config, not hardcoded per endpoint.
 builder.Configuration.AddEnvironmentVariables();
-var apiVersion = builder.Configuration["ApiVersion"] ?? "1.0.0";
+var apiVersion = builder.Configuration["API_VERSION"] ?? builder.Configuration["ApiVersion"] ?? "1.0.0";
 builder.Services.AddSingleton(new ApiInfo(
     builder.Configuration["ApiTitle"] ?? "CFC Animal Feed Software Chatbot API",
     apiVersion));
+
+builder.Services.AddSingleton(sp => RuntimeOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
+builder.Services.AddSingleton<RuntimeDiagnostics>();
+builder.Services.AddHttpClient(RuntimeDiagnostics.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan)
+    .RedactLoggedHeaders(_ => true)
+    .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+    {
+        AllowAutoRedirect = false,
+        PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+    });
 
 // Preserve Pydantic wire format: snake_case names, nulls emitted, no camelCasing.
 // (See local/pydantic-models-and-csharp-migration.md §1–2.)
 builder.Services.ConfigureHttpJsonOptions(o =>
 {
     o.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
-    o.SerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.SnakeCaseLower;
+    // Dictionary keys may be external identifiers (e.g. Pinecone namespaces); never rename them.
+    o.SerializerOptions.DictionaryKeyPolicy = null;
     o.SerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.Never;
 });
 
