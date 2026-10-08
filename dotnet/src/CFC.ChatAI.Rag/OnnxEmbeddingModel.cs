@@ -8,7 +8,7 @@ namespace CFC.ChatAI.Rag;
 /// Mirrors sentence-transformers: BERT tokenize -> transformer -> mean pooling -> L2 normalization.
 /// </summary>
 
-public sealed class OnnxEmbeddingModel : IDisposable
+internal sealed class OnnxEmbeddingModel : IDisposable
 {
     public const int Dimension = 384;
     private const int MaxTokens = 256; // models max sequence length
@@ -18,8 +18,8 @@ public sealed class OnnxEmbeddingModel : IDisposable
 
     public OnnxEmbeddingModel(string modelPath, string vocabPath)
     {
-        _session = new InferenceSession(modelPath);
         _tokenizer = new WordPieceTokenizer(vocabPath);
+        _session = new InferenceSession(modelPath);
     }
 
     /// <summary> Equivalent of Python encode_query().</summary>
@@ -67,6 +67,8 @@ public sealed class OnnxEmbeddingModel : IDisposable
 
         // L2 normalize
         float norm = MathF.Sqrt(v.Sum(x => x * x ));
+        if (dim != Dimension || !float.IsFinite(norm) || norm <= 0)
+            throw new InvalidOperationException("ONNX output has invalid dimension or zero/nonfinite norm.");
         for (int d = 0; d < dim; d++) v[d] /= norm;
 
         return v;

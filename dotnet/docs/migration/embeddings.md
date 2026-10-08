@@ -4,6 +4,19 @@
 **Owner:** Logan Loch
 **Last edited:** 10/1/26
 
+## C# service boundary
+
+The model and tokenizer are now internal. Production callers use the chunk-only
+`IPineconeService`; only RAG tests and the diagnostic harness have friend access.
+DI owns one lazy, serialized model adapter and disposes it at shutdown. The
+256-token algorithm remains unchanged; zero/nonfinite normalization is rejected.
+See [Pinecone service configuration and cutover](pinecone-service.md).
+
+The earlier vector parity findings below still apply, but **legacy Pinecone
+metadata is insufficient for the new full-content contract**. Re-ingest complete
+chunks into an explicitly model-compatible versioned target before retrieval
+cutover; do not infer full record compatibility from embedding parity alone.
+
 ## What it does
 Turns text (user questions and document chunks) into 384-dimension vectors
 using the `sentence-transformers/all-MiniLM-L6-v2` model. These vectors are
@@ -114,7 +127,7 @@ Found during the bridge test and reported to the team and client:
 - Pass threshold: cosine ≥ 0.9999
 
 ## Open items
-- [ ] Convert the harness check into xUnit tests (`EmbeddingParityTests.cs`)
+- [x] Convert the harness check into opt-in xUnit tests (`OnnxEmbeddingCompatibilityTests.cs`); enable with `RUN_ONNX_INTEGRATION=1` and explicit test asset paths.
 - [ ] Pin the model download to a specific Hugging Face commit (not `main`);
       before deployment, host a copy CFC controls (e.g., Supabase storage)
 - [ ] Argument validation on public methods (CFC standards)
