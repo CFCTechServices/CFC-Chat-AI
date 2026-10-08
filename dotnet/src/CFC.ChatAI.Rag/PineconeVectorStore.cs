@@ -43,7 +43,28 @@ public sealed class PineconeVectorStore
     /// <summary> Index handle created on the first use (matches Python's lazy property). </summary>
     private IndexClient Index => _index ??= _client.Index(_indexName);
 
-    ///<summary> Equivalent of Python query(): the top-k most similar vectors to the given query vector. </summary>
+    /// <summary>Equivalent of Python query(): the topK most similar vectors.</summary>
+    public async Task<IReadOnlyList<VectorMatch>> QueryAsync(
+        float[] vector, int topK = 5, bool includeMetadata = true, Metadata? filter = null)
+    {
+        ArgumentNullException.ThrowIfNull(vector);
+        ArgumentOutOfRangeException.ThrowIfLessThan(topK, 1);
+
+        var response = await Index.QueryAsync(new QueryRequest
+        {
+            Vector = vector,
+            TopK = (uint)topK,
+            IncludeMetadata = includeMetadata,
+            Filter = filter,
+            Namespace = _namespace,
+        });
+
+        return (response.Matches ?? [])
+            .Select(m => new VectorMatch(m.Id, m.Score ?? 0f, m.Metadata))
+            .ToList();
+    }
+    
+    /// <summary> Equivalent of Python upsert_vectors(), sent in batches to stay under pinecone request limit</summary>
     public async Task UpsertAsync(IEnumerable<VectorRecord> records)
     {
         ArgumentNullException.ThrowIfNull(records);
