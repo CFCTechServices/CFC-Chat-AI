@@ -12,5 +12,7 @@ public static class EndpointExtensions
     {
         app.MapHealth();
         app.MapRuntimeConfiguration();
+        app.MapAuthSelfService();
+        app.MapProfile();
     }
 }

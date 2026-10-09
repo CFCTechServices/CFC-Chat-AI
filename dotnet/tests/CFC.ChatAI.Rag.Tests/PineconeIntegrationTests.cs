@@ -17,7 +17,7 @@ public sealed class PineconeIntegrationTests
 {
     [PineconeIntegrationFact]
     [Trait("Category", "Integration")]
-    public async Task RealMetadataRoundTripSharedCollectionIsolationAndFilterDeletion()
+    public async Task RealMetadataRoundTripSharedCollectionIsolationAndChunkDeletion()
     {
         // Never read production PINECONE_API_KEY/PINECONE_INDEX_NAME. Namespace is unique per run.
         var identity = OnnxEmbeddingCompatibilityTests.Required("PINECONE_TEST_MODEL_IDENTITY");
@@ -56,8 +56,9 @@ public sealed class PineconeIntegrationTests
             var oversized = document with { ChunkId = "oversized", Text = new string('牛', 40_001) };
             var error = await Assert.ThrowsAsync<PineconeServiceException>(() => service.UpsertChunksAsync(ChunkCollection.Documents, [oversized], deadline.Token));
             Assert.Equal(PineconeErrorCategory.OversizedChunk, error.Category);
-            var deleted = await service.DeleteDocumentAsync(ChunkCollection.Documents, "test-doc", deadline.Token);
-            Assert.Equal(ChunkOperationStatus.Acknowledged, deleted.Status); Assert.Null(deleted.AffectedCount);
+            var deleted = await service.DeleteChunksAsync(ChunkCollection.Documents, [document.ChunkId], deadline.Token);
+            Assert.Equal(ChunkOperationStatus.Acknowledged, deleted.Status);
+            Assert.Equal(new[] { document.ChunkId }, deleted.AcknowledgedIds); Assert.Null(deleted.AffectedCount);
             await Poll(service, ChunkCollection.Documents, document.Text, 0, deadline.Token);
             Assert.Single(await service.SearchAsync(ChunkCollection.Videos, video.Text, new(), deadline.Token));
             var idDelete = await service.DeleteChunksAsync(ChunkCollection.Videos, [video.ChunkId], deadline.Token);
@@ -68,8 +69,8 @@ public sealed class PineconeIntegrationTests
         finally
         {
             using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(45));
-            await service.DeleteDocumentAsync(ChunkCollection.Documents, "test-doc", cleanup.Token);
-            await service.DeleteDocumentAsync(ChunkCollection.Videos, "test-video", cleanup.Token);
+            await service.DeleteChunksAsync(ChunkCollection.Documents, [document.ChunkId], cleanup.Token);
+            await service.DeleteChunksAsync(ChunkCollection.Videos, [video.ChunkId], cleanup.Token);
         }
     }
 

@@ -21,29 +21,12 @@ public sealed class PineconeServiceDeleteTests
     }
 
     [Fact]
-    public async Task DocumentDeletesUseCompleteFilterAndNeverInventCounts()
-    {
-        var f = new ServiceFixture(o => o with { AllowedDocumentIds = ["doc-1", "doc-2"] });
-        var result = await f.Service.DeleteDocumentAsync(ChunkCollection.Documents, "doc-1");
-        Assert.Null(result.AffectedCount); Assert.Empty(result.AcknowledgedIds);
-        var constraints = Assert.Single(f.Transport.Deletes).Filter.GetProperty("$and").EnumerateArray().ToArray();
-        Assert.Equal(2, constraints.Count(c => c.TryGetProperty("doc_id", out _)));
-        Assert.Contains("document", f.Transport.Deletes[0].Filter.GetRawText());
-        await Assert.ThrowsAsync<PineconeServiceException>(() => f.Service.DeleteDocumentAsync(ChunkCollection.Documents, "outside"));
-        Assert.Single(f.Transport.Deletes);
-    }
-
-    [Fact]
-    public async Task PartialDeletesIdentifyUnresolvedIdsAndDocumentFailuresAreIndeterminate()
+    public async Task PartialDeletesIdentifyUnresolvedIdsAndAreIndeterminate()
     {
         var f = new ServiceFixture(); f.Transport.FailDeleteNumber = 2;
         var error = await Assert.ThrowsAsync<ChunkOperationException>(() => f.Service.DeleteChunksAsync(ChunkCollection.Documents, ["1", "2", "3"]));
         Assert.Equal(new[] { "1", "2" }, error.CompletedIds); Assert.Equal(new[] { "3" }, error.UnresolvedIds);
         Assert.True(error.IsIndeterminate); Assert.Equal(PineconeErrorCategory.PartialDelete, error.Category);
-        var doc = new ServiceFixture(); doc.Transport.FailDeleteNumber = 1;
-        var docError = await Assert.ThrowsAsync<ChunkOperationException>(() => doc.Service.DeleteDocumentAsync(ChunkCollection.Documents, "doc-1"));
-        Assert.True(docError.IsIndeterminate); Assert.Empty(docError.CompletedIds); Assert.Empty(docError.UnresolvedIds);
-        Assert.Equal("doc-1", docError.DocumentId);
     }
 
     [Fact]

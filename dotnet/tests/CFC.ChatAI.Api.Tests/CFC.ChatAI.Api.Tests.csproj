@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\CFC.ChatAI.Api\CFC.ChatAI.Api.csproj" />
+    <None Include="..\..\..\deployment\iis-web.config" Link="iis-web.config" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

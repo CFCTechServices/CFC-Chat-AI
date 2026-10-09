@@ -2,6 +2,8 @@ using System.Text.Json;
 using CFC.ChatAI.Api.Endpoints;
 using CFC.ChatAI.Api.Configuration;
 using CFC.ChatAI.Api.Services;
+using CFC.ChatAI.Api.Authentication;
+using CFC.ChatAI.Api.Infrastructure.Supabase;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration.AddProjectDotEnv(builder.Environment.ContentRootPath,
@@ -16,6 +18,9 @@ builder.Services.AddSingleton(new ApiInfo(
 
 builder.Services.AddSingleton(sp => RuntimeOptions.FromConfiguration(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<RuntimeDiagnostics>();
+builder.Services.AddSupabaseInfrastructure();
+builder.Services.AddSupabaseAuthentication();
+builder.Services.AddSelfServiceRateLimits(builder.Configuration);
 builder.Services.AddHttpClient(RuntimeDiagnostics.HttpClientName, client => client.Timeout = Timeout.InfiniteTimeSpan)
     .RedactLoggedHeaders(_ => true)
     .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
@@ -35,6 +40,9 @@ builder.Services.ConfigureHttpJsonOptions(o =>
 });
 
 var app = builder.Build();
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseRateLimiter();
 app.MapAllEndpoints(); // one line per route group lives inside EndpointExtensions
 app.Run();
 

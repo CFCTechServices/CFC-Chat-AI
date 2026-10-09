@@ -63,7 +63,7 @@ Before deploying `deployment/iis-web.config`:
 1. Ensure the repository `.env` is readable by the .NET service account, or set `DOTENV_PATH` to its location. Deployment environment variables can override file values.
 2. Verify all four routes directly on `http://127.0.0.1:5000`. With real credentials, compare Pinecone counts/namespaces and Supabase connectivity against Python. A fully configured detailed check should be `ok=true`.
 3. Publish/start the .NET host and apply the four exact GET-only `DotNet_*` IIS rules above the Python catch-all. No auth/health/visibility prefix is claimed wholesale.
-4. Repeat the checks through IIS, including existing Python-only routes such as `/api/profile/me`. Confirm query strings are preserved. On a dev VM, stopping .NET should yield 502 on migrated routes, proving proxy routing.
+4. Repeat the checks through IIS, including existing Python-only routes such as `/api/admin/users`. The configuration also contains the five auth/profile rules documented in [auth/profile migration](auth-profile.md); review those operational gates before applying the complete file. Confirm query strings are preserved. On a dev VM, stopping .NET should yield 502 on migrated routes, proving proxy routing.
 5. Roll back any route by setting its rule `enabled="false"`; requests then fall through to Python on port 8000. Keep Python implementations until the observation period ends.
 
 The rules in the repository are updated; applying them to a running IIS deployment and live-service validation are separate operational steps.

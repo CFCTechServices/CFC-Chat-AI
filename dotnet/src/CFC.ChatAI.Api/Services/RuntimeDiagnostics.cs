@@ -59,7 +59,7 @@ public sealed class RuntimeDiagnostics(IHttpClientFactory clients, RuntimeOption
             ["embedding_model"] = CheckEmbeddingAvailability()
         };
         var ok = services.Values.All(s => s.Status == "ok");
-        return new(ok, version, ok ? "All systems operational (C#)" : "One or more services degraded", services);
+        return new(ok, version, ok ? "All systems operational" : "One or more services degraded", services);
     }
 
     private ServiceStatus CheckEmbeddingAvailability()

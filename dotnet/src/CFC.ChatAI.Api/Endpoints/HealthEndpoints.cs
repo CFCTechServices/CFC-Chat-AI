@@ -12,7 +12,7 @@ public static class HealthEndpoints
         app.MapGet("/api/health", (ApiInfo info) =>
             new HealthResponse(
                 Ok: true,
-                Message: "CFC Animal Feed Software Chatbot API is running (C#)",
+                Message: "CFC Animal Feed Software Chatbot API is running",
                 Version: info.Version))
             .WithTags("health");
 
