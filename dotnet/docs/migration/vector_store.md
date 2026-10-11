@@ -71,3 +71,52 @@ which every chat question uses, is verified. Write operations remain untested.
 
 ## Findings outside this component
 - **Duplicate chunks in the index**
+
+## Text layer: TextVectorStore (10/11/2026)
+
+`PineconeVectorStore` takes vectors, the same as Python's `VectorStore`. `TextVectorStore` is a thin
+layer on top that takes **text**: it embeds with `IEmbeddingModel` (the ONNX model), then calls the
+vector store. Python has no single class for this. It does the same two steps inline:
+
+| Python (inline) | C# |
+|---|---|
+| `rag.py` `retrieve_context()`: `encode_query(query)` → `vector_store.query(...)` | `SearchAsync(query, topK, includeMetadata, filter)` |
+| `ingest.py` `_prepare_vectors()`: `encode(texts)` → `upsert_vectors(...)` | `UpsertAsync(IReadOnlyList<TextRecord>)` |
+| `delete_document(ids)` | `DeleteAsync(ids)` (pass-through) |
+
+- **Wire format unchanged:** same record IDs, metadata passed through as-is, text not copied into
+  metadata. Works against the existing production index with no re-ingest.
+- `SearchAsync` returns the **query vector** with the matches, because the feedback re-ranking
+  (`FeedbackService.get_query_aware_scores`) reuses it.
+- `UpsertAsync` embeds all texts in **one batch**, as Python does; the vector store still sends
+  them to Pinecone 100 at a time.
+- `IEmbeddingModel` and `IVectorStore` were added (implemented by `OnnxEmbeddingModel` and
+  `PineconeVectorStore`) so the layer can be unit-tested with fakes. Their public methods are unchanged.
+- `PineconeVectorStore` stays public for vector-level work (`TextVectorStore.Vectors`).
+
+**Tests:**
+- `TextVectorStoreTests`: wiring tests with fakes (no model, no network)
+- `TextVectorStoreParityTests`: the vector sent to Pinecone for each of the 15 reference questions
+  matches the vector Python queried with (cosine ≥ 0.9999). Offline; uses the real ONNX model.
+- Live: `dotnet run --project tools/CFC.ChatAI.Rag.VectorStoreCheck -- --text` runs the 15 questions
+  as text through `TextVectorStore` against the production index (read-only).
+  **Result (10/11/2026): 15 questions: 12 PASS, 3 TIE, 0 FAIL.** Scores within ±0.000001 of
+  Python's; all TIEs are reorderings within exact-tie groups (the same behavior as the vector replay).
+
+## Comparison with PineconeService (branch migration/first-migration-chunk)
+
+Brayden's `IPineconeService` is also text-in (whole chunks and query text). It is a bigger
+redesign, not a port, and **it is not compatible with the current production index**:
+
+| | PineconeVectorStore + TextVectorStore | PineconeService |
+|---|---|---|
+| Pinecone access | Official `Pinecone.Client` SDK | Hand-written HTTP transport |
+| Record IDs | Python's chunk IDs, unchanged | `document:<sha256(chunk_id)>`; records whose ID doesn't match are skipped |
+| Metadata | Python's minimal metadata; text stays in Supabase | New schema with full text plus `schema_version`, `model_identity`, `collection` |
+| Search filter | Caller's filter only | Always requires `schema_version`, `model_identity`, `collection` |
+| Production index today | Verified (15 questions: 10 PASS, 5 TIE, 0 FAIL) | Would return no results: existing records lack those fields. Its own doc says it needs a new index and a full re-ingest |
+| Hardening | Basic | Payload-size budgets, partial-write errors, retries, document-ID scope, health check, cancellation |
+
+Worth adopting from PineconeService later: separate document/video target configuration, a health
+check that actually hits the index, cancellation tokens, and its finding that Python writes video
+chunks to the document index while video retrieval reads the video index (needs confirming).

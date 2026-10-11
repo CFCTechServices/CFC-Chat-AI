@@ -21,7 +21,7 @@ public sealed record VectorMatch(string Id, float Score, Metadata? Metadata);
 /// C# port of app/core/vector_store.py. Wraps one pinecone index and an optional namespace
 /// create one instance per index (documents and videos use seperate indexes)
 /// </summary>
-public sealed class PineconeVectorStore
+public sealed class PineconeVectorStore : IVectorStore
 {
     private const int UPSERT_BATCH_SIZE = 100;
 
