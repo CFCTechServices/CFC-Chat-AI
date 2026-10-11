@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.30.0" />
+    <PackageReference Include="Pinecone.Client" Version="4.0.2" />
   </ItemGroup>
 
 </Project>

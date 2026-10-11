@@ -22,4 +22,9 @@
     <ProjectReference Include="..\..\src\CFC.ChatAI.Rag\CFC.ChatAI.Rag.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="TestData\**" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\models\**" LinkBase="models" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

@@ -112,12 +112,13 @@ Found during the bridge test and reported to the team and client:
 - Token debugging: `python tools\debug_tokens.py "any sentence"` prints Python's
   token IDs for comparison with `WordPieceTokenizer`
 - Pass threshold: cosine ≥ 0.9999
+- xUnit: `dotnet test` runs `EmbeddingParityTests` (13 parity cases + dimension, batch and ported feeback-threshold checks)
 
 ## Open items
-- [ ] Convert the harness check into xUnit tests (`EmbeddingParityTests.cs`)
+- [x] Convert the harness check into xUnit tests (`EmbeddingParityTests.cs`)
 - [ ] Pin the model download to a specific Hugging Face commit (not `main`);
       before deployment, host a copy CFC controls (e.g., Supabase storage)
 - [ ] Argument validation on public methods (CFC standards)
 - [ ] Align formatting with CFC Programming Standards (tabs, `ID` casing, constants)
 - [ ] Batch embedding with padding for faster ingestion (optimization)
-- [ ] Recommend index deduplication to the client (stretch goal)
+- [ ] Recommend index deduplication  (stretch goal)
