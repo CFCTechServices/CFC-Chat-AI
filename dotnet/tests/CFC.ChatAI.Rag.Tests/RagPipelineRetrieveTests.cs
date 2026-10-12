@@ -108,6 +108,24 @@ public class RagPipelineRetrieveTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => pipeline.RetrieveContextAsync("q"));
     }
 
+    [Fact]
+    public async Task Reranker_GetsChunksAndQueryVector_AndItsOrderIsReturned()
+    {
+        var matches = new[] { new VectorMatch("a", 0.9f, null), new VectorMatch("b", 0.8f, null), new VectorMatch("c", 0.7f, null) };
+        var reranker = new ReversingReranker();
+        var pipeline = new RagPipeline(
+            new TextVectorStore(new FakeEmbedder(), new FakeVectorStore(matches)),
+            new FakeChunkRepository(),
+            reranker);
+
+        var chunks = await pipeline.RetrieveContextAsync("q");
+
+        Assert.Equal(new[] { "c", "b", "a" }, chunks.Select(c => c.ChunkId));   // reranker's order wins
+        Assert.Equal(new[] { 1, 2, 3 }, chunks.Select(c => c.Rank));             // ranks renumbered
+        Assert.Equal(new[] { 1f, 0f }, reranker.ReceivedVector);                 // same vector Pinecone used
+    }
+
+
     // ---- fakes ----
 
     private sealed class FakeEmbedder : IEmbeddingModel
@@ -135,5 +153,20 @@ public class RagPipelineRetrieveTests
             throwError
                 ? throw new HttpRequestException("Supabase down")
                 : Task.FromResult<IReadOnlyDictionary<string, ChunkRow>>((rows ?? []).ToDictionary(r => r.ChunkId));
+    }
+        /// <summary>Stand-in for the future feedback reranker: reverses the order and renumbers ranks.</summary>
+    private sealed class ReversingReranker : IFeedbackReranker
+    {
+        public float[]? ReceivedVector { get; private set; }
+
+        public Task<IReadOnlyList<ContextChunk>> RerankAsync(
+            IReadOnlyList<ContextChunk> chunks, float[] queryVector, CancellationToken cancellationToken = default)
+        {
+            ReceivedVector = queryVector;
+            IReadOnlyList<ContextChunk> reversed = Enumerable.Reverse(chunks)
+                .Select((chunk, i) => chunk with { Rank = i + 1 })
+                .ToList();
+            return Task.FromResult(reversed);
+        }
     }
 }

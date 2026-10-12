@@ -17,14 +17,16 @@ public sealed class RagPipeline
     private readonly TextVectorStore _textStore;
     private readonly IChunkRepository _chunks;
     private readonly ILogger<RagPipeline> _logger;
+    private readonly IFeedbackReranker _reranker;
 
-    public RagPipeline(TextVectorStore textStore, IChunkRepository chunks, ILogger<RagPipeline>? logger = null)
+    public RagPipeline(TextVectorStore textStore, IChunkRepository chunks, IFeedbackReranker? reranker = null, ILogger<RagPipeline>? logger = null)
     {
         ArgumentNullException.ThrowIfNull(textStore);
         ArgumentNullException.ThrowIfNull(chunks);
 
         _textStore = textStore;
         _chunks = chunks;
+        _reranker = reranker ?? NoOpFeedbackReranker.Instance;
         _logger = logger ?? NullLogger<RagPipeline>.Instance;
     }
 
@@ -55,8 +57,8 @@ public sealed class RagPipeline
                 chunks.Add(Merge(i + 1, match, row));
             }
 
-            // Step 5: feedback re-ranking goes here (it will use search.QueryVector).
-            return chunks;
+            // 4) Feedback re-ranking (a no-op unless a real reranker was passed in).
+            return await _reranker.RerankAsync(chunks, search.QueryVector, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
