@@ -8,7 +8,7 @@ namespace CFC.ChatAI.Rag;
 /// Mirrors sentence-transformers: BERT tokenize -> transformer -> mean pooling -> L2 normalization.
 /// </summary>
 
-public sealed class OnnxEmbeddingModel : IDisposable
+public sealed class OnnxEmbeddingModel : IEmbeddingModel, IDisposable
 {
     public const int Dimension = 384;
     private const int MaxTokens = 256; // models max sequence length
