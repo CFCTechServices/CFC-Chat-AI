@@ -24,6 +24,10 @@ internal sealed class SupabaseIdentityGateway(SupabaseTransport transport) : IId
         {
             return null;
         }
+        catch (SupabaseRequestException)
+        {
+            throw new CFC.ChatAI.Supabase.Common.DependencyFailureException("Supabase", "HTTP request");
+        }
     }
 
     public async Task RequestPasswordRecoveryAsync(

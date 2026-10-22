@@ -180,19 +180,23 @@ public class TextVectorStoreParityTests : IClassFixture<EmbeddingModelFixture>
     public static IEnumerable<object[]> Questions() =>
         LoadReferences().Select(r => new object[] { r.Question });
 
-    private static List<RetrievalReference> LoadReferences() =>
-        JsonSerializer.Deserialize<List<RetrievalReference>>(
-            File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "TestData", "retrieval_reference.json")),
+    private static List<RetrievalReference> LoadReferences()
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, "TestData", "retrieval_reference.json");
+        if (!File.Exists(path)) return [];
+        return JsonSerializer.Deserialize<List<RetrievalReference>>(
+            File.ReadAllText(path),
             new JsonSerializerOptions { PropertyNameCaseInsensitive = true, PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower })!;
+    }
 
-    [Theory]
+    [RequiresEmbeddingModelTheory]
     [MemberData(nameof(Questions))]
     public async Task SearchAsync_SendsSameQueryVectorAsPython(string question)
     {
         var expected = LoadReferences().Single(r => r.Question == question).QueryVector;
         var store = new RecordingStore();
 
-        var result = await new TextVectorStore(_fixture.Model, store).SearchAsync(question, topK: 5);
+        var result = await new TextVectorStore(_fixture.Model!, store).SearchAsync(question, topK: 5);
 
         Assert.Equal(expected.Length, store.LastVector!.Length);
         Assert.True(Cosine(expected, store.LastVector) >= MIN_COSINE,

@@ -20,7 +20,7 @@ public sealed class PineconeServiceTests
         Assert.Same(vectors.LastQueryVector, result.QueryVector);
         Assert.Equal("match-1", Assert.Single(result.Matches).Id);
         Assert.Equal(new[] { "test query" }, embedder.QueryCalls);
-        Assert.Equal("document", vectors.LastFilter!["kind"].ToString());
+        Assert.Equal("document", JsonSerializer.Deserialize<string>(vectors.LastFilter!["kind"].ToString()));
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public sealed class PineconeServiceTests
         Assert.Equal(2, count);
         Assert.Equal(new[] { "first", "second" }, embedder.BatchTexts);
         Assert.Equal(new[] { "chunk-1", "chunk-2" }, vectors.Upserted!.Select(v => v.Id));
-        Assert.Equal("upload", vectors.Upserted[0].Metadata!["source"].ToString());
+        Assert.Equal("upload", JsonSerializer.Deserialize<string>(vectors.Upserted[0].Metadata!["source"].ToString()));
     }
 
     [Fact]

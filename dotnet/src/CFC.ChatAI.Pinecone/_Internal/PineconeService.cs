@@ -118,9 +118,22 @@ internal sealed class PineconeService : IPineconeService
         if (values is null) return null;
         var sdkMetadata = new Metadata();
         foreach (var pair in values)
-            sdkMetadata[pair.Key] = pair.Value!;
+            sdkMetadata[pair.Key] = ToSdkValue(pair.Value);
         return sdkMetadata;
     }
+
+    private static MetadataValue ToSdkValue(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.String => value.GetString()!,
+        JsonValueKind.Number when value.TryGetInt64(out var integer) => integer,
+        JsonValueKind.Number => value.GetDouble(),
+        JsonValueKind.True => true,
+        JsonValueKind.False => false,
+        JsonValueKind.Array => value.EnumerateArray().Select(item => item.GetString()!).ToArray(),
+        JsonValueKind.Object => ToSdkMetadata(value.EnumerateObject()
+            .ToDictionary(property => property.Name, property => property.Value, StringComparer.Ordinal))!,
+        _ => throw new ArgumentException($"Unsupported Pinecone metadata value: {value.ValueKind}.", nameof(value)),
+    };
 
     private static object? ReadProperty(object instance, string name) =>
         instance.GetType().GetProperty(name, BindingFlags.Instance | BindingFlags.Public)?.GetValue(instance);
