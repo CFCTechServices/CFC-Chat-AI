@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text;
 
-namespace CFC.ChatAI.Rag;
+namespace CFC.ChatAI.Pinecone.Internal;
 
 /// <summary>
 /// Exact port of Hugging Face's uncased BERT tokenizer
@@ -9,7 +9,7 @@ namespace CFC.ChatAI.Rag;
 /// Replaces Microsoft.ML.Tokenizers, which drops symbols such as '°' instead of
 /// word-piecing them the way Hugging Face does.
 /// </summary>
-public sealed class WordPieceTokenizer
+internal sealed class WordPieceTokenizer
 {
     private const int MaxCharsPerWord = 100;
     private readonly Dictionary<string, int> _vocab = new(StringComparer.Ordinal);

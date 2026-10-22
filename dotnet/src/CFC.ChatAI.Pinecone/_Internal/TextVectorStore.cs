@@ -1,15 +1,15 @@
 using Pinecone;
 
-namespace CFC.ChatAI.Rag;
+namespace CFC.ChatAI.Pinecone.Internal;
 
 /// <summary>A chunk to store by its text: the text is embedded and stored under <paramref name="Id"/>.</summary>
-public sealed record TextRecord(string Id, string Text, Metadata? Metadata = null);
+internal sealed record TextRecord(string Id, string Text, Metadata? Metadata = null);
 
 /// <summary>
 /// Search results plus the query's embedding. The vector is returned because the feedback
 /// re-ranking (FeedbackService.get_query_aware_scores in Python) reuses the same query vector.
 /// </summary>
-public sealed record TextSearchResult(float[] QueryVector, IReadOnlyList<VectorMatch> Matches);
+internal sealed record TextSearchResult(float[] QueryVector, IReadOnlyList<VectorMatch> Matches);
 
 /// <summary>
 /// Thin text-in layer over <see cref="IVectorStore"/>: embeds with <see cref="IEmbeddingModel"/>,
@@ -22,7 +22,7 @@ public sealed record TextSearchResult(float[] QueryVector, IReadOnlyList<VectorM
 /// copied into metadata (Python stores minimal metadata; full text lives in Supabase document_chunks).
 /// That keeps it compatible with the existing production index, with no re-ingest.
 /// </summary>
-public sealed class TextVectorStore
+internal sealed class TextVectorStore
 {
     private readonly IEmbeddingModel _embedder;
     private readonly IVectorStore _store;

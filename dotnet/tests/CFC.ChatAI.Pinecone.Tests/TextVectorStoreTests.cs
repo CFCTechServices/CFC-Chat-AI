@@ -1,8 +1,8 @@
 using System.Text.Json;
-using CFC.ChatAI.Rag;
+using CFC.ChatAI.Pinecone.Internal;
 using Pinecone;
 
-namespace CFC.ChatAI.Rag.Tests;
+namespace CFC.ChatAI.Pinecone.Tests;
 
 /// <summary>
 /// Unit tests for the text-in layer, using fakes (no model, no network).

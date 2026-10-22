@@ -23,6 +23,6 @@ Conventions:
 
 ## Adding tests for a newly ported component
 1. Write a Python script in `tools/` that records the Python component's outputs
-2. Save them to `tests/CFC.ChatAI.Rag.Tests/TestData/`
+2. Save them to `tests/CFC.ChatAI.Pinecone.Tests/TestData/`
 3. Write a C# test class that compares the port against that file
 4. Document it in the component's `docs/migration/*.md` under "How it's tested"

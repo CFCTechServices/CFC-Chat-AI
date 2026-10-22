@@ -1,34 +1,29 @@
-using System.Data.Common;
-using System.Numerics;
-using System.Reflection.Metadata;
-using System.Reflection.Metadata.Ecma335;
-using System.Windows.Markup;
 using Pinecone;
 /// <summary> Alias for Pinecone.Vector to simplify usage. </summary>
 using Vector = Pinecone.Vector;
 
 
-namespace CFC.ChatAI.Rag;
+namespace CFC.ChatAI.Pinecone.Internal;
 
 
 /// <summary>A vector to store: chunk ID, embedding values, and optional metadata.</summary>
-public sealed record VectorRecord(string Id, float[] Values, Metadata? Metadata = null);
+internal sealed record VectorRecord(string Id, float[] Values, Metadata? Metadata = null);
 
 /// <summary> A search result: chunk ID, similarity score, and stored metadata </summary>
-public sealed record VectorMatch(string Id, float Score, Metadata? Metadata);
+internal sealed record VectorMatch(string Id, float Score, Metadata? Metadata);
 
 /// <summary>
 /// C# port of app/core/vector_store.py. Wraps one pinecone index and an optional namespace
 /// create one instance per index (documents and videos use seperate indexes)
 /// </summary>
-public sealed class PineconeVectorStore : IVectorStore
+internal sealed class PineconeVectorStore : IVectorStore
 {
     private const int UPSERT_BATCH_SIZE = 100;
 
     private readonly PineconeClient _client;
     private readonly string _indexName;
     private readonly string? _namespace;
-    private IndexClient? _index;
+    private readonly Lazy<IndexClient> _index;
 
     public PineconeVectorStore(string apiKey, string indexName, string? indexNamespace = null)
     {
@@ -38,10 +33,11 @@ public sealed class PineconeVectorStore : IVectorStore
         _client = new PineconeClient(apiKey);
         _indexName = indexName;
         _namespace = string.IsNullOrWhiteSpace(indexNamespace) ? null : indexNamespace;
+        _index = new Lazy<IndexClient>(() => _client.Index(_indexName));
     }
 
     /// <summary> Index handle created on the first use (matches Python's lazy property). </summary>
-    private IndexClient Index => _index ??= _client.Index(_indexName);
+    private IndexClient Index => _index.Value;
 
     /// <summary>Equivalent of Python query(): the topK most similar vectors.</summary>
     public async Task<IReadOnlyList<VectorMatch>> QueryAsync(

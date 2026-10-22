@@ -1,7 +1,7 @@
 using System.Text.Json;
-using CFC.ChatAI.Rag;
+using CFC.ChatAI.Pinecone.Internal;
 
-namespace CFC.ChatAI.Rag.Tests;
+namespace CFC.ChatAI.Pinecone.Tests;
 
 /// <summary>
 /// Loads the ONNX model and python reference embeddings once, shared by every test in the class

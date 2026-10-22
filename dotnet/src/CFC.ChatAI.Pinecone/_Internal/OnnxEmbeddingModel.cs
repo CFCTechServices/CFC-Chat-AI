@@ -1,14 +1,14 @@
 using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 
-namespace CFC.ChatAI.Rag;
+namespace CFC.ChatAI.Pinecone.Internal;
 
 /// <summary>
 /// C# port of app/core/embeddings.py: all-MiniLM-L6-v2 run via ONNX Runtime.
 /// Mirrors sentence-transformers: BERT tokenize -> transformer -> mean pooling -> L2 normalization.
 /// </summary>
 
-public sealed class OnnxEmbeddingModel : IEmbeddingModel, IDisposable
+internal sealed class OnnxEmbeddingModel : IEmbeddingModel, IDisposable
 {
     public const int Dimension = 384;
     private const int MaxTokens = 256; // models max sequence length

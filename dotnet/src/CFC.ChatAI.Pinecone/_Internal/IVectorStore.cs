@@ -1,12 +1,12 @@
 using Pinecone;
 
-namespace CFC.ChatAI.Rag;
+namespace CFC.ChatAI.Pinecone.Internal;
 
 /// <summary>
 /// Vector-level operations on one index/namespace. Implemented by <see cref="PineconeVectorStore"/>.
 /// Exists so callers such as <see cref="TextVectorStore"/> can be unit-tested with a fake.
 /// </summary>
-public interface IVectorStore
+internal interface IVectorStore
 {
     Task<IReadOnlyList<VectorMatch>> QueryAsync(
         float[] vector, int topK = 5, bool includeMetadata = true, Metadata? filter = null);

@@ -19,7 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\CFC.ChatAI.Rag\CFC.ChatAI.Rag.csproj" />
+    <ProjectReference Include="..\..\src\CFC.ChatAI.Pinecone\CFC.ChatAI.Pinecone.csproj" />
   </ItemGroup>
 
   <ItemGroup>
