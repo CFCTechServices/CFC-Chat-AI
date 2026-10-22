@@ -1,4 +1,6 @@
-namespace CFC.ChatAI.Pinecone;
+using System.Text.Json;
+
+namespace CFC.ChatAI.Pinecone.Contracts;
 
 /// <summary>Application-facing text and record operations for a configured Pinecone index.</summary>
 public interface IPineconeService
@@ -8,7 +10,7 @@ public interface IPineconeService
         string query,
         int topK = 5,
         bool includeMetadata = true,
-        IReadOnlyDictionary<string, System.Text.Json.JsonElement>? filter = null,
+        IReadOnlyDictionary<string, JsonElement>? filter = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>Embeds and upserts text records, returning the number written.</summary>

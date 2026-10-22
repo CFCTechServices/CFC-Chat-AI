@@ -1,3 +1,4 @@
+using CFC.ChatAI.Pinecone.Contracts;
 using CFC.ChatAI.Pinecone.Internal;
 using Microsoft.Extensions.DependencyInjection;
 

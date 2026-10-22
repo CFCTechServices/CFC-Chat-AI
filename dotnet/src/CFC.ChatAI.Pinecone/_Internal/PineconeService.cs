@@ -1,6 +1,6 @@
 using System.Reflection;
 using System.Text.Json;
-using CFC.ChatAI.Pinecone;
+using CFC.ChatAI.Pinecone.Contracts;
 using Pinecone;
 
 namespace CFC.ChatAI.Pinecone.Internal;

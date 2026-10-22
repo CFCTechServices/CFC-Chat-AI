@@ -1,5 +1,5 @@
 using System.Text.Json;
-using CFC.ChatAI.Pinecone;
+using CFC.ChatAI.Pinecone.Contracts;
 using CFC.ChatAI.Pinecone.Internal;
 using Pinecone;
 
