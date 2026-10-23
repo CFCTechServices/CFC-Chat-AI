@@ -11,6 +11,12 @@ public interface IFeedbackRepository
         FeedbackSubmission submission,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Returns this user's non-null ratings for the supplied message IDs; absent/null ratings are omitted.</summary>
+    Task<IReadOnlyDictionary<string, int>> GetUserScoresForMessagesAsync(
+        string userId,
+        IReadOnlyList<string> messageIds,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Missing feedback rows are omitted and therefore have an implicit score of zero.</summary>
     Task<IReadOnlyDictionary<string, int>> GetGlobalScoresAsync(
         IReadOnlyList<string> chunkIds,

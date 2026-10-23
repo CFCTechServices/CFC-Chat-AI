@@ -1,8 +1,11 @@
 using CFC.ChatAI.Supabase.Chunks;
+using CFC.ChatAI.Supabase.Conversations;
 using CFC.ChatAI.Supabase.Feedback;
 using CFC.ChatAI.Supabase.Identity;
+using CFC.ChatAI.Supabase.Invitations;
 using CFC.ChatAI.Supabase.Storage;
 using CFC.ChatAI.Supabase.Internal;
+using CFC.ChatAI.Supabase.Profiles;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace CFC.ChatAI.Supabase;
@@ -30,8 +33,16 @@ public static class DependencyInjection
             new SupabaseIdentityGateway(serviceProvider.GetRequiredService<SupabaseTransport>()));
         services.AddSingleton<IAdminIdentityGateway>(serviceProvider =>
             new SupabaseAdminIdentityGateway(serviceProvider.GetRequiredService<SupabaseTransport>()));
+        services.AddSingleton<IUserProfileRepository>(serviceProvider =>
+            new SupabaseUserProfileRepository(serviceProvider.GetRequiredService<SupabaseTransport>()));
+        services.AddSingleton<IAdminProfileRepository>(serviceProvider =>
+            new SupabaseAdminProfileRepository(serviceProvider.GetRequiredService<SupabaseTransport>()));
+        services.AddSingleton<IInvitationRepository>(serviceProvider =>
+            new SupabaseInvitationRepository(serviceProvider.GetRequiredService<SupabaseTransport>()));
         services.AddSingleton<IChunkRepository>(serviceProvider =>
             new SupabaseChunkRepository(serviceProvider.GetRequiredService<SupabaseTransport>()));
+        services.AddSingleton<IConversationRepository>(serviceProvider =>
+            new SupabaseConversationRepository(serviceProvider.GetRequiredService<SupabaseTransport>()));
         services.AddSingleton<IFeedbackRepository>(serviceProvider =>
             new SupabaseFeedbackRepository(serviceProvider.GetRequiredService<SupabaseTransport>()));
         services.AddSingleton<IObjectStorage>(serviceProvider =>

@@ -8,6 +8,7 @@ namespace CFC.ChatAI.Supabase.Internal;
 internal sealed class SupabaseObjectStorage(SupabaseTransport transport, SupabaseOptions options) : IObjectStorage
 {
     private const int DeleteBatchSize = 100;
+    private static readonly TimeSpan MaximumSignedUrlLifetime = TimeSpan.FromHours(1);
 
     public async Task<StoredObject> UploadAsync(
         ObjectKey key,
@@ -129,18 +130,25 @@ internal sealed class SupabaseObjectStorage(SupabaseTransport transport, Supabas
         CancellationToken cancellationToken = default)
     {
         ValidateKey(key);
-        if (lifetime <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(lifetime));
+        if (lifetime <= TimeSpan.Zero || lifetime > MaximumSignedUrlLifetime)
+            throw new ArgumentOutOfRangeException(nameof(lifetime), "Signed URL lifetime must be positive and no more than one hour.");
         var seconds = checked((long)Math.Ceiling(lifetime.TotalSeconds));
         var uri = ObjectUri("object/sign", GetBucket(key.Area), key.Path);
         using var request = SupabaseTransport.JsonRequest(HttpMethod.Post, uri, new { expiresIn = seconds });
         using var response = await transport.SendServiceAsync(request, cancellationToken).ConfigureAwait(false);
         var result = await SupabaseTransport.ReadJsonAsync<SignedUrlResponse>(response, cancellationToken)
             .ConfigureAwait(false);
-        var signedUrl = result.SignedUrl ?? result.SignedURL;
+        var signedUrl = result.SignedUrl;
+        if (string.IsNullOrWhiteSpace(signedUrl) && result.AdditionalData is not null &&
+            result.AdditionalData.TryGetValue("signedURL", out var alternate) && alternate.ValueKind == System.Text.Json.JsonValueKind.String)
+            signedUrl = alternate.GetString();
         if (string.IsNullOrWhiteSpace(signedUrl))
             throw new InvalidDataException("Supabase did not return a signed URL.");
         if (Uri.TryCreate(signedUrl, UriKind.Absolute, out var absolute)) return absolute;
-        return new Uri(new Uri(options.Url.TrimEnd('/') + "/"), signedUrl.TrimStart('/'));
+        var relativePath = signedUrl.TrimStart('/');
+        return relativePath.StartsWith("storage/v1/", StringComparison.Ordinal)
+            ? new Uri(new Uri(options.Url.TrimEnd('/') + "/"), relativePath)
+            : transport.StorageUri(relativePath);
     }
 
     public Uri GetPublicUrl(ObjectKey key)
@@ -197,7 +205,7 @@ internal sealed class SupabaseObjectStorage(SupabaseTransport transport, Supabas
     private sealed class SignedUrlResponse
     {
         [JsonPropertyName("signedUrl")] public string? SignedUrl { get; init; }
-        [JsonPropertyName("signedURL")] public string? SignedURL { get; init; }
+        [JsonExtensionData] public Dictionary<string, System.Text.Json.JsonElement>? AdditionalData { get; init; }
     }
 
     private sealed class BorrowedStream(Stream inner) : Stream

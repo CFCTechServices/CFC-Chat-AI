@@ -17,6 +17,19 @@ public interface IChunkRepository
         PageRequest page,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Returns null when the document has no persisted chunk rows.</summary>
+    Task<DocumentMetadata?> GetDocumentMetadataAsync(
+        string documentId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Lists summaries in stable source-then-document-ID order. This scans bounded pages of chunk rows and
+    /// aggregates them client-side; it does not use a database view or imply snapshot isolation.
+    /// </summary>
+    Task<Page<DocumentSummary>> ListDocumentSummariesAsync(
+        PageRequest page,
+        CancellationToken cancellationToken = default);
+
     Task DeleteByIdsAsync(
         IReadOnlyList<string> chunkIds,
         CancellationToken cancellationToken = default);

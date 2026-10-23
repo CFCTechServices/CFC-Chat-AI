@@ -25,9 +25,9 @@ The current adapters are stateless and do not use Pinecone. Preserve those bound
 2. **No cross-provider workflows in adapters.** Do not add methods such as `DeleteDocumentEverywhere`, `SearchAndHydrate`, or `IngestAndStore`. Those workflows belong above the Supabase and Pinecone adapters.
 3. **No provider-wide service locator.** Add focused contracts and inject the required one(s); do not expose a broad `ISupabaseService` root.
 4. **No shared mutable user session.** User access tokens must be supplied/scoped per request. Never change authorization state on a singleton HTTP client or adapter.
-5. **Least privilege.** User-scoped operations use the caller's access token and anon key so RLS remains effective. Service-role operations are distinct privileged capabilities and must only be used by trusted application workflows after authorization.
+5. **Least privilege.** User-scoped operations use the caller's access token and anon key so RLS remains effective. RLS filters rows, not columns: review SQL grants as well as policy expressions, and do not assume an adapter field allow-list protects direct PostgREST callers. Service-role operations are distinct privileged capabilities and must only be used by trusted application workflows after authorization.
 6. **Do not move business policy into repositories.** Repositories do not decide if an invitation is expired, whether a user may change a role, or whether an account is eligible. They expose focused persistence operations; application services enforce policy.
-7. **Preserve deployed behavior.** Verify schemas, RLS policies, grants, RPC signatures, foreign keys, and Storage paths before relying on them. Do not infer atomicity or cascade behavior from endpoint comments.
+7. **Preserve deployed behavior.** Verify schemas, RLS policies, grants, RPC signatures, foreign keys, and Storage paths before relying on them. Do not infer atomicity or cascade behavior from endpoint comments. Supplied profile exports currently show a security blocker: `authenticated` has effective INSERT/UPDATE privileges on every `profiles` column, while self-row policies only constrain `id`. Do not enable production self-service profile writes until database-side column restrictions are reviewed and tested.
 8. **Typed, bounded, async operations.** Use application-owned DTOs, pagination, cancellation, explicit not-found semantics, and sanitized provider failures. Do not expose Supabase HTTP/wire response types.
 
 ## Planned capabilities
@@ -138,11 +138,12 @@ Keep recursive traversal and document lifecycle coordination in an application w
 ### Phase 0 — Contract and database reconnaissance
 
 1. Inventory the active routes in `main.py` and cross-check `local/csharp-endpoint-migration-chunks.md`.
-2. Capture actual table columns, constraints, indexes, RLS policies, grants, foreign keys/cascades, RPC definitions, and Storage policies/path examples from the target Supabase project.
+2. Capture actual table columns, constraints, indexes, RLS policies, grants, foreign keys/cascades, RPC definitions, and Storage policies/path examples from the target Supabase project. Sanitized profile exports have been supplied; confirm their project identity and inspect effective/table/column ACLs and any profile-creation trigger.
 3. Record for every operation whether Python currently uses a user token, anon key, or service-role key. Mark intentional deviations and decide whether .NET preserves them or deliberately changes them.
 4. Write contract DTOs and expected absence/conflict/failure semantics before implementing HTTP calls.
+5. Resolve the known profile write escalation: restrict user writes to intended fields at the database permission/trigger boundary, preserve service-role admin operations, and verify with direct authenticated PostgREST negative tests.
 
-**Exit criteria:** reviewed endpoint-to-operation matrix; no undocumented schema assumptions; user-vs-service-role behavior is decided.
+**Exit criteria:** reviewed endpoint-to-operation matrix; no undocumented schema assumptions; user-vs-service-role behavior is decided; profile self-service cannot write privileged columns through the database API.
 
 ### Phase 1 — Transport and security foundation
 
@@ -156,11 +157,11 @@ Keep recursive traversal and document lifecycle coordination in an application w
 ### Phase 2 — Profiles and account reads
 
 1. Add user-profile and admin-profile contracts/DTOs and internal adapters.
-2. Implement self-read/self-update with only allowed columns and user-scoped credentials.
+2. Implement self-read/self-update with only allowed columns and user-scoped credentials. The adapter allow-list is defense-in-depth; database ACLs/policies must also prevent direct clients from setting privileged columns.
 3. Implement admin list/read/update operations with service-role credentials and bounded pagination.
-4. Add tests for missing profiles, empty updates, forbidden self-service fields, paging, and sanitized database errors.
+4. Add tests for missing profiles, empty updates, forbidden self-service fields, paging, and sanitized database errors. Integration tests must also prove direct user-token requests cannot change `role`, `status`, `deleted_at`, or `deleted_by`, or insert a profile with privileged values.
 
-**Exit criteria:** profile endpoints and authentication/authorization profile lookups have persistence coverage without merging token validation and profile policy.
+**Exit criteria:** profile endpoints and authentication/authorization profile lookups have persistence coverage without merging token validation and profile policy; database-level self-service write restrictions are verified while service-role admin operations continue to work.
 
 ### Phase 3 — Invitations
 
@@ -233,6 +234,7 @@ The Supabase module is a solid base when:
 - All planned operations are exposed through small typed contracts and internal Supabase-only implementations.
 - All routes that require Supabase persistence can be implemented without direct Supabase SDK/REST calls in endpoints or application services.
 - User-scoped and privileged calls are separated and tested; no token/session state is shared across requests.
+- Database grants and RLS jointly enforce profile least privilege; user-token integration tests reject privileged profile writes and service-role admin integration tests pass.
 - Existing chunk, feedback, identity, and Storage behavior remains covered and documented.
 - Database/RLS/RPC/Storage assumptions are verified against the deployment target.
 - The project and its tests have no dependency or runtime call path to Pinecone, embedding/model services, or any other external provider.

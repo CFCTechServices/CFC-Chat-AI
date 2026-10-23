@@ -1,0 +1,4 @@
+policyname,roles,cmd,qual,with_check
+Users can insert own profile on signup,{public},INSERT,null,(auth.uid() = id)
+Users can update own profile,{public},UPDATE,(auth.uid() = id),(auth.uid() = id)
+Users can view own profile,{public},SELECT,((auth.uid() = id) AND (deleted_at IS NULL)),null

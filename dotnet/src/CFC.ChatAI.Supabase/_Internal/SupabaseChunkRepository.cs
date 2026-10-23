@@ -74,6 +74,68 @@ internal sealed class SupabaseChunkRepository(SupabaseTransport transport) : ICh
         return new ChunkIdPage(rows.Select(row => row.ChunkId).ToArray(), rows.Count == page.Limit);
     }
 
+    public async Task<DocumentMetadata?> GetDocumentMetadataAsync(
+        string documentId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(documentId);
+        var metadata = new DocumentMetadataAccumulator();
+        await foreach (var row in ReadDocumentRowsAsync(documentId, cancellationToken).ConfigureAwait(false))
+            metadata.Add(documentId, row);
+        return metadata.ChunkCount == 0 ? null : metadata.ToMetadata(documentId);
+    }
+
+    public async Task<Page<DocumentSummary>> ListDocumentSummariesAsync(
+        PageRequest page,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(page);
+        var documents = new SortedDictionary<string, DocumentMetadataAccumulator>(StringComparer.Ordinal);
+        await foreach (var row in ReadDocumentRowsAsync(documentId: null, cancellationToken).ConfigureAwait(false))
+        {
+            if (!documents.TryGetValue(row.DocumentId, out var aggregate))
+            {
+                aggregate = new DocumentMetadataAccumulator();
+                documents.Add(row.DocumentId, aggregate);
+            }
+            aggregate.Add(row.DocumentId, row);
+        }
+
+        var summaries = documents
+            .Select(pair => pair.Value.ToSummary(pair.Key))
+            .OrderBy(summary => summary.Source ?? string.Empty, StringComparer.Ordinal)
+            .ThenBy(summary => summary.DocumentId, StringComparer.Ordinal)
+            .Skip(page.Offset)
+            .Take(page.Limit + 1)
+            .ToArray();
+        var hasMore = summaries.Length > page.Limit;
+        if (hasMore) Array.Resize(ref summaries, page.Limit);
+        return new Page<DocumentSummary>(summaries, hasMore);
+    }
+
+    private async IAsyncEnumerable<DocumentSourceRow> ReadDocumentRowsAsync(
+        string? documentId,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        const int scanPageSize = PageRequest.MaximumPageSize;
+        var offset = 0;
+        while (true)
+        {
+            var filter = documentId is null
+                ? string.Empty
+                : $"&doc_id=eq.{SupabaseTransport.Escape(documentId)}";
+            var query = $"{Table}?select=doc_id,source,source_type{filter}" +
+                        $"&order=doc_id.asc,chunk_id.asc&offset={offset}&limit={scanPageSize}";
+            using var request = SupabaseTransport.Request(HttpMethod.Get, transport.RestUri(query));
+            using var response = await transport.SendServiceAsync(request, cancellationToken).ConfigureAwait(false);
+            var rows = await SupabaseTransport.ReadJsonAsync<List<DocumentSourceRow>>(response, cancellationToken)
+                .ConfigureAwait(false);
+            foreach (var row in rows) yield return row;
+            if (rows.Count < scanPageSize) yield break;
+            offset = checked(offset + scanPageSize);
+        }
+    }
+
     public async Task DeleteByIdsAsync(
         IReadOnlyList<string> chunkIds,
         CancellationToken cancellationToken = default)
@@ -94,6 +156,41 @@ internal sealed class SupabaseChunkRepository(SupabaseTransport transport) : ICh
         var quoted = string.Join(',', values.Select(value =>
             $"\"{value.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal)}\""));
         return SupabaseTransport.Escape($"in.({quoted})");
+    }
+
+    private sealed class DocumentSourceRow
+    {
+        [JsonPropertyName("doc_id")] public string DocumentId { get; init; } = string.Empty;
+        [JsonPropertyName("source")] public string? Source { get; init; }
+        [JsonPropertyName("source_type")] public string? SourceType { get; init; }
+    }
+
+    private sealed class DocumentMetadataAccumulator
+    {
+        private string? source;
+        private string? sourceType;
+
+        internal int ChunkCount { get; private set; }
+
+        internal void Add(string documentId, DocumentSourceRow row)
+        {
+            ChunkCount = checked(ChunkCount + 1);
+            source = Merge(documentId, source, row.Source);
+            sourceType = Merge(documentId, sourceType, row.SourceType);
+        }
+
+        internal DocumentMetadata ToMetadata(string documentId) => new(documentId, source, sourceType);
+
+        internal DocumentSummary ToSummary(string documentId) =>
+            new(documentId, source, sourceType, ChunkCount);
+
+        private static string? Merge(string documentId, string? current, string? next)
+        {
+            if (string.IsNullOrWhiteSpace(next)) return current;
+            if (current is not null && !string.Equals(current, next, StringComparison.Ordinal))
+                throw new DocumentMetadataInconsistencyException(documentId);
+            return next;
+        }
     }
 
     private sealed class ChunkIdRow

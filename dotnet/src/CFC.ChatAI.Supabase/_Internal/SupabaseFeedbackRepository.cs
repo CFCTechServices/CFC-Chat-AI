@@ -27,6 +27,35 @@ internal sealed class SupabaseFeedbackRepository(SupabaseTransport transport) : 
         using var response = await transport.SendServiceAsync(request, cancellationToken).ConfigureAwait(false);
     }
 
+    public async Task<IReadOnlyDictionary<string, int>> GetUserScoresForMessagesAsync(
+        string userId,
+        IReadOnlyList<string> messageIds,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+        ArgumentNullException.ThrowIfNull(messageIds);
+        if (messageIds.Count > 1000)
+            throw new ArgumentOutOfRangeException(nameof(messageIds), "At most 1000 message IDs may be queried at once.");
+
+        var scores = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var batch in messageIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct(StringComparer.Ordinal).Chunk(FilterBatchSize))
+        {
+            var quoted = string.Join(',', batch.Select(id =>
+                $"\"{id.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("\"", "\\\"", StringComparison.Ordinal)}\""));
+            var query = $"feedback?select=message_id,score&user_id=eq.{SupabaseTransport.Escape(userId)}&message_id={SupabaseTransport.Escape($"in.({quoted})")}&score=not.is.null";
+            using var request = SupabaseTransport.Request(HttpMethod.Get, transport.RestUri(query));
+            using var response = await transport.SendServiceAsync(request, cancellationToken).ConfigureAwait(false);
+            var rows = await SupabaseTransport.ReadJsonAsync<List<UserFeedbackRow>>(response, cancellationToken)
+                .ConfigureAwait(false);
+            foreach (var row in rows)
+            {
+                if (row.Score.HasValue) scores[row.MessageId] = row.Score.Value;
+            }
+        }
+
+        return scores;
+    }
+
     public async Task<IReadOnlyDictionary<string, int>> GetGlobalScoresAsync(
         IReadOnlyList<string> chunkIds,
         CancellationToken cancellationToken = default)
@@ -122,6 +151,12 @@ internal sealed class SupabaseFeedbackRepository(SupabaseTransport transport) : 
     }
 
     private const int WriteBatchSize = 500;
+
+    private sealed class UserFeedbackRow
+    {
+        [JsonPropertyName("message_id")] public string MessageId { get; init; } = string.Empty;
+        [JsonPropertyName("score")] public int? Score { get; init; }
+    }
 
     private sealed class GlobalScoreRow
     {

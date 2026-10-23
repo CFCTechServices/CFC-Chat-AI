@@ -19,13 +19,16 @@ The contracts and models in `CFC.ChatAI.Supabase` describe this integration, rat
 |---|---|
 | `IIdentityGateway` | Validate a bearer token and request password recovery |
 | `IAdminIdentityGateway` | Privileged user lookup, ban/unban, global session revocation, and identity deletion |
+| `IUserProfileRepository` / `IAdminProfileRepository` | User-token self-profile reads/allow-listed updates and privileged profile administration/email lookup |
+| `IInvitationRepository` | Privileged invitation lookups, insert with returned DB fields, and deletes |
+| `IConversationRepository` | Caller-token session/message list, create, read, update, delete, history/context, and feedback-context reads |
 | `IChunkRepository` | Upsert chunks, hydrate rows by IDs, list document chunk IDs by page, and delete by IDs |
-| `IFeedbackRepository` | Atomic feedback submission RPC, global/query-aware scores, and query-event persistence |
+| `IFeedbackRepository` | Atomic feedback submission RPC, current-user message ratings, global/query-aware scores, and query-event persistence |
 | `IObjectStorage` | Upload/download/list/delete objects and create signed/public URLs |
 
-Supabase-facing models and contracts are organized by concern under `Identity/`, `Chunks/`, `Feedback/`, `Storage/`, and `Common/` in `dotnet/src/CFC.ChatAI.Supabase`. Database operations are grouped by behavior rather than mechanically exposing one repository per table.
+Supabase-facing models and contracts are organized by concern under `Identity/`, `Conversations/`, `Chunks/`, `Feedback/`, `Storage/`, and `Common/` in `dotnet/src/CFC.ChatAI.Supabase`. Database operations are grouped by behavior rather than mechanically exposing one repository per table.
 
-There are intentionally no interfaces yet for profiles, invitations, or conversations: add those when the associated endpoints are migrated. Authorization policy, profile status/role checks, embedding, feedback reranking, and cross-provider ingestion/retrieval/deletion orchestration are not Supabase adapter responsibilities.
+Authorization policy, profile status/role checks, invitation expiry decisions, chat generation, embedding, feedback reranking, and cross-provider ingestion/retrieval/deletion orchestration are not Supabase adapter responsibilities.
 
 ## Registration
 
@@ -50,11 +53,12 @@ Configuration requires the project URL, anon key, and service-role key. Supply s
 
 - `IIdentityGateway.GetUserAsync` sends the supplied user token with the anon API key. It returns `null` for an invalid/expired token; transport/server failures remain failures, not invalid-credential results.
 - Password recovery also uses the anon key.
-- `IAdminIdentityGateway` and the chunk, feedback, and object-storage adapters use the service-role key. Treat these as trusted backend capabilities and inject them only into server-side workflows. They bypass ordinary RLS enforcement; an interface is not an authorization check.
+- `IAdminIdentityGateway`, `IAdminProfileRepository`, `IInvitationRepository`, and the chunk, feedback, and object-storage adapters use the service-role key. Treat these as trusted backend capabilities and inject them only into server-side workflows. They bypass ordinary RLS enforcement; an interface is not an authorization check. The feedback current-user read explicitly filters by user ID but is still service-role scoped.
+- `IUserProfileRepository` uses the anon key plus an explicit caller token per request and filters by the supplied user ID. `IConversationRepository` similarly uses the anon key + caller token for every operation; session-table operations carry an explicit owner filter. Message rows have no owner column, so their isolation depends on the session ownership check and deployed message/session RLS policies. The adapter's profile field allow-list does not replace database-side grants/column restrictions; the supplied profile privilege export shows a separate blocker that must be fixed and integration-tested before production self-service writes.
 - Never pass service-role credentials, access tokens, or signed URLs to frontend configuration or logs. Validate caller permissions and ownership above these adapters.
 - Profile status/role validation is not folded into token validation. Existing account policy must remain in ASP.NET authentication/authorization and profile application services when migrated.
 
-This initial implementation covers backend ingestion/retrieval and privileged Auth operations. It does **not** replace user-scoped profile/session access. Add separate request-scoped user-token adapters before migrating an endpoint whose behavior depends on RLS; never change a shared client's session per request.
+User-scoped profile calls attach the supplied token to that request only; no shared client session is changed. Invitation lookups and writes are privileged backend calls, matching the existing Python use of the service-role Supabase client. Never use these capabilities without application authorization.
 
 ## Persistence behavior and guarantees
 
@@ -64,11 +68,25 @@ This initial implementation covers backend ingestion/retrieval and privileged Au
 
 A missing requested ID is omitted from `GetByIdsAsync`; this is distinct from a failed request. `ListIdsForDocumentAsync` uses offset/limit pagination and sets `HasMore` when a full page is returned. Callers must continue until `HasMore` is false.
 
+### Conversations
+
+`IConversationRepository` exposes bounded, user-token session listing (including optional count/preview detail), session create/read/title update/delete, ordered history, last-N chat context, message insertion with JSON metadata, and assistant-message/preceding-user context for feedback processing. Lists are stably ordered and detailed lists cap a page at 100 sessions. Context reads return chronological order. Session table queries include `user_id`; message queries first verify the owning session and use the caller token, so correct database RLS remains essential.
+
+Session deletion intentionally sends message deletion followed by session deletion as two requests, matching observed Python behavior. It is not transactional; a failure in the second request raises `SessionDeletionPartialFailureException` to signal that messages may already have been removed. Chat generation, query embeddings, feedback event generation, and endpoint authorization remain application workflow concerns.
+
 ### Feedback
 
-The vote operation calls `submit_message_feedback` once with the current argument names (`p_message_id`, `p_user_id`, `p_new_rating`), preserving the atomic database operation used by Python. Global and query-aware scores map to `chunk_feedback_scores` and `get_query_aware_chunk_scores`; query events map to `chunk_feedback_events`.
+The vote operation calls `submit_message_feedback` once with the current argument names (`p_message_id`, `p_user_id`, `p_new_rating`), preserving the atomic database operation used by Python. `GetUserScoresForMessagesAsync` returns only non-null scores for a caller-supplied user ID and bounded message IDs; it does not establish message/session ownership. Global and query-aware scores map to `chunk_feedback_scores` and `get_query_aware_chunk_scores`; query events map to `chunk_feedback_events`.
 
 Query-event delete and insert are deliberately separate methods, not a claimed atomic replace. A failed event sync can be partial; it remains a best-effort workflow concern. Embeddings must be prepared above the repository. The deployed RPC SQL, argument types, RLS/grants, and vector dimension must be verified against the target Supabase project before rollout.
+
+### Profiles and invitations
+
+Profile self-service operations use the caller token and only serialize `full_name`/`avatar_url`; privileged profile operations and all invitation operations use service-role credentials. The adapter does not make account or invitation policy decisions.
+
+`IInvitationRepository` provides latest-by-email and latest-unregistered-by-email reads, insertion returning the persisted row (including database-generated expiry), deletion by ID, and deletion by email. The application compares UTC expiry timestamps and decides `active`, `expired`, `registered`, or `none`. Replacing an expired invitation is a separate delete then insert, not a transaction; concurrent inserts are arbitrated only if the target database has the expected unique index. A recognized SQLSTATE `23505` for `idx_one_active_invite_per_email` becomes `InvitationConflictException`; unrelated failures remain sanitized dependency failures.
+
+The supplied schema excerpt shows a seven-day `expires_at` default and invitation fields, but does not confirm the active-invitation partial unique index, its exact name/predicate, source project identity, or deployed grants. Verify these against the target project before rollout. Profile email lookup is exposed through `IAdminProfileRepository.GetByEmailAsync` for invitation workflows.
 
 ### Object storage
 
@@ -82,6 +100,18 @@ The adapters surface sanitized HTTP/network failures as `DependencyFailureExcept
 
 Retries must be operation-specific. Stable chunk IDs make upsert retry-friendly, but do not make password recovery, vote changes, or object operations universally idempotent. Do not treat a Pinecone + Supabase workflow as a transaction.
 
+## Operational readiness and configuration
+
+`AddSupabaseInfrastructure` validates its options at registration time: the URL must be an absolute HTTP(S) URL with no embedded user information, query, or fragment; both API keys and bucket names must be non-empty; and the request timeout must be greater than zero and no more than five minutes. HTTP is allowed for local development. Use HTTPS for every non-local deployment. Validation checks shape/presence only; it does not verify that keys, buckets, policies, or the project URL belong together.
+
+- **Secrets:** inject the anon and service-role keys from a deployment secret manager/environment configuration. Never commit them, put them in public configuration, include them in logs/telemetry, or return them in API responses. The service-role key bypasses ordinary RLS and must remain server-side; rotate it through the deployment's secret-management process if exposed. The anon key is not a substitute for database authorization.
+- **Buckets:** explicitly verify `DocumentsBucket` and `VideosBucket` against the target project. Defaults (`cfc-docs`, `cfc-videos`) are convenience defaults, not proof those buckets exist or have suitable privacy/policies. Confirm expected key layouts and object size/overwrite policy, and test recursive traversal at the application layer; adapter listing returns direct children only. Keep signed URL lifetimes short and do not log or persist signed URLs as durable links.
+- **RLS and grants:** test with the actual caller JWT and anon key, not only the service role. RLS row policies do not restrict columns. The supplied profile privilege export shows all-column authenticated INSERT/UPDATE privileges with self-row policies, so self-service profile writes remain a production blocker until the database ACL/policy design is corrected and direct negative tests prove privileged fields cannot be changed or inserted. Conversation policies/grants, feedback and RPC privileges, invitation rules, and service-role access must likewise be checked against the deployment target.
+- **Rate limits and retries:** respect Supabase/Auth/Storage rate-limit responses and `Retry-After` where available at the application boundary. This package does not automatically retry. Apply bounded, operation-specific retry/backoff only where the operation is safe to repeat; do not blindly retry password recovery, vote changes, deletes, or multi-step workflows. A timeout can occur after the server committed a write, so reconcile state before retrying non-idempotent requests. Keep concurrency bounded and surface sanitized dependency failures.
+- **Timeouts and monitoring:** the default request timeout is 30 seconds (maximum five minutes) and covers the response-header wait; streaming body reads remain caller-cancellation-aware. Monitor sanitized operation outcomes, latency, throttling, and timeout counts without recording credentials, user tokens, request bodies, PII, or signed URLs.
+
+Configuration cannot establish deployment readiness. Use a non-production project for integration checks and do not describe unit-test success as proof of RLS, schema, RPC, or Storage correctness.
+
 ## Validation status and migration prerequisites
 
-The adapters and HTTP-handler unit tests (`dotnet/tests/CFC.ChatAI.Supabase.Tests`) are wired into the solution, but this environment did not provide the `dotnet` executable, so build/test execution could not be performed here. Before production migration, verify the deployed table columns, RPC definitions and grants, Storage bucket policies/path layouts, and the selected endpoint's user-vs-service-role behavior. Add live-environment integration tests for RLS/authorization, concurrent requests, pagination, partial failures, and the deployed RPC transaction semantics.
+The HTTP-handler unit tests (`dotnet/tests/CFC.ChatAI.Supabase.Tests`) run without a live Supabase project; the suite passes (25 tests as of the Phase 6 documentation run). No target-project integration test was run. Before production migration, verify deployed table columns, the invitation partial unique index and expiry default, chat-session/message RLS and insert/delete grants, the chat-message foreign-key delete behavior, RPC definitions/grants, Storage bucket policies/path layouts, and each endpoint's user-vs-service-role behavior. Add live-environment integration tests for profile ACLs, invitation races, cross-user session/message access, session deletion, admin account lifecycle, expired signed URLs, object pagination, partial failures, and deployed RPC transaction semantics.
