@@ -1,5 +1,5 @@
 ﻿using System.Text.Json;
-using CFC.ChatAI.Rag;
+using CFC.ChatAI.Pinecone.Internal;
 
 // Read-only parity check for PineconeVectorStore
 // Replays the exact query vectors Python used (retrieval_reference.json) and compares
@@ -25,7 +25,7 @@ Console.WriteLine(textMode
     : "Mode: vector (replaying Python's query vectors)\n");
 
 var references = JsonSerializer.Deserialize<List<RetrievalReference>>(
-    File.ReadAllText("tests/CFC.ChatAI.Rag.Tests/TestData/retrieval_reference.json"),
+    File.ReadAllText("tests/CFC.ChatAI.Pinecone.Tests/TestData/retrieval_reference.json"),
     new JsonSerializerOptions { PropertyNameCaseInsensitive = true, PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower })!;
 
 int passCount = 0, tieCount = 0, failCount = 0;
