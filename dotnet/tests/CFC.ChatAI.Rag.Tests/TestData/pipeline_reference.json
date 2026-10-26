@@ -1,0 +1,917 @@
+[
+ {
+  "question": "How do i add new feed ingredients?",
+  "chunks": [
+   {
+    "rank": 1,
+    "score": 0.654031754,
+    "chunk_id": "9718cda0-3483-4ac3-afde-73a54eed3978",
+    "text": "In the Concept5 Formulation System, “Ingredients” are the physical “raw materials” which are combined in the manufacturing of feed or food “Products”. The system allows the definition of an unlimited number of Ingredients. Ingredients are added and maintained by clicking on the “Ingredient Maintenance” command button located on the Main Menu. Selection of this function will result in the form shown below. Use this form to add or change ingredient names, nutrient values, types, costs, out-of-stock indicator, alternate code, round amount, production minimum, Legacy code, mix report parameters. (For more detailed information, see the Help file Contents tab - Ingredients, Editing Ingredients.) The “Save-As” function may be used to add a new ingredient which closely resembles an existing ingredient, and a copy and editing process will save time and reduce errors. [See the Help file Contents tab - Ingredients, Adding Ingredients (Copy an Existing Ingredient).]",
+    "source": "Concept 5 Getting Started Guide.docx",
+    "source_type": "document",
+    "doc_id": "concept-5-getting-started-guide",
+    "section_id": "40598804-e40a-4df5-9c44-753fb9b55813",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 2,
+    "score": 0.654031754,
+    "chunk_id": "ceefaa7d-ca46-4b84-8851-754b568b3708",
+    "text": "In the Concept5 Formulation System, “Ingredients” are the physical “raw materials” which are combined in the manufacturing of feed or food “Products”. The system allows the definition of an unlimited number of Ingredients. Ingredients are added and maintained by clicking on the “Ingredient Maintenance” command button located on the Main Menu. Selection of this function will result in the form shown below. Use this form to add or change ingredient names, nutrient values, types, costs, out-of-stock indicator, alternate code, round amount, production minimum, Legacy code, mix report parameters. (For more detailed information, see the Help file Contents tab - Ingredients, Editing Ingredients.) The “Save-As” function may be used to add a new ingredient which closely resembles an existing ingredient, and a copy and editing process will save time and reduce errors. [See the Help file Contents tab - Ingredients, Adding Ingredients (Copy an Existing Ingredient).]",
+    "source": "Concept 5 Getting Started Guide.DOC",
+    "source_type": "document",
+    "doc_id": "concept-5-getting-started-guide",
+    "section_id": "547b7b4c-eec5-4c42-bb4d-2a59861fb4f4",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 3,
+    "score": 0.649512708,
+    "chunk_id": "7ede0e70-6c9b-4811-a3fb-df7ee9f07553",
+    "text": "Ingredients can also be added to the system by copying an existing ingredient. Select the ingredient to be copied and click the Save As button. Enter an ingredient code in the popup (up to eight alphanumeric digits). The screen will return with the new ingredient code but all other information, including the name, will be from the ingredient copied. Edit the data as necessary.",
+    "source": "CFC Horse Ration 89 Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc-horse-ration-89-guide",
+    "section_id": "c71489b0-bb19-4f32-9698-956697eb4445",
+    "section_title": "Copying Ingredients"
+   },
+   {
+    "rank": 4,
+    "score": 0.649512708,
+    "chunk_id": "8196537c-f777-4ee2-a8e8-fcf0e2848815",
+    "text": "Ingredients can also be added to the system by copying an existing ingredient. Select the ingredient to be copied and click the Save As button. Enter an ingredient code in the popup (up to eight alphanumeric digits). The screen will return with the new ingredient code but all other information, including the name, will be from the ingredient copied. Edit the data as necessary.",
+    "source": "CFC Horse Ration Guide Bak1.DOC",
+    "source_type": "document",
+    "doc_id": "cfc-horse-ration-guide-bak1",
+    "section_id": "de71145b-bdd5-43bc-942d-9593bd177742",
+    "section_title": "Copying Ingredients"
+   },
+   {
+    "rank": 5,
+    "score": 0.649512708,
+    "chunk_id": "ece1ddbd-2c70-4de0-9de8-c7989e2a8bfa",
+    "text": "Ingredients can also be added to the system by copying an existing ingredient. Select the ingredient to be copied and click the Save As button. Enter an ingredient code in the popup (up to eight alphanumeric digits). The screen will return with the new ingredient code but all other information, including the name, will be from the ingredient copied. Edit the data as necessary.",
+    "source": "CFC Dairy Ration Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc-dairy-ration-guide",
+    "section_id": "7bd1b753-ab95-49e0-ae0d-6989b8fa6c1e",
+    "section_title": "Copying Ingredients"
+   }
+  ],
+  "context": "[CHUNK_ID: 9718cda0-3483-4ac3-afde-73a54eed3978]\nSource: Concept 5 Getting Started Guide.docx\nTitle: Untitled\nIn the Concept5 Formulation System, “Ingredients” are the physical “raw materials” which are combined in the manufacturing of feed or food “Products”. The system allows the definition of an unlimited number of Ingredients. Ingredients are added and maintained by clicking on the “Ingredient Maintenance” command button located on the Main Menu. Selection of this function will result in the form shown below. Use this form to add or change ingredient names, nutrient values, types, costs, out-of-stock indicator, alternate code, round amount, production minimum, Legacy code, mix report parameters. (For more detailed information, see the Help file Contents tab - Ingredients, Editing Ingredients.) The “Save-As” function may be used to add a new ingredient which closely resembles an existing ingredient, and a copy and editing process will save time and reduce errors. [See the Help file Contents tab - Ingredients, Adding Ingredients (Copy an Existing Ingredient).]\n\n---\n[CHUNK_ID: ceefaa7d-ca46-4b84-8851-754b568b3708]\nSource: Concept 5 Getting Started Guide.DOC\nTitle: Untitled\nIn the Concept5 Formulation System, “Ingredients” are the physical “raw materials” which are combined in the manufacturing of feed or food “Products”. The system allows the definition of an unlimited number of Ingredients. Ingredients are added and maintained by clicking on the “Ingredient Maintenance” command button located on the Main Menu. Selection of this function will result in the form shown below. Use this form to add or change ingredient names, nutrient values, types, costs, out-of-stock indicator, alternate code, round amount, production minimum, Legacy code, mix report parameters. (For more detailed information, see the Help file Contents tab - Ingredients, Editing Ingredients.) The “Save-As” function may be used to add a new ingredient which closely resembles an existing ingredient, and a copy and editing process will save time and reduce errors. [See the Help file Contents tab - Ingredients, Adding Ingredients (Copy an Existing Ingredient).]\n\n---\n[CHUNK_ID: 7ede0e70-6c9b-4811-a3fb-df7ee9f07553]\nSource: CFC Horse Ration 89 Guide.DOC\nTitle: Copying Ingredients\nIngredients can also be added to the system by copying an existing ingredient. Select the ingredient to be copied and click the Save As button. Enter an ingredient code in the popup (up to eight alphanumeric digits). The screen will return with the new ingredient code but all other information, including the name, will be from the ingredient copied. Edit the data as necessary.\n\n---\n[CHUNK_ID: 8196537c-f777-4ee2-a8e8-fcf0e2848815]\nSource: CFC Horse Ration Guide Bak1.DOC\nTitle: Copying Ingredients\nIngredients can also be added to the system by copying an existing ingredient. Select the ingredient to be copied and click the Save As button. Enter an ingredient code in the popup (up to eight alphanumeric digits). The screen will return with the new ingredient code but all other information, including the name, will be from the ingredient copied. Edit the data as necessary.\n\n---\n[CHUNK_ID: ece1ddbd-2c70-4de0-9de8-c7989e2a8bfa]\nSource: CFC Dairy Ration Guide.DOC\nTitle: Copying Ingredients\nIngredients can also be added to the system by copying an existing ingredient. Select the ingredient to be copied and click the Save As button. Enter an ingredient code in the popup (up to eight alphanumeric digits). The screen will return with the new ingredient code but all other information, including the name, will be from the ingredient copied. Edit the data as necessary.\n"
+ },
+ {
+  "question": "how do i change the amount of NEG DIARY",
+  "chunks": [
+   {
+    "rank": 1,
+    "score": 0.403118163,
+    "chunk_id": "2b0e0110-265c-41c8-ab66-47c68f17abcc",
+    "text": "The Add/Subtract a specified amount to Existing Specs option will increase or decrease the existing specification of the nutrient in the chosen products by the amount entered in the boxes in the Change Min/Max Specs by Amount frame (shown when the Add/Subtract option is chosen). Subtraction requires a negative number entry. This option will change only existing specifications. Click the Apply Changes button to execute. The Restore Current Specs button will undo all changes. Then click the Save button. The Nutrient Specifications Changes log will open listing the changes made. Click the print icon to execute a print. The log may also be copied to the clipboard or printed to file by clicking the appropriate button. After clicking the Exit button, a dialog box will appear asking if the products should be saved to a string. The Increment Existing Specs by Percent Change option will increase or decrease the existing specification of the nutrient in the chosen products by the percent entered",
+    "source": "CFC5 Browse Edit Getting Started Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc5-browse-edit-getting-started-guide",
+    "section_id": "80e09867-9253-4adc-b3fa-067a1044e275",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 2,
+    "score": 0.402011871,
+    "chunk_id": "24c5d89e-a6ff-485a-a4be-fc24d80eae9a",
+    "text": "The Daily Nutrient Requirement Tables form the base of the system. Shown on the tabs are the eight basic nutrients that make up the Daily Intake Requirements of a ration. Note that each value in the tables corresponds to an animal type and weight. When a ration is built, both a type and weight must be specified; the ration is then solved to the corresponding values (see p.14). When building a ration, any weight may be specified, the system will automatically factor the requirements. All of the information shown on the tables is from the 1989 NRC Nutrient Requirements of Horses publication. The values in the tables can be edited by clicking in a cell and typing in new numbers, then press the Enter key or select another cell. A Cancel Changes button will appear that will allow all changes to be cancelled and the original numbers replaced. If the changes are desired, click the Save and Exit button.",
+    "source": "CFC Horse Ration Guide Bak1.DOC",
+    "source_type": "document",
+    "doc_id": "cfc-horse-ration-guide-bak1",
+    "section_id": "721a0100-5202-4ae7-9a1f-26ad2466b221",
+    "section_title": "Daily Nutrient Requirement Tables (cont.)"
+   },
+   {
+    "rank": 3,
+    "score": 0.402011871,
+    "chunk_id": "d26fd564-02cb-4211-b53b-12a8f31f4c2b",
+    "text": "The Daily Nutrient Requirement Tables form the base of the system. Shown on the tabs are the eight basic nutrients that make up the Daily Intake Requirements of a ration. Note that each value in the tables corresponds to an animal type and weight. When a ration is built, both a type and weight must be specified; the ration is then solved to the corresponding values (see p.14). When building a ration, any weight may be specified, the system will automatically factor the requirements. All of the information shown on the tables is from the 1989 NRC Nutrient Requirements of Horses publication. The values in the tables can be edited by clicking in a cell and typing in new numbers, then press the Enter key or select another cell. A Cancel Changes button will appear that will allow all changes to be cancelled and the original numbers replaced. If the changes are desired, click the Save and Exit button.",
+    "source": "CFC Horse Ration 89 Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc-horse-ration-89-guide",
+    "section_id": "16f67d1c-ca17-434a-9009-ded6b1137c2f",
+    "section_title": "Daily Nutrient Requirement Tables (cont.)"
+   },
+   {
+    "rank": 4,
+    "score": 0.399050713,
+    "chunk_id": "51e8cd9b-74ee-493b-8069-098d57ec3925",
+    "text": "amount requires a negative number entry. This option will change only existing specifications. Click the Apply Changes button to execute. The Restore Current Specs button will undo all changes. Then click the Save button. The Ingredient Specifications Changes log will open listing the changes made. Click the print icon to execute a print. The log may also be copied to the clipboard or printed to file by clicking the appropriate button. After clicking the Exit button, a dialog box will appear asking if the products should be saved to a string. Product Nutrient Specification Changes Following the instructions described on pp. 10 & 11 to access the Product Specifications screen (shown below), click the Nutrient Limits As Mixed button to open the Browse/Edit Nutrient Specifications frame (see next page). Product Nutrient Specification Changes (cont.) You must now select the nutrient to be edited. Enter the code in the Nutrient Number box or click the Pick from List button to open the nutrient index. In the example shown, nutrient number 12, Protein, Crude, has been chosen. Click the Edit button.",
+    "source": "CFC5 Browse Edit Getting Started Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc5-browse-edit-getting-started-guide",
+    "section_id": "80e09867-9253-4adc-b3fa-067a1044e275",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 5,
+    "score": 0.396547318,
+    "chunk_id": "69b8e73d-6edd-4b8c-b1f4-0327927da2d7",
+    "text": "in the boxes in the Increment Min/Max Specs by Percent Change frame (shown when the Increment option is chosen). Decreasing the amount requires a negative number entry. This option will change only existing specifications. Click the Apply Changes button to execute. The Restore Current Specs button will undo all changes. Then click the Save button. The Nutrient Specifications Changes log will open listing the changes made. Click the print icon to execute a print. The log may also be copied to the clipboard or printed to file by clicking the appropriate button. After clicking the Exit button, a dialog box will appear asking if the products should be saved to a string. Product Nutrient Ratio Limits Changes This feature allows a user to edit nutrient ratio specifications in a scrolling mode in a group of selected products. To access the browse/edit mode for product nutrient ratio specifications. Click the Nutrient Ratio Limits button to open the Browse/Edit Nutrient Ratio Limits frame (see next page).",
+    "source": "CFC5 Browse Edit Getting Started Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc5-browse-edit-getting-started-guide",
+    "section_id": "80e09867-9253-4adc-b3fa-067a1044e275",
+    "section_title": "Untitled"
+   }
+  ],
+  "context": "[CHUNK_ID: 2b0e0110-265c-41c8-ab66-47c68f17abcc]\nSource: CFC5 Browse Edit Getting Started Guide.DOC\nTitle: Untitled\nThe Add/Subtract a specified amount to Existing Specs option will increase or decrease the existing specification of the nutrient in the chosen products by the amount entered in the boxes in the Change Min/Max Specs by Amount frame (shown when the Add/Subtract option is chosen). Subtraction requires a negative number entry. This option will change only existing specifications. Click the Apply Changes button to execute. The Restore Current Specs button will undo all changes. Then click the Save button. The Nutrient Specifications Changes log will open listing the changes made. Click the print icon to execute a print. The log may also be copied to the clipboard or printed to file by clicking the appropriate button. After clicking the Exit button, a dialog box will appear asking if the products should be saved to a string. The Increment Existing Specs by Percent Change option will increase or decrease the existing specification of the nutrient in the chosen products by the percent entered\n\n---\n[CHUNK_ID: 24c5d89e-a6ff-485a-a4be-fc24d80eae9a]\nSource: CFC Horse Ration Guide Bak1.DOC\nTitle: Daily Nutrient Requirement Tables (cont.)\nThe Daily Nutrient Requirement Tables form the base of the system. Shown on the tabs are the eight basic nutrients that make up the Daily Intake Requirements of a ration. Note that each value in the tables corresponds to an animal type and weight. When a ration is built, both a type and weight must be specified; the ration is then solved to the corresponding values (see p.14). When building a ration, any weight may be specified, the system will automatically factor the requirements. All of the information shown on the tables is from the 1989 NRC Nutrient Requirements of Horses publication. The values in the tables can be edited by clicking in a cell and typing in new numbers, then press the Enter key or select another cell. A Cancel Changes button will appear that will allow all changes to be cancelled and the original numbers replaced. If the changes are desired, click the Save and Exit button.\n\n---\n[CHUNK_ID: d26fd564-02cb-4211-b53b-12a8f31f4c2b]\nSource: CFC Horse Ration 89 Guide.DOC\nTitle: Daily Nutrient Requirement Tables (cont.)\nThe Daily Nutrient Requirement Tables form the base of the system. Shown on the tabs are the eight basic nutrients that make up the Daily Intake Requirements of a ration. Note that each value in the tables corresponds to an animal type and weight. When a ration is built, both a type and weight must be specified; the ration is then solved to the corresponding values (see p.14). When building a ration, any weight may be specified, the system will automatically factor the requirements. All of the information shown on the tables is from the 1989 NRC Nutrient Requirements of Horses publication. The values in the tables can be edited by clicking in a cell and typing in new numbers, then press the Enter key or select another cell. A Cancel Changes button will appear that will allow all changes to be cancelled and the original numbers replaced. If the changes are desired, click the Save and Exit button.\n"
+ },
+ {
+  "question": "How do I get started with Concept 5?",
+  "chunks": [
+   {
+    "rank": 1,
+    "score": 0.613882065,
+    "chunk_id": "b6c63f01-1cd8-4322-9bd7-c94d8bf03d73",
+    "text": "1831 Forest Drive; Suite H Annapolis, MD 21401 410-267-5540 Guide for Getting Started with the CONCEPT5 Formulation System This guide describes how to use the very minimal basic features of the Concept5 formulation system required for the creation of your first formula. For a more detailed explanation of each function, please refer to the on-screen Help file within Concept5. The Help file can be accessed from the menu bar on the main menu, or by clicking the Help button found on almost every screen. When you install Concept5, either as a Trial or Licensed version, you have the option to begin with a “blank” database, or with preloaded demonstration data. If you install the system with a blank database, you MUST follow the instructions in this guide, in the order that they are presented, before you can create your first formula. If you install the system with demonstration data (or your own data converted by CFC from another formulation system to Concept5), it is still recommended that you follow the instructions in this guide in order to become familiar with the Concept5 data structure and content.",
+    "source": "Concept 5 Getting Started Guide.DOC",
+    "source_type": "document",
+    "doc_id": "concept-5-getting-started-guide",
+    "section_id": "547b7b4c-eec5-4c42-bb4d-2a59861fb4f4",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 2,
+    "score": 0.567422867,
+    "chunk_id": "9f3f8f80-46e6-402d-94b5-46680238ec84",
+    "text": "Guide for Getting Started with the CONCEPT5 Formulation System This guide describes how to use the very minimal basic features of the Concept5 formulation system required for the creation of your first formula. For a more detailed explanation of each function, please refer to the on-screen Help file within Concept5. The Help file can be accessed from the menu bar on the main menu, or by clicking the Help button found on almost every screen. When you install Concept5, either as a Trial or Licensed version, you have the option to begin with a “blank” database, or with preloaded demonstration data. If you install the system with a blank database, you MUST follow the instructions in this guide, in the order that they are presented, before you can create your first formula. If you install the system with demonstration data (or your own data converted by CFC from another formulation system to Concept5), it is still recommended that you follow the instructions in this guide in order to become familiar with the Concept5 data structure and content. Although the Concept5 system contains several hundred features and functions, this guide will discuss only the following eight minimal functions:",
+    "source": "Concept 5 Getting Started Guide.docx",
+    "source_type": "document",
+    "doc_id": "concept-5-getting-started-guide",
+    "section_id": "40598804-e40a-4df5-9c44-753fb9b55813",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 3,
+    "score": 0.547551215,
+    "chunk_id": "ae43c3ea-5a6a-469d-9643-b18bd4f447b2",
+    "text": "Guide for Getting Started with the CONCEPT4 Formulation System This guide describes how to use the basic features of the Concept4 formulation system required for the creation of your first formula. For a more detailed explanation of each function, please refer to the on-screen Help file within Concept4. The Help file can be accessed from the menu bar on the main menu, or by clicking the Help button found on almost every screen. Concept4 has three performance levels from which to choose, Levels 1, 2, and 3. We will use Level 2 for all the screen examples. It should be noted, however, that the screens and functionalities described in this guide are common to all three levels.",
+    "source": "CFC Concept4 User Guide.doc",
+    "source_type": "document",
+    "doc_id": "cfc-concept4-user-guide",
+    "section_id": "939866fd-bc3e-4864-90e5-833e8e4489b4",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 4,
+    "score": 0.435584068,
+    "chunk_id": "23b1c49a-3542-4143-aa40-b054ac146760",
+    "text": "When you install Concept4, either as a Trial or Licensed version, you have the option to begin with a “blank” database, or with preloaded demonstration data. If you install the system with a blank database, you MUST follow the instructions in this guide, in the order that they are presented, before you can create your first formula. If you install the system with demonstration data (or your own data converted by CFC from another formulation system to Concept4), it is still recommended that you follow the instructions in this guide in order to become familiar with the Concept4 data structure and content. Although the Concept4 system contains many features and functions, this guide will discuss only the following seven minimal functions: System Options Nutrient Definitions Ingredient Names and Nutrient Composition Ingredient Costs Manufactured Product Definitions Trial/Production Formula View/Modify Least Cost Formulation CFC4-S Main Menu: Like most, if not all, Windows applications, the Concept4 Main Menu contains a “drop-down” menu line at the top of the screen which may be used to gain access to any and all of the system functions.",
+    "source": "CFC Concept4 User Guide.doc",
+    "source_type": "document",
+    "doc_id": "cfc-concept4-user-guide",
+    "section_id": "939866fd-bc3e-4864-90e5-833e8e4489b4",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 5,
+    "score": 0.43415451,
+    "chunk_id": "7839a920-f8dc-4e2a-b759-ba5d29557547",
+    "text": "Quick Reference Least Cost Formulation Summary of Concept5 Standard Features and Functions",
+    "source": "GlossaryC5.DOC",
+    "source_type": "document",
+    "doc_id": "glossaryc5",
+    "section_id": "4b6b3fad-d833-444b-bc78-51806353b4d8",
+    "section_title": "Untitled"
+   }
+  ],
+  "context": "[CHUNK_ID: b6c63f01-1cd8-4322-9bd7-c94d8bf03d73]\nSource: Concept 5 Getting Started Guide.DOC\nTitle: Untitled\n1831 Forest Drive; Suite H Annapolis, MD 21401 410-267-5540 Guide for Getting Started with the CONCEPT5 Formulation System This guide describes how to use the very minimal basic features of the Concept5 formulation system required for the creation of your first formula. For a more detailed explanation of each function, please refer to the on-screen Help file within Concept5. The Help file can be accessed from the menu bar on the main menu, or by clicking the Help button found on almost every screen. When you install Concept5, either as a Trial or Licensed version, you have the option to begin with a “blank” database, or with preloaded demonstration data. If you install the system with a blank database, you MUST follow the instructions in this guide, in the order that they are presented, before you can create your first formula. If you install the system with demonstration data (or your own data converted by CFC from another formulation system to Concept5), it is still recommended that you follow the instructions in this guide in order to become familiar with the Concept5 data structure and content.\n\n---\n[CHUNK_ID: 9f3f8f80-46e6-402d-94b5-46680238ec84]\nSource: Concept 5 Getting Started Guide.docx\nTitle: Untitled\nGuide for Getting Started with the CONCEPT5 Formulation System This guide describes how to use the very minimal basic features of the Concept5 formulation system required for the creation of your first formula. For a more detailed explanation of each function, please refer to the on-screen Help file within Concept5. The Help file can be accessed from the menu bar on the main menu, or by clicking the Help button found on almost every screen. When you install Concept5, either as a Trial or Licensed version, you have the option to begin with a “blank” database, or with preloaded demonstration data. If you install the system with a blank database, you MUST follow the instructions in this guide, in the order that they are presented, before you can create your first formula. If you install the system with demonstration data (or your own data converted by CFC from another formulation system to Concept5), it is still recommended that you follow the instructions in this guide in order to become familiar with the Concept5 data structure and content. Although the Concept5 system contains several hundred features and functions, this guide will discuss only the following eight minimal functions:\n\n---\n[CHUNK_ID: ae43c3ea-5a6a-469d-9643-b18bd4f447b2]\nSource: CFC Concept4 User Guide.doc\nTitle: Untitled\nGuide for Getting Started with the CONCEPT4 Formulation System This guide describes how to use the basic features of the Concept4 formulation system required for the creation of your first formula. For a more detailed explanation of each function, please refer to the on-screen Help file within Concept4. The Help file can be accessed from the menu bar on the main menu, or by clicking the Help button found on almost every screen. Concept4 has three performance levels from which to choose, Levels 1, 2, and 3. We will use Level 2 for all the screen examples. It should be noted, however, that the screens and functionalities described in this guide are common to all three levels.\n"
+ },
+ {
+  "question": "How do I export data from CFC5 to another program?",
+  "chunks": [
+   {
+    "rank": 1,
+    "score": 0.709387839,
+    "chunk_id": "9e39fd8f-c852-41f6-9f4a-ade59fec2771",
+    "text": "When the export is complete, a prompt will appear confirming the export and identifying the name and location of the file. Click OK to return the previous screen. The export is now complete. Import ASCII This feature imports data from an ASCII file in Concept5 format into a CFC5 database. Caution should be observed whenever importing data into an established database. Consider copying and storing the existing data folder to a separate location prior to any import transaction. You may wish to refer to the Help file for additional information (see Help file>Contents tab>Data Exchange). As a further safeguard, the import feature may be inactivated by selecting No in the Allow Data Import frame of the General/Default Units tab of the System Options screen (see Help file: Contents tab>System Options>General/Defaults Units). If using multiple data folders (a feature available only on multi-user systems), you must choose the data folder that will receive the imported data. The main menu shows the current data folder at the bottom of the screen. Select the desired data folder by clicking the Open Database In Folder button and choosing from the options shown.",
+    "source": "CFC5 Data Exchange Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc5-data-exchange-guide",
+    "section_id": "579848d5-3356-44ea-bcdd-723ee01a3136",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 2,
+    "score": 0.706940711,
+    "chunk_id": "c6e3a1a8-5a9b-43d4-a128-3f9004407c47",
+    "text": "Export ASCII This function exports data from a CFC5 database into a standard CFC5 ASCII file. The data within this ASCII file can then be imported into a separate CFC5 database. This feature is especially helpful in transferring data between computers/locations. If using multiple data folders (a feature available only on multi-user systems), you must choose the data folder from which the data will be exported. The main menu shows the current data folder at the bottom of the screen. Select the desired data folder by clicking the Open Database In Folder button and choosing from the options shown. Then click the Data Exchange button to open the Data Exchange screen.Export ASCII (cont.) From the Data Exchange screen, click the Export ASCII button to open the Data Exchange – ASCII Export screen. The database folder chosen will be showing in the screen header. Export ASCII (cont.)",
+    "source": "CFC5 Data Exchange Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc5-data-exchange-guide",
+    "section_id": "579848d5-3356-44ea-bcdd-723ee01a3136",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 3,
+    "score": 0.630707741,
+    "chunk_id": "f1c9a0e7-8961-4f01-96ea-ed788598f3f9",
+    "text": "LEARNING THE CONCEPT5 DATA EXCHANGE FEATURE The Data Exchange feature of Concept5 provides the ability to: Export selected products into a standard formula bank update (FBU*) file or a vendor-specific process control interface file. Select and export data from any CFC5 database into a standard CFC5 ASCII file. Select and import data from any standard CFC5 ASCII file into any CFC5 database. Select and export data from a chosen database into standard ASCII files in Legacy (VLCFX) format. Select and export any specified ingredient or product data to grid controls for copying to the clipboard and/or exporting to a .csv file. These capabilities offer the flexibility to transfer data easily and effectively both within the Concept5 system and to external applications. *(The FBU file is a generic ASCII format formula export file that can be used to interface with other applications.)",
+    "source": "CFC5 Data Exchange Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc5-data-exchange-guide",
+    "section_id": "579848d5-3356-44ea-bcdd-723ee01a3136",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 4,
+    "score": 0.597896576,
+    "chunk_id": "2aa00e5e-31aa-4c99-90e6-6a5d58d34043",
+    "text": "4. Select the “Export Data” tab and review the “Data Types Selected for Export” area for any errors. 5. Make note of the Folder and Filename where the data is to be exported and select the “Export Data” option to export the specified data. 7. The following message will appear when then export is successful. Import Plant 1 Data 1. Copy the export file from the “Source” database to the User folder for import into the “Target” database. NOTE: The filename and location of the export file are defined during the export process. Copy the file into the subfolder named after the User ID of the user performing the import located within the folder named ”PRO5WORK” on the “C” drive of the workstation performing the import For Example - If the user ID of the user running the import is “JMOORE” then copy the export file to the following subfolder: C : \\ PRO5WORK \\ JMOORE Once the file has been copied, select the “Data Exchange (Import/Export) button from the main menu to access the Data Exchange functions. 3. From the main menu of the “Data Exchange” screen, select the “Import ASCII” button. 4. Verify the name and location of the file to be imported and select the “Open” button.",
+    "source": "DEX Tutorial.doc",
+    "source_type": "document",
+    "doc_id": "dex-tutorial",
+    "section_id": "688ea3b6-a2a1-4761-89e2-df6aaf2674b6",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 5,
+    "score": 0.577815056,
+    "chunk_id": "cb646059-3d7f-4773-8e27-dde6d37ee810",
+    "text": "Install the trial copy of the Concept 5 or Concept 5-M program onto the new server. On the third step of the installation, leave the Data & Program Files checked, click the Data Options button and select the Blank Database option (“Data and Program Files” option box not available on CFC5-M installation). Send CFC the “Installation Code” and use the “License Code” supplied to switch the program to license status per your previous license agreement. Copy the Custom Program File(s) and User ID file (if applicable) into the program folder on the new server from the backed up copy from the old server. Copy the Data Files and/or Folders into the appropriate folders on the new server from the backed up copy from the old server. If the new server and installation folder is to be mapped differently than the previous server, each workstation that has been set up to access and use the program via the server installations shortcut and default database access location needs to be revised. Workstation Shortcut – Modify the properties of the shortcut on each workstation so that the drive and folder location of the startup file named CFC5.EXE is correct for the new server drive mapping.",
+    "source": "C5 Reinstallation Tutorial.doc",
+    "source_type": "document",
+    "doc_id": "c5-reinstallation-tutorial",
+    "section_id": "269096de-5b00-44dc-8b73-593373b59a4c",
+    "section_title": "Untitled"
+   }
+  ],
+  "context": "[CHUNK_ID: 9e39fd8f-c852-41f6-9f4a-ade59fec2771]\nSource: CFC5 Data Exchange Guide.DOC\nTitle: Untitled\nWhen the export is complete, a prompt will appear confirming the export and identifying the name and location of the file. Click OK to return the previous screen. The export is now complete. Import ASCII This feature imports data from an ASCII file in Concept5 format into a CFC5 database. Caution should be observed whenever importing data into an established database. Consider copying and storing the existing data folder to a separate location prior to any import transaction. You may wish to refer to the Help file for additional information (see Help file>Contents tab>Data Exchange). As a further safeguard, the import feature may be inactivated by selecting No in the Allow Data Import frame of the General/Default Units tab of the System Options screen (see Help file: Contents tab>System Options>General/Defaults Units). If using multiple data folders (a feature available only on multi-user systems), you must choose the data folder that will receive the imported data. The main menu shows the current data folder at the bottom of the screen. Select the desired data folder by clicking the Open Database In Folder button and choosing from the options shown.\n\n---\n[CHUNK_ID: c6e3a1a8-5a9b-43d4-a128-3f9004407c47]\nSource: CFC5 Data Exchange Guide.DOC\nTitle: Untitled\nExport ASCII This function exports data from a CFC5 database into a standard CFC5 ASCII file. The data within this ASCII file can then be imported into a separate CFC5 database. This feature is especially helpful in transferring data between computers/locations. If using multiple data folders (a feature available only on multi-user systems), you must choose the data folder from which the data will be exported. The main menu shows the current data folder at the bottom of the screen. Select the desired data folder by clicking the Open Database In Folder button and choosing from the options shown. Then click the Data Exchange button to open the Data Exchange screen.Export ASCII (cont.) From the Data Exchange screen, click the Export ASCII button to open the Data Exchange – ASCII Export screen. The database folder chosen will be showing in the screen header. Export ASCII (cont.)\n\n---\n[CHUNK_ID: f1c9a0e7-8961-4f01-96ea-ed788598f3f9]\nSource: CFC5 Data Exchange Guide.DOC\nTitle: Untitled\nLEARNING THE CONCEPT5 DATA EXCHANGE FEATURE The Data Exchange feature of Concept5 provides the ability to: Export selected products into a standard formula bank update (FBU*) file or a vendor-specific process control interface file. Select and export data from any CFC5 database into a standard CFC5 ASCII file. Select and import data from any standard CFC5 ASCII file into any CFC5 database. Select and export data from a chosen database into standard ASCII files in Legacy (VLCFX) format. Select and export any specified ingredient or product data to grid controls for copying to the clipboard and/or exporting to a .csv file. These capabilities offer the flexibility to transfer data easily and effectively both within the Concept5 system and to external applications. *(The FBU file is a generic ASCII format formula export file that can be used to interface with other applications.)\n"
+ },
+ {
+  "question": "How do I set up Concept 5 on a network workstation?",
+  "chunks": [
+   {
+    "rank": 1,
+    "score": 0.692323685,
+    "chunk_id": "8ece1f18-c652-4e26-976e-715c65120723",
+    "text": "Concept 5 Network Workstation Setup NOTE: A setup process is required on workstations attached to a network where the Concept 5 program is already installed. Any users workstation that has access to the network server with the Concept 5 program installed can execute and successfully operate the Concept 5 program as long as the following conditions exist: The workstation and user have complete access rights to the location on the server where BOTH the programs and data are located. The location on the server where the data and programs for the Concept 5 system are located appear within a folder or folders of an accessible mapped drive. The workstation has gone through the process of loading all the required runtime support files onto the workstation itself as well as registering these files within the workstations operating systems registry. A shortcut is set up that properly points to the mapped network drive, folder(s) and file to execute the Concept 5 program.",
+    "source": "C5 Network Workstation Tutorial.doc",
+    "source_type": "document",
+    "doc_id": "c5-network-workstation-tutorial",
+    "section_id": "1f0aa97e-3ef8-4f4f-b898-338100b8b3fd",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 2,
+    "score": 0.649618149,
+    "chunk_id": "48eaf175-58da-43a4-bbff-14700ddebb90",
+    "text": "NOTE: When run, this program does NOT ask for any input from the user. Once started it begins processing immediately and will require that the workstation is re-booted. It is best to have all other running programs closed due to the requirement for a re-boot. Execute the AutoRegisterCFC.EXE wizard from the workstation to be set up to run the Concept 5 program from the network. Allow the workstation to be rebooted. Once re-booted, the workstation will have gone through the process of loading all the required runtime support files onto the workstation’s hard drive. These files will also have been self registered within the workstation’s operating systems registry. Setting Up Work Station Shortcut On the workstation to use the Concept 5 program on the server, close or minimize all other programs so a clear view of the desktop screen is visible. Move the mouse arrow to a position on the desktop screen where there are no shortcut icons and “RIGHT” click the mouse. The following dialogue window (or one similar) will appear:",
+    "source": "C5 Network Workstation Tutorial.doc",
+    "source_type": "document",
+    "doc_id": "c5-network-workstation-tutorial",
+    "section_id": "1f0aa97e-3ef8-4f4f-b898-338100b8b3fd",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 3,
+    "score": 0.602267265,
+    "chunk_id": "c57a1789-21c9-47db-a3ea-00a5eb352959",
+    "text": "Items 1 and 2 are the responsibility of the administrator of the network server and workstations and are outside of the scope of this document. Following are methods that may be followed to accomplish items 3 and 4 of the above list. Method 1 – Run the Concept 5 installation wizard in a manner that triggers the wizard to recognize you are installing the program on a workstation that will access the program from a central network server. It is recommended (although not necessary) that the most recent installation program is obtained for this process. Contact Creative Formulation Concepts (CFC) for information regarding the Internet location to download a copy of this program.",
+    "source": "C5 Network Workstation Tutorial.doc",
+    "source_type": "document",
+    "doc_id": "c5-network-workstation-tutorial",
+    "section_id": "1f0aa97e-3ef8-4f4f-b898-338100b8b3fd",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 4,
+    "score": 0.588023186,
+    "chunk_id": "3cb72d10-d843-462e-bd0a-e1bb876cbce3",
+    "text": "Concept 5 and Concept 5-M Re-Installation / Transfer Instructions NOTE: This information is for the re-installation or transfer of previously installed and licensed Concept 5 or Concept 5-M systems. Please read through the instructions before starting to ensure the proper process for your situation is followed. To transfer the Concept 5 program to a new Desktop, Laptop, Network Server or Server Workstation will require that the installation process is run on the new machine(s). It is recommended (although not necessary) that the most recent installation program is obtained for this process. Contact Creative Formulation Concepts (CFC) for information regarding the Internet location to download a copy of this program. This installation will install the program as a “trial” system. Once installed on the new PC, you will need to start the program and make a note of the “Installation Code” that is shown on the opening screen. This code needs to be supplied to someone at CFC for the generation of a corresponding code to switch your installation to “License” status. There are three basic installation situations: Workstation Installations - “Stand Alone”",
+    "source": "C5 Reinstallation Tutorial.doc",
+    "source_type": "document",
+    "doc_id": "c5-reinstallation-tutorial",
+    "section_id": "269096de-5b00-44dc-8b73-593373b59a4c",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 5,
+    "score": 0.562850952,
+    "chunk_id": "cd78647b-06fb-49bc-90ae-7288508a092f",
+    "text": "Make a backup of the following files and/or folders on the main server installation as a safety precaution. Program files located in the main installation folder named CFC5 Any Data Files located within the subfolder of the main installation program folder named DATA Install a copy of the Concept 5 program onto the new PC using the following settings within the installation wizard: On the second step of the installation, select the location of the installed copy of the program on the server. - Use the browse button to browse to the location on the server where the programs for the Concept 5 system are located within a folder or folders of an accessible mapped network drive **IMPORTANT** On the 3rd step of the installation, leave the Data & Program Files UN-Checked. Use the remaining default installation settings to continue and complete the installation process. Once completed the workstation (not the network server) will need to re-boot. You should be prompted for this to happen automatically. A new Shortcut will appear on the workstation linking it to the network installation.",
+    "source": "C5 Network Workstation Tutorial.doc",
+    "source_type": "document",
+    "doc_id": "c5-network-workstation-tutorial",
+    "section_id": "1f0aa97e-3ef8-4f4f-b898-338100b8b3fd",
+    "section_title": "Untitled"
+   }
+  ],
+  "context": "[CHUNK_ID: 8ece1f18-c652-4e26-976e-715c65120723]\nSource: C5 Network Workstation Tutorial.doc\nTitle: Untitled\nConcept 5 Network Workstation Setup NOTE: A setup process is required on workstations attached to a network where the Concept 5 program is already installed. Any users workstation that has access to the network server with the Concept 5 program installed can execute and successfully operate the Concept 5 program as long as the following conditions exist: The workstation and user have complete access rights to the location on the server where BOTH the programs and data are located. The location on the server where the data and programs for the Concept 5 system are located appear within a folder or folders of an accessible mapped drive. The workstation has gone through the process of loading all the required runtime support files onto the workstation itself as well as registering these files within the workstations operating systems registry. A shortcut is set up that properly points to the mapped network drive, folder(s) and file to execute the Concept 5 program.\n\n---\n[CHUNK_ID: 48eaf175-58da-43a4-bbff-14700ddebb90]\nSource: C5 Network Workstation Tutorial.doc\nTitle: Untitled\nNOTE: When run, this program does NOT ask for any input from the user. Once started it begins processing immediately and will require that the workstation is re-booted. It is best to have all other running programs closed due to the requirement for a re-boot. Execute the AutoRegisterCFC.EXE wizard from the workstation to be set up to run the Concept 5 program from the network. Allow the workstation to be rebooted. Once re-booted, the workstation will have gone through the process of loading all the required runtime support files onto the workstation’s hard drive. These files will also have been self registered within the workstation’s operating systems registry. Setting Up Work Station Shortcut On the workstation to use the Concept 5 program on the server, close or minimize all other programs so a clear view of the desktop screen is visible. Move the mouse arrow to a position on the desktop screen where there are no shortcut icons and “RIGHT” click the mouse. The following dialogue window (or one similar) will appear:\n\n---\n[CHUNK_ID: c57a1789-21c9-47db-a3ea-00a5eb352959]\nSource: C5 Network Workstation Tutorial.doc\nTitle: Untitled\nItems 1 and 2 are the responsibility of the administrator of the network server and workstations and are outside of the scope of this document. Following are methods that may be followed to accomplish items 3 and 4 of the above list. Method 1 – Run the Concept 5 installation wizard in a manner that triggers the wizard to recognize you are installing the program on a workstation that will access the program from a central network server. It is recommended (although not necessary) that the most recent installation program is obtained for this process. Contact Creative Formulation Concepts (CFC) for information regarding the Internet location to download a copy of this program.\n"
+ },
+ {
+  "question": "How do I create a ration for a horse?",
+  "chunks": [
+   {
+    "rank": 1,
+    "score": 0.588701248,
+    "chunk_id": "d26fd564-02cb-4211-b53b-12a8f31f4c2b",
+    "text": "The Daily Nutrient Requirement Tables form the base of the system. Shown on the tabs are the eight basic nutrients that make up the Daily Intake Requirements of a ration. Note that each value in the tables corresponds to an animal type and weight. When a ration is built, both a type and weight must be specified; the ration is then solved to the corresponding values (see p.14). When building a ration, any weight may be specified, the system will automatically factor the requirements. All of the information shown on the tables is from the 1989 NRC Nutrient Requirements of Horses publication. The values in the tables can be edited by clicking in a cell and typing in new numbers, then press the Enter key or select another cell. A Cancel Changes button will appear that will allow all changes to be cancelled and the original numbers replaced. If the changes are desired, click the Save and Exit button.",
+    "source": "CFC Horse Ration 89 Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc-horse-ration-89-guide",
+    "section_id": "16f67d1c-ca17-434a-9009-ded6b1137c2f",
+    "section_title": "Daily Nutrient Requirement Tables (cont.)"
+   },
+   {
+    "rank": 2,
+    "score": 0.588701248,
+    "chunk_id": "24c5d89e-a6ff-485a-a4be-fc24d80eae9a",
+    "text": "The Daily Nutrient Requirement Tables form the base of the system. Shown on the tabs are the eight basic nutrients that make up the Daily Intake Requirements of a ration. Note that each value in the tables corresponds to an animal type and weight. When a ration is built, both a type and weight must be specified; the ration is then solved to the corresponding values (see p.14). When building a ration, any weight may be specified, the system will automatically factor the requirements. All of the information shown on the tables is from the 1989 NRC Nutrient Requirements of Horses publication. The values in the tables can be edited by clicking in a cell and typing in new numbers, then press the Enter key or select another cell. A Cancel Changes button will appear that will allow all changes to be cancelled and the original numbers replaced. If the changes are desired, click the Save and Exit button.",
+    "source": "CFC Horse Ration Guide Bak1.DOC",
+    "source_type": "document",
+    "doc_id": "cfc-horse-ration-guide-bak1",
+    "section_id": "721a0100-5202-4ae7-9a1f-26ad2466b221",
+    "section_title": "Daily Nutrient Requirement Tables (cont.)"
+   },
+   {
+    "rank": 3,
+    "score": 0.579595625,
+    "chunk_id": "6b793101-02e0-4532-8ab5-87b7f0ef8946",
+    "text": "USING THE CFC HORSE RATION FORMULATION 2007 SYSTEM The CFC Horse Ration Formulation System is a freestanding program that is used to balance feed components to meet the animals’ daily requirements. System flexibility allows many and varied user applications. Intake requirements are guided by the 2007 NRC Nutrient Requirements of Horses, Sixth Revised Edition. System configuration allows up to 1000 ingredients, 1000 products, and 50 nutrients. All features can be customized to meet the user's approach to horse nutrition. It is suggested that the system set-up should proceed in the following order: defining/refining the nutrients to be used in the Nutrient Maintenance screen (p.3); defining any desired default Nutrient Ratios (p.5); creating the ingredients and refining their nutrient profiles in the Ingredient Maintenance screen (p.6); setting the system general defaults on the System Options screen; from this same screen, the user identifies the intermediate ration components that are used to build the total daily ration (p.8); defining the individual parameters on the Ration Balancer screen to build the finished ration (p.11);",
+    "source": "CFC HORSE RATION 2007 GUIDE.doc",
+    "source_type": "document",
+    "doc_id": "cfc-horse-ration-2007-guide",
+    "section_id": "985788d6-35e8-465e-84a3-88274ce8c260",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 4,
+    "score": 0.573965073,
+    "chunk_id": "3044ab70-0fc6-4c1a-96c3-11809602d4f2",
+    "text": "USING THE CFC HORSE RATION FORMULATION SYSTEM The CFC Horse Ration Formulation System is a freestanding program that is used to balance feed components to meet the animals’ daily requirements. System flexibility allows many and varied user applications. Intake requirements are guided by the 1989 NRC Nutrient Requirements of Horses publication. System configuration allows up to 1000 ingredients, 1000 products, and 50 nutrients. All features can be customized to meet the user's approach to horse nutrition. It is suggested that system set-up should proceed in the following order: defining/refining the nutrients to be used in the Nutrient Maintenance screen (p.3); viewing/refining the Daily Nutrient Requirement Tables (p.6); defining any desired Nutrient Ratios (p.7); creating the ingredients and refining their nutrient profiles in the Ingredient Maintenance screen (p.8); setting the system general defaults on the System Options screen; from this same screen, the user identifies the intermediate ration components that are used to build the total daily ration (p.10); defining the individual parameters on the Ration Balancer screen to build the finished ration (p.13);",
+    "source": "CFC Horse Ration Guide Bak1.DOC",
+    "source_type": "document",
+    "doc_id": "cfc-horse-ration-guide-bak1",
+    "section_id": "1873d627-6fa4-40f0-a92d-74d2cbe7d2ea",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 5,
+    "score": 0.573965073,
+    "chunk_id": "f2362350-8dce-4ad8-a33a-68507969cd67",
+    "text": "USING THE CFC HORSE RATION FORMULATION SYSTEM The CFC Horse Ration Formulation System is a freestanding program that is used to balance feed components to meet the animals’ daily requirements. System flexibility allows many and varied user applications. Intake requirements are guided by the 1989 NRC Nutrient Requirements of Horses publication. System configuration allows up to 1000 ingredients, 1000 products, and 50 nutrients. All features can be customized to meet the user's approach to horse nutrition. It is suggested that system set-up should proceed in the following order: defining/refining the nutrients to be used in the Nutrient Maintenance screen (p.3); viewing/refining the Daily Nutrient Requirement Tables (p.6); defining any desired Nutrient Ratios (p.7); creating the ingredients and refining their nutrient profiles in the Ingredient Maintenance screen (p.8); setting the system general defaults on the System Options screen; from this same screen, the user identifies the intermediate ration components that are used to build the total daily ration (p.10); defining the individual parameters on the Ration Balancer screen to build the finished ration (p.13);",
+    "source": "CFC Horse Ration 89 Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc-horse-ration-89-guide",
+    "section_id": "b74bc279-09cb-4135-ba18-900a216fe007",
+    "section_title": "Untitled"
+   }
+  ],
+  "context": "[CHUNK_ID: d26fd564-02cb-4211-b53b-12a8f31f4c2b]\nSource: CFC Horse Ration 89 Guide.DOC\nTitle: Daily Nutrient Requirement Tables (cont.)\nThe Daily Nutrient Requirement Tables form the base of the system. Shown on the tabs are the eight basic nutrients that make up the Daily Intake Requirements of a ration. Note that each value in the tables corresponds to an animal type and weight. When a ration is built, both a type and weight must be specified; the ration is then solved to the corresponding values (see p.14). When building a ration, any weight may be specified, the system will automatically factor the requirements. All of the information shown on the tables is from the 1989 NRC Nutrient Requirements of Horses publication. The values in the tables can be edited by clicking in a cell and typing in new numbers, then press the Enter key or select another cell. A Cancel Changes button will appear that will allow all changes to be cancelled and the original numbers replaced. If the changes are desired, click the Save and Exit button.\n\n---\n[CHUNK_ID: 24c5d89e-a6ff-485a-a4be-fc24d80eae9a]\nSource: CFC Horse Ration Guide Bak1.DOC\nTitle: Daily Nutrient Requirement Tables (cont.)\nThe Daily Nutrient Requirement Tables form the base of the system. Shown on the tabs are the eight basic nutrients that make up the Daily Intake Requirements of a ration. Note that each value in the tables corresponds to an animal type and weight. When a ration is built, both a type and weight must be specified; the ration is then solved to the corresponding values (see p.14). When building a ration, any weight may be specified, the system will automatically factor the requirements. All of the information shown on the tables is from the 1989 NRC Nutrient Requirements of Horses publication. The values in the tables can be edited by clicking in a cell and typing in new numbers, then press the Enter key or select another cell. A Cancel Changes button will appear that will allow all changes to be cancelled and the original numbers replaced. If the changes are desired, click the Save and Exit button.\n\n---\n[CHUNK_ID: 6b793101-02e0-4532-8ab5-87b7f0ef8946]\nSource: CFC HORSE RATION 2007 GUIDE.doc\nTitle: Untitled\nUSING THE CFC HORSE RATION FORMULATION 2007 SYSTEM The CFC Horse Ration Formulation System is a freestanding program that is used to balance feed components to meet the animals’ daily requirements. System flexibility allows many and varied user applications. Intake requirements are guided by the 2007 NRC Nutrient Requirements of Horses, Sixth Revised Edition. System configuration allows up to 1000 ingredients, 1000 products, and 50 nutrients. All features can be customized to meet the user's approach to horse nutrition. It is suggested that the system set-up should proceed in the following order: defining/refining the nutrients to be used in the Nutrient Maintenance screen (p.3); defining any desired default Nutrient Ratios (p.5); creating the ingredients and refining their nutrient profiles in the Ingredient Maintenance screen (p.6); setting the system general defaults on the System Options screen; from this same screen, the user identifies the intermediate ration components that are used to build the total daily ration (p.8); defining the individual parameters on the Ration Balancer screen to build the finished ration (p.11);\n"
+ },
+ {
+  "question": "What is a nutrient ratio template?",
+  "chunks": [
+   {
+    "rank": 1,
+    "score": 0.786235,
+    "chunk_id": "4a15cfc3-04bf-414a-b9d0-e27a063262f8",
+    "text": "Nutrient Ratio Templates A Nutrient Ratio Template is a pre-defined list of Nutrient Ratio Requirements. Once defined, a template may be added or merged into a Product Specification with a mouse click of a single command button, resulting in a significant time savings as compared to adding nutrient ratios to specifications one ratio at a time. As Templates are added to the system, each is identified by an 8 character Template Code, along with a 40 character description. The system will allow the definition of an unlimited number of Templates. Templates are added and maintained by selection of a menu item on the Concept5 Main Menu as follows: After selection of the menu item from the Main Menu, the first Ratio Template in the database will be displayed. (If no Templates exist, you will be asked if you want to add a new Template.)",
+    "source": "Nutrient Ratio Templates.doc",
+    "source_type": "document",
+    "doc_id": "nutrient-ratio-templates",
+    "section_id": "fc3d058d-de2a-44a1-8c8d-18bd5f1fd57d",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 2,
+    "score": 0.749022067,
+    "chunk_id": "adf2c75b-85eb-4d39-8f9f-b53f80e05654",
+    "text": "CFC Nutrient Ratio Templates Guide A Nutrient Ratio Template is a pre-defined list of Nutrient Ratio Requirements. Once defined, a template may be added or merged into a Product Specification with a mouse click of a single command button, resulting in a significant time savings as compared to adding nutrient ratios to specifications one ratio at a time. As Templates are added to the system, each is identified by an 8 character Template Code, along with a 40 character description. The system will allow the definition of an unlimited number of Templates. Templates are added and maintained by selection of a menu item on the Concept5 Main Menu as follows: Creating/Editing Templates After selection of the menu item from the Main Menu, the first Ratio Template in the database will be displayed. (If no Templates exist, you will be asked if you want to add a new Template.)",
+    "source": "CFC Nutrient Ratio Templates Guide.doc",
+    "source_type": "document",
+    "doc_id": "cfc-nutrient-ratio-templates-guide",
+    "section_id": "0e6dcde9-63af-4fed-8187-84046462c6e7",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 3,
+    "score": 0.739074767,
+    "chunk_id": "c705b0eb-a045-42e0-8cbb-17e1ae640cbc",
+    "text": "Nutrient Ratios allows the establishment of relationships between nutrients. While these relationships can be simple ratios, the system allows a greater level of flexibility because neither units of measure nor absolute inclusion rates are defined. (For example, a ratio between two nutrients of 1 to 1000 or 10 to 10,000 will produce the same result.) From the main menu, click the Nutrient Ratio Definition button to open the Nutrient Ratio Maintenance screen. When first opened, the screen will be blank. In the following example a row has been completed. In this example a check is in the Active column. Activating a nutrient ratio will show the ratio for every ration but will not require the ration to meet the requirement unless specified in the Must Meet column. Enter the code number of the first nutrient in the ratio (the numerator), in this case row 8, Protein, in the NutrNo column by clicking in the cell and choosing from the listing.",
+    "source": "CFC Dairy Ration Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc-dairy-ration-guide",
+    "section_id": "c117b862-edd2-4eab-beae-7de3a9cfd72d",
+    "section_title": "Nutrient Ratios"
+   },
+   {
+    "rank": 4,
+    "score": 0.730988562,
+    "chunk_id": "75e6f522-6f16-43b4-9af9-727dc464c4f5",
+    "text": "From the main menu, click the Nutrient Ratio Definition button to open the Nutrient Ratio Maintenance screen. When first opened, the table will be blank. In the following example a row has been completed. Nutrient Ratios allows the establishment of relationships between nutrients. While these relationships can be simple ratios, the system allows a greater level of flexibility because neither units of measure nor absolute inclusion rates are defined. (For example, a ratio between two nutrients of 1 to 1000 or 10 to 10,000 will produce the same result.) In this example a check is in the Active column. Activating a nutrient ratio will show the ratio for every ration but will not require the ration to meet the requirement unless specified in the Must Meet column. Enter the code number of the first nutrient in the ratio (the numerator), in this case nutrient 4, Calcium, in the NutrNo column by clicking in the cell and choosing from the listing.",
+    "source": "CFC HORSE RATION 2007 GUIDE.doc",
+    "source_type": "document",
+    "doc_id": "cfc-horse-ration-2007-guide",
+    "section_id": "e4a0554e-c052-4ed4-8253-848bae284827",
+    "section_title": "Nutrient Ratios"
+   },
+   {
+    "rank": 5,
+    "score": 0.724809706,
+    "chunk_id": "42fe9c3a-a90f-4f2a-83fb-01d984e607c0",
+    "text": "Nutrient Ratios allows the establishment of relationships between nutrients. While these relationships can be simple ratios, the system allows a greater level of flexibility because neither units of measure nor absolute inclusion rates are defined. (For example, a ratio between two nutrients of 1 to 1000 or 10 to 10,000 will produce the same result.) From the main menu, click the Nutrient Ratio Definition button to open the Nutrient Ratio Maintenance screen. When first opened, the table will be blank. In the following example a row has been completed. In this example a check is in the Active column. Activating a nutrient ratio will show the ratio for every ration but will not require the ration to meet the requirement unless specified in the Must Meet column. Enter the code number of the first nutrient in the ratio (the numerator), in this case nutrient 4, Calcium, in the NutrNo column by clicking in the cell and choosing from the listing.",
+    "source": "CFC Horse Ration Guide Bak1.DOC",
+    "source_type": "document",
+    "doc_id": "cfc-horse-ration-guide-bak1",
+    "section_id": "bfa528ea-7943-4443-9923-105df7f4b6cf",
+    "section_title": "Nutrient Ratios"
+   }
+  ],
+  "context": "[CHUNK_ID: 4a15cfc3-04bf-414a-b9d0-e27a063262f8]\nSource: Nutrient Ratio Templates.doc\nTitle: Untitled\nNutrient Ratio Templates A Nutrient Ratio Template is a pre-defined list of Nutrient Ratio Requirements. Once defined, a template may be added or merged into a Product Specification with a mouse click of a single command button, resulting in a significant time savings as compared to adding nutrient ratios to specifications one ratio at a time. As Templates are added to the system, each is identified by an 8 character Template Code, along with a 40 character description. The system will allow the definition of an unlimited number of Templates. Templates are added and maintained by selection of a menu item on the Concept5 Main Menu as follows: After selection of the menu item from the Main Menu, the first Ratio Template in the database will be displayed. (If no Templates exist, you will be asked if you want to add a new Template.)\n\n---\n[CHUNK_ID: adf2c75b-85eb-4d39-8f9f-b53f80e05654]\nSource: CFC Nutrient Ratio Templates Guide.doc\nTitle: Untitled\nCFC Nutrient Ratio Templates Guide A Nutrient Ratio Template is a pre-defined list of Nutrient Ratio Requirements. Once defined, a template may be added or merged into a Product Specification with a mouse click of a single command button, resulting in a significant time savings as compared to adding nutrient ratios to specifications one ratio at a time. As Templates are added to the system, each is identified by an 8 character Template Code, along with a 40 character description. The system will allow the definition of an unlimited number of Templates. Templates are added and maintained by selection of a menu item on the Concept5 Main Menu as follows: Creating/Editing Templates After selection of the menu item from the Main Menu, the first Ratio Template in the database will be displayed. (If no Templates exist, you will be asked if you want to add a new Template.)\n\n---\n[CHUNK_ID: c705b0eb-a045-42e0-8cbb-17e1ae640cbc]\nSource: CFC Dairy Ration Guide.DOC\nTitle: Nutrient Ratios\nNutrient Ratios allows the establishment of relationships between nutrients. While these relationships can be simple ratios, the system allows a greater level of flexibility because neither units of measure nor absolute inclusion rates are defined. (For example, a ratio between two nutrients of 1 to 1000 or 10 to 10,000 will produce the same result.) From the main menu, click the Nutrient Ratio Definition button to open the Nutrient Ratio Maintenance screen. When first opened, the screen will be blank. In the following example a row has been completed. In this example a check is in the Active column. Activating a nutrient ratio will show the ratio for every ration but will not require the ration to meet the requirement unless specified in the Must Meet column. Enter the code number of the first nutrient in the ratio (the numerator), in this case row 8, Protein, in the NutrNo column by clicking in the cell and choosing from the listing.\n"
+ },
+ {
+  "question": "How do I find an equivalent ingredient?",
+  "chunks": [
+   {
+    "rank": 1,
+    "score": 0.587356627,
+    "chunk_id": "77e7c3ea-86c0-4031-a66a-ea3ae5a39866",
+    "text": "An ingredient search may be conducted on the Multi-Step products by clicking the Ingredient Search button on the Multi-Step main menu. The screen shown in Example I-1 will appear. Enter the ingredient code in the textbox and click Search. The result of the search is shown in Example I-2. Example I-1",
+    "source": "CFC5 MultiStep.docx",
+    "source_type": "document",
+    "doc_id": "cfc5-multistep",
+    "section_id": "c967ef13-a688-440b-8882-5cc561c0709a",
+    "section_title": "Ingredient Search"
+   },
+   {
+    "rank": 2,
+    "score": 0.587356627,
+    "chunk_id": "4f5eec1d-b47b-4249-85c5-c53e2da24914",
+    "text": "An ingredient search may be conducted on the Multi-Step products by clicking the Ingredient Search button on the Multi-Step main menu. The screen shown in Example I-1 will appear. Enter the ingredient code in the textbox and click Search. The result of the search is shown in Example I-2. Example I-1",
+    "source": "CFC5 MultiStep.doc",
+    "source_type": "document",
+    "doc_id": "cfc5-multistep",
+    "section_id": "8725d97f-5da9-4384-ac3b-6d9e9de33606",
+    "section_title": "Ingredient Search"
+   },
+   {
+    "rank": 3,
+    "score": 0.587356627,
+    "chunk_id": "30b3ffc8-cb7c-42a3-98f1-6eb8b7c3d3c4",
+    "text": "An ingredient search may be conducted on the Multi-Step products by clicking the Ingredient Search button on the Multi-Step main menu. The screen shown in Example I-1 will appear. Enter the ingredient code in the textbox and click Search. The result of the search is shown in Example I-2. Example I-1",
+    "source": "CFC5 MultiStep.doc",
+    "source_type": "document",
+    "doc_id": "cfc5-multistep",
+    "section_id": "ef1cdf86-9721-4da9-87fb-5c1cf0073487",
+    "section_title": "Ingredient Search"
+   },
+   {
+    "rank": 4,
+    "score": 0.587356627,
+    "chunk_id": "ea719b7f-707b-4126-b654-b4983ef73213",
+    "text": "An ingredient search may be conducted on the Multi-Step products by clicking the Ingredient Search button on the Multi-Step main menu. The screen shown in Example I-1 will appear. Enter the ingredient code in the textbox and click Search. The result of the search is shown in Example I-2. Example I-1",
+    "source": "MultiStepKen1.Doc",
+    "source_type": "document",
+    "doc_id": "multistepken1",
+    "section_id": "5d1112fe-b95f-401e-8666-760d46f94373",
+    "section_title": "Ingredient Search"
+   },
+   {
+    "rank": 5,
+    "score": 0.582411826,
+    "chunk_id": "e33b49e2-1ffc-4ff9-afb5-5acd71204be9",
+    "text": "Ingredient Maintenance (cont.) The Get Ingredient button will open the ingredient menu for selecting the ingredient to show on screen. Click on the desired ingredient and select the Get Ingredient button on the index (or double-click the ingredient in the list). The First, Previous, Next, and Last buttons can also be used to scroll through the existing ingredients.",
+    "source": "CFC Fertilizer Blending System Guide.doc",
+    "source_type": "document",
+    "doc_id": "cfc-fertilizer-blending-system-guide",
+    "section_id": "5104551c-8b0b-45cf-96cb-96867fb429f8",
+    "section_title": "Untitled"
+   }
+  ],
+  "context": "[CHUNK_ID: 77e7c3ea-86c0-4031-a66a-ea3ae5a39866]\nSource: CFC5 MultiStep.docx\nTitle: Ingredient Search\nAn ingredient search may be conducted on the Multi-Step products by clicking the Ingredient Search button on the Multi-Step main menu. The screen shown in Example I-1 will appear. Enter the ingredient code in the textbox and click Search. The result of the search is shown in Example I-2. Example I-1\n\n---\n[CHUNK_ID: 4f5eec1d-b47b-4249-85c5-c53e2da24914]\nSource: CFC5 MultiStep.doc\nTitle: Ingredient Search\nAn ingredient search may be conducted on the Multi-Step products by clicking the Ingredient Search button on the Multi-Step main menu. The screen shown in Example I-1 will appear. Enter the ingredient code in the textbox and click Search. The result of the search is shown in Example I-2. Example I-1\n\n---\n[CHUNK_ID: 30b3ffc8-cb7c-42a3-98f1-6eb8b7c3d3c4]\nSource: CFC5 MultiStep.doc\nTitle: Ingredient Search\nAn ingredient search may be conducted on the Multi-Step products by clicking the Ingredient Search button on the Multi-Step main menu. The screen shown in Example I-1 will appear. Enter the ingredient code in the textbox and click Search. The result of the search is shown in Example I-2. Example I-1\n\n---\n[CHUNK_ID: ea719b7f-707b-4126-b654-b4983ef73213]\nSource: MultiStepKen1.Doc\nTitle: Ingredient Search\nAn ingredient search may be conducted on the Multi-Step products by clicking the Ingredient Search button on the Multi-Step main menu. The screen shown in Example I-1 will appear. Enter the ingredient code in the textbox and click Search. The result of the search is shown in Example I-2. Example I-1\n\n---\n[CHUNK_ID: e33b49e2-1ffc-4ff9-afb5-5acd71204be9]\nSource: CFC Fertilizer Blending System Guide.doc\nTitle: Untitled\nIngredient Maintenance (cont.) The Get Ingredient button will open the ingredient menu for selecting the ingredient to show on screen. Click on the desired ingredient and select the Get Ingredient button on the index (or double-click the ingredient in the list). The First, Previous, Next, and Last buttons can also be used to scroll through the existing ingredients.\n"
+ },
+ {
+  "question": "How do I browse and edit records in CFC5?",
+  "chunks": [
+   {
+    "rank": 1,
+    "score": 0.497901917,
+    "chunk_id": "78436907-25b6-45bd-9582-534653132522",
+    "text": "After clicking this button, the form shown on the previous page will be shown allowing you to select which Tag ID’s to include in the “View Tags” form shown below. This screen will show the Tag ID’s you selected, and the “status” of the current tag (if any). You may view the tag on the screen by selecting a Tag ID in the “Tag ID” column, and then clicking the “View Tag” button. The current tag that has been generated for the selected Tat ID will appear on the screen. It will look exactly as it will appear when printed. Storing Tags Generated tags will be stored automatically in the current CFC5 database folder. (This folder is identified at the top of both the Generate Tags screen and the Review/Edit/Print Tags screen.) If desired, tags may be stored in a different folder but a path must be set to this folder. To designate a different folder for storing generated tags: 1.) From the main menu, click the TAG (Labeling) button to open the Labeling (Tags) window. 2.) On the Formatting Controls frame, click the Tag Systems Controls button to open the Tag System Controls window. 3.) In the Generated Tag Files frame, press the Browse button to set the path to the desired folder.",
+    "source": "LEARNING CONCEPT5 TAG.doc",
+    "source_type": "document",
+    "doc_id": "learning-concept5-tag",
+    "section_id": "5cfd7b93-e0b8-4ddd-b8e9-808e6d28211c",
+    "section_title": "The entry options of the Tag Nutrient Guarantee Formatting Controls screen are outlined below. For more information, see the Help file: Labeling>Making a Label>Formatting Controls>Nutrient Guarantee."
+   },
+   {
+    "rank": 2,
+    "score": 0.460076362,
+    "chunk_id": "c6e3a1a8-5a9b-43d4-a128-3f9004407c47",
+    "text": "Export ASCII This function exports data from a CFC5 database into a standard CFC5 ASCII file. The data within this ASCII file can then be imported into a separate CFC5 database. This feature is especially helpful in transferring data between computers/locations. If using multiple data folders (a feature available only on multi-user systems), you must choose the data folder from which the data will be exported. The main menu shows the current data folder at the bottom of the screen. Select the desired data folder by clicking the Open Database In Folder button and choosing from the options shown. Then click the Data Exchange button to open the Data Exchange screen.Export ASCII (cont.) From the Data Exchange screen, click the Export ASCII button to open the Data Exchange – ASCII Export screen. The database folder chosen will be showing in the screen header. Export ASCII (cont.)",
+    "source": "CFC5 Data Exchange Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc5-data-exchange-guide",
+    "section_id": "579848d5-3356-44ea-bcdd-723ee01a3136",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 3,
+    "score": 0.451993,
+    "chunk_id": "f1c9a0e7-8961-4f01-96ea-ed788598f3f9",
+    "text": "LEARNING THE CONCEPT5 DATA EXCHANGE FEATURE The Data Exchange feature of Concept5 provides the ability to: Export selected products into a standard formula bank update (FBU*) file or a vendor-specific process control interface file. Select and export data from any CFC5 database into a standard CFC5 ASCII file. Select and import data from any standard CFC5 ASCII file into any CFC5 database. Select and export data from a chosen database into standard ASCII files in Legacy (VLCFX) format. Select and export any specified ingredient or product data to grid controls for copying to the clipboard and/or exporting to a .csv file. These capabilities offer the flexibility to transfer data easily and effectively both within the Concept5 system and to external applications. *(The FBU file is a generic ASCII format formula export file that can be used to interface with other applications.)",
+    "source": "CFC5 Data Exchange Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc5-data-exchange-guide",
+    "section_id": "579848d5-3356-44ea-bcdd-723ee01a3136",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 4,
+    "score": 0.445705891,
+    "chunk_id": "ac996755-a3c1-44db-a74c-95d60d304a95",
+    "text": "Method 2 – Run a utility specifically designed to perform the functions mentioned in condition 3 above (runtime support installation and registration). Then, manually perform the functions mentioned in condition 4 listed above (shortcut creation and setup). NOTE: Method 2 requires the use of a utility wizard supplied by Creative Formulation Concepts named “AutoRegisterCFC.EXE”. During the installation process that occurs when initially installing the Concept 5 program, this file is placed within the main program folder that is named CFC5 by default (although another folder name may be selected during the installation process). This utility is also available directly from CFC or by downloading it from the customer area of the CFC web site. Note – For future reference, the default Concept 5 installation folders are as follows: - Main installation folder for program and user ID files = “CFC5” Data sub-folder for all database related files = “DATA” (located under CFC5 folder).",
+    "source": "C5 Network Workstation Tutorial.doc",
+    "source_type": "document",
+    "doc_id": "c5-network-workstation-tutorial",
+    "section_id": "1f0aa97e-3ef8-4f4f-b898-338100b8b3fd",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 5,
+    "score": 0.441287518,
+    "chunk_id": "ed89419a-bf53-45fe-a126-911cb94e7ead",
+    "text": "The document is intended as a brief description of how to use Browse/Edit. Refer to the Help file for a more complete explanation of all the applications. To access the Browse/Edit feature, click the Browse/Edit button on the main menu. The Browse/Edit screen will open displaying five buttons. The operations herein will apply to either company-specific or plant-specific maintenance (for plant-specific maintenance, click the Change Plant Button to access the desired plant). Plant-specific screens will always reference the plant at the top of the working screen and changes will apply only to the plant chosen. To edit ingredients, click the Ingredient Data button. The Edit Base Ingredient Data frame will open showing multiple options. Choose the parameter to be edited. In the following example, the Single Nutrient Value option has been chosen. Click the Edit button to continue. The Ingredient Selection Options frame will open. Choose the ingredients to be viewed/edited. In this example, the All Ingredients option was selected. Click the OK button to continue.",
+    "source": "CFC5 Browse Edit Getting Started Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc5-browse-edit-getting-started-guide",
+    "section_id": "80e09867-9253-4adc-b3fa-067a1044e275",
+    "section_title": "Untitled"
+   }
+  ],
+  "context": "[CHUNK_ID: 78436907-25b6-45bd-9582-534653132522]\nSource: LEARNING CONCEPT5 TAG.doc\nTitle: The entry options of the Tag Nutrient Guarantee Formatting Controls screen are outlined below. For more information, see the Help file: Labeling>Making a Label>Formatting Controls>Nutrient Guarantee.\nAfter clicking this button, the form shown on the previous page will be shown allowing you to select which Tag ID’s to include in the “View Tags” form shown below. This screen will show the Tag ID’s you selected, and the “status” of the current tag (if any). You may view the tag on the screen by selecting a Tag ID in the “Tag ID” column, and then clicking the “View Tag” button. The current tag that has been generated for the selected Tat ID will appear on the screen. It will look exactly as it will appear when printed. Storing Tags Generated tags will be stored automatically in the current CFC5 database folder. (This folder is identified at the top of both the Generate Tags screen and the Review/Edit/Print Tags screen.) If desired, tags may be stored in a different folder but a path must be set to this folder. To designate a different folder for storing generated tags: 1.) From the main menu, click the TAG (Labeling) button to open the Labeling (Tags) window. 2.) On the Formatting Controls frame, click the Tag Systems Controls button to open the Tag System Controls window. 3.) In the Generated Tag Files frame, press the Browse button to set the path to the desired folder.\n\n---\n[CHUNK_ID: c6e3a1a8-5a9b-43d4-a128-3f9004407c47]\nSource: CFC5 Data Exchange Guide.DOC\nTitle: Untitled\nExport ASCII This function exports data from a CFC5 database into a standard CFC5 ASCII file. The data within this ASCII file can then be imported into a separate CFC5 database. This feature is especially helpful in transferring data between computers/locations. If using multiple data folders (a feature available only on multi-user systems), you must choose the data folder from which the data will be exported. The main menu shows the current data folder at the bottom of the screen. Select the desired data folder by clicking the Open Database In Folder button and choosing from the options shown. Then click the Data Exchange button to open the Data Exchange screen.Export ASCII (cont.) From the Data Exchange screen, click the Export ASCII button to open the Data Exchange – ASCII Export screen. The database folder chosen will be showing in the screen header. Export ASCII (cont.)\n\n---\n[CHUNK_ID: f1c9a0e7-8961-4f01-96ea-ed788598f3f9]\nSource: CFC5 Data Exchange Guide.DOC\nTitle: Untitled\nLEARNING THE CONCEPT5 DATA EXCHANGE FEATURE The Data Exchange feature of Concept5 provides the ability to: Export selected products into a standard formula bank update (FBU*) file or a vendor-specific process control interface file. Select and export data from any CFC5 database into a standard CFC5 ASCII file. Select and import data from any standard CFC5 ASCII file into any CFC5 database. Select and export data from a chosen database into standard ASCII files in Legacy (VLCFX) format. Select and export any specified ingredient or product data to grid controls for copying to the clipboard and/or exporting to a .csv file. These capabilities offer the flexibility to transfer data easily and effectively both within the Concept5 system and to external applications. *(The FBU file is a generic ASCII format formula export file that can be used to interface with other applications.)\n"
+ },
+ {
+  "question": "How do I build a beef cattle ration?",
+  "chunks": [
+   {
+    "rank": 1,
+    "score": 0.610552847,
+    "chunk_id": "648c5982-e81a-4d15-8665-28a8a6ed38cf",
+    "text": " |  |  |  |  |  |  |  |  | \n |  |  |  |  | Nutrient Content | Nutrient Content |  | Requirements | Requirements\n |  | Cost |  | Moisture | Protein | Fat |  | Min | Max\n | Ingredient | $/Ton |  | Pct | Pct | Pct |  | Pct | Pct\n |  |  |  |  |  |  |  |  | \n | Corn | 105 |  | 12.50 | 8.50 | 3.98 |  | - | -\n | Soy | 220 |  | 10.00 | 47.00 | 0.49 |  | - | -\n | Beef Mix | 100 |  | 60.00 | 14.50 | 24.00 |  | - | -\n | Tallow | 246 |  | - | - | 100.00 |  | - | -\n | Digest | 300 |  | 68.00 | 14.00 | 6.00 |  | 2.50 | 2.50\n | Vit Pmx | 3,800 |  | 5.00 | - | - |  | 0.05 | 0.05\n | Min Pmx | 750 |  | 4.00 | - | - |  | 0.05 | 0.05\n |  |  |  |  |  |  |  |  | ",
+    "source": "MultiStepDefined.doc",
+    "source_type": "document",
+    "doc_id": "multistepdefined",
+    "section_id": "838c058e-ba18-4738-8f77-28eda5d74d07",
+    "section_title": "Introduction"
+   },
+   {
+    "rank": 2,
+    "score": 0.5940485,
+    "chunk_id": "851e2e25-93d2-4bbc-908b-b2d01b122171",
+    "text": "USING THE CFC BEEF FEEDER GROWOUT MODEL The CFC Beef Feeder Growout Model allows you to define and simulate a complete growout model. All predictive equations, multiplier defaults, and adjustment factor defaults are from the NRC Nutrient Requirements of Beef Cattle, Seventh Revised Edition, 1996, with NRC 2000 modifications. The model’s straightforward design and total flexibility allows you to define: the desired energy multipliers and dry matter adjustment factors for their respective predictive equations; the rations to be used and how they will be fed in the model; herd data; monetary data. The growout is then simulated and provides summaries for performance, economics, total ration usage, and the growout detail for every day the animals are on feed. The beef system is linked to the Concept5 formulation system to allow any stored ration within Concept5 to be used in the model. The following pages will guide you through the set up and computation of the model, and will provide a description of the solution summary. From the menu bar on the Concept5 main menu, select Tools, then Beef Growout Model.",
+    "source": "CFC Beef Model Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc-beef-model-guide",
+    "section_id": "9ff005eb-88b3-4856-bee5-831d0db498a4",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 3,
+    "score": 0.583487511,
+    "chunk_id": "4e0a3de5-8d9c-4c94-a2ee-aaf66be0073b",
+    "text": "20 220Lean Beef 0 0 0 0 79.175 0.1550 0.0550 1.000 20 311Fat 0 0 0 0 109.254 0.1045 0.1298 0.100 20 320Calc Carbonate 0 0 0 0 15.268 0.0212 0.0151 0.100 20 340Salt 0 0 0 0 7.500 0.0161 0.0273 0.100 20 410Vitamin Premix 0 0 0 0 15.000 1.4175 1.9210 0.000 20 420Mineral Premix 0 0 0 0 30.000 1.0271 0.3656 0.000 20 510Digest 0 0 0 0 30.000 1.5120 0.1560 0.100 25 30STEP1 25 40STEP1 25 50STEP1 25 90STEP1 25 220STEP1 25 311STEP1 25 320STEP1 25 340STEP1 25 410STEP1 25 420STEP1 25 311STEP3 25 510STEP3 30 4Protein Pct 6.090 30 5Fat Pct 2.500 30 6Fiber Pct 0.865 30 7Ash Pct 1.566 30 8Calcium Pct 0.126 30 9Phosphorus Pct 0.129 30 10ME Kcal/g 0.832 40BEEF Beef Component STEP3 Coating STEP2 Extrusion 311Fat 5.38 40BEEF Beef Component STEP3 Coating STEP2 Extrusion 510Digest 2.15",
+    "source": "Concept5 Multi-Step BOL FBU File Layout and Example.doc",
+    "source_type": "document",
+    "doc_id": "concept5-multi-step-bol-fbu-file-layout-and-example",
+    "section_id": "b1e51359-df0a-465a-9997-7b661b258c59",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 4,
+    "score": 0.571676195,
+    "chunk_id": "16b3be17-9610-41c2-882e-bc7c271bb1ca",
+    "text": "20 220Lean Beef 0 0 0 0 79.175 0.1550 0.0550 1.000 20 311Fat 0 0 0 0 109.254 0.1045 0.1298 0.100 20 320Calc Carbonate 0 0 0 0 15.268 0.0212 0.0151 0.100 20 340Salt 0 0 0 0 7.500 0.0161 0.0273 0.100 20 410Vitamin Premix 0 0 0 0 15.000 1.4175 1.9210 0.000 20 420Mineral Premix 0 0 0 0 30.000 1.0271 0.3656 0.000 20 510Digest 0 0 0 0 30.000 1.5120 0.1560 0.100 25 30STEP1 25 40STEP1 25 50STEP1 25 90STEP1 25 220STEP1 25 311STEP1 25 320STEP1 25 340STEP1 25 410STEP1 25 420STEP1 25 311STEP3 25 510STEP3 30 4Protein Pct 5.647 6.090 30 5Fat Pct 2.318 2.500 30 6Fiber Pct 0.802 0.865 30 7Ash Pct 1.452 1.566 30 8Calcium Pct 0.116 0.126 30 9Phosphorus Pct 0.120 0.129 30 10ME Kcal/g 0.772 0.832 40BEEF Beef Component STEP3 Coating STEP2 Extrusion 311Fat 5.38 40BEEF Beef Component STEP3 Coating STEP2 Extrusion 510Digest 2.15",
+    "source": "Concept5 Multi-Step BOM FBU File Layout and Example.doc",
+    "source_type": "document",
+    "doc_id": "concept5-multi-step-bom-fbu-file-layout-and-example",
+    "section_id": "f0bc5931-687c-4807-b9be-410af55adbde",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 5,
+    "score": 0.56310755,
+    "chunk_id": "85725850-9644-4ccd-b4fd-92b314a6c772",
+    "text": " |  |  |  |  |  |  | \n | Selling Price: | 0.00 | 116.65 | 188.34 | 291.56 | 1501.00 | \n |  |  |  |  |  |  | \n | Ingredient | Lbs | Lbs | Lbs | Lbs | Lbs | \n | Corn | 775.18 | 991.52 | 1197.44 | 1047.70 | 843.76 | \n | Soy | 190.20 | 375.42 | 800.36 | 949.83 | 1153.75 | \n | Beef Mix | 1033.21 | 631.43 | 0.00 | 0.00 | 0.00 | \n | Vit Pmx | 0.71 | 0.81 | 1.10 | 1.24 | 1.25 | \n | Min Pmx | 0.71 | 0.81 | 1.10 | 1.24 | 1.25 | \n | Tallow | 0.00 | 0.00 | 210.05 | 444.62 | 455.20 | \n | Digest | 35.23 | 40.68 | 55.19 | 61.83 | 62.27 | \n |  |  |  |  |  |  | \n | Total Ingr Lbs: | 2035.23 | 2040.68 | 2265.25 | 2506.46 | 2517.47 | \n | Moisture Loss: | 625.99 | 413.49 | 57.62 | 33.14 | 26.67 | \n | Finish Prod Lbs: | 1409.24 | 1627.19 | 2207.63 | 2473.32 | 2490.80 | \n |  |  |  |  |  |  | \n | Revenue: | 0.00 | 94.91 | 207.89 | 360.56 | 1869.34 | \n | Cost: | 120.17 | 132.88 | 187.53 | 226.26 | 239.37 | \n | Return: | -120.17 | -37.97 | 20.36 | 134.30 | 1629.97 | \n |  |  |  |  |  |  | \n | : | 116.64 | 188.33 | 291.55 | 1500.13 | Infinity | \n |  |  |  |  |  |  | ",
+    "source": "MultiStepDefined.doc",
+    "source_type": "document",
+    "doc_id": "multistepdefined",
+    "section_id": "f4ee9a90-bc27-45a6-8172-9605bf77f9d8",
+    "section_title": "Processing Steps"
+   }
+  ],
+  "context": "[CHUNK_ID: 648c5982-e81a-4d15-8665-28a8a6ed38cf]\nSource: MultiStepDefined.doc\nTitle: Introduction\n |  |  |  |  |  |  |  |  | \n |  |  |  |  | Nutrient Content | Nutrient Content |  | Requirements | Requirements\n |  | Cost |  | Moisture | Protein | Fat |  | Min | Max\n | Ingredient | $/Ton |  | Pct | Pct | Pct |  | Pct | Pct\n |  |  |  |  |  |  |  |  | \n | Corn | 105 |  | 12.50 | 8.50 | 3.98 |  | - | -\n | Soy | 220 |  | 10.00 | 47.00 | 0.49 |  | - | -\n | Beef Mix | 100 |  | 60.00 | 14.50 | 24.00 |  | - | -\n | Tallow | 246 |  | - | - | 100.00 |  | - | -\n | Digest | 300 |  | 68.00 | 14.00 | 6.00 |  | 2.50 | 2.50\n | Vit Pmx | 3,800 |  | 5.00 | - | - |  | 0.05 | 0.05\n | Min Pmx | 750 |  | 4.00 | - | - |  | 0.05 | 0.05\n |  |  |  |  |  |  |  |  | \n\n---\n[CHUNK_ID: 851e2e25-93d2-4bbc-908b-b2d01b122171]\nSource: CFC Beef Model Guide.DOC\nTitle: Untitled\nUSING THE CFC BEEF FEEDER GROWOUT MODEL The CFC Beef Feeder Growout Model allows you to define and simulate a complete growout model. All predictive equations, multiplier defaults, and adjustment factor defaults are from the NRC Nutrient Requirements of Beef Cattle, Seventh Revised Edition, 1996, with NRC 2000 modifications. The model’s straightforward design and total flexibility allows you to define: the desired energy multipliers and dry matter adjustment factors for their respective predictive equations; the rations to be used and how they will be fed in the model; herd data; monetary data. The growout is then simulated and provides summaries for performance, economics, total ration usage, and the growout detail for every day the animals are on feed. The beef system is linked to the Concept5 formulation system to allow any stored ration within Concept5 to be used in the model. The following pages will guide you through the set up and computation of the model, and will provide a description of the solution summary. From the menu bar on the Concept5 main menu, select Tools, then Beef Growout Model.\n\n---\n[CHUNK_ID: 4e0a3de5-8d9c-4c94-a2ee-aaf66be0073b]\nSource: Concept5 Multi-Step BOL FBU File Layout and Example.doc\nTitle: Untitled\n20 220Lean Beef 0 0 0 0 79.175 0.1550 0.0550 1.000 20 311Fat 0 0 0 0 109.254 0.1045 0.1298 0.100 20 320Calc Carbonate 0 0 0 0 15.268 0.0212 0.0151 0.100 20 340Salt 0 0 0 0 7.500 0.0161 0.0273 0.100 20 410Vitamin Premix 0 0 0 0 15.000 1.4175 1.9210 0.000 20 420Mineral Premix 0 0 0 0 30.000 1.0271 0.3656 0.000 20 510Digest 0 0 0 0 30.000 1.5120 0.1560 0.100 25 30STEP1 25 40STEP1 25 50STEP1 25 90STEP1 25 220STEP1 25 311STEP1 25 320STEP1 25 340STEP1 25 410STEP1 25 420STEP1 25 311STEP3 25 510STEP3 30 4Protein Pct 6.090 30 5Fat Pct 2.500 30 6Fiber Pct 0.865 30 7Ash Pct 1.566 30 8Calcium Pct 0.126 30 9Phosphorus Pct 0.129 30 10ME Kcal/g 0.832 40BEEF Beef Component STEP3 Coating STEP2 Extrusion 311Fat 5.38 40BEEF Beef Component STEP3 Coating STEP2 Extrusion 510Digest 2.15\n\n---\n[CHUNK_ID: 16b3be17-9610-41c2-882e-bc7c271bb1ca]\nSource: Concept5 Multi-Step BOM FBU File Layout and Example.doc\nTitle: Untitled\n20 220Lean Beef 0 0 0 0 79.175 0.1550 0.0550 1.000 20 311Fat 0 0 0 0 109.254 0.1045 0.1298 0.100 20 320Calc Carbonate 0 0 0 0 15.268 0.0212 0.0151 0.100 20 340Salt 0 0 0 0 7.500 0.0161 0.0273 0.100 20 410Vitamin Premix 0 0 0 0 15.000 1.4175 1.9210 0.000 20 420Mineral Premix 0 0 0 0 30.000 1.0271 0.3656 0.000 20 510Digest 0 0 0 0 30.000 1.5120 0.1560 0.100 25 30STEP1 25 40STEP1 25 50STEP1 25 90STEP1 25 220STEP1 25 311STEP1 25 320STEP1 25 340STEP1 25 410STEP1 25 420STEP1 25 311STEP3 25 510STEP3 30 4Protein Pct 5.647 6.090 30 5Fat Pct 2.318 2.500 30 6Fiber Pct 0.802 0.865 30 7Ash Pct 1.452 1.566 30 8Calcium Pct 0.116 0.126 30 9Phosphorus Pct 0.120 0.129 30 10ME Kcal/g 0.772 0.832 40BEEF Beef Component STEP3 Coating STEP2 Extrusion 311Fat 5.38 40BEEF Beef Component STEP3 Coating STEP2 Extrusion 510Digest 2.15\n"
+ },
+ {
+  "question": "reset password",
+  "chunks": [
+   {
+    "rank": 1,
+    "score": 0.401041985,
+    "chunk_id": "f1c3afa4-fca3-4a01-a50e-62424d85e86e",
+    "text": "In the example shown below, the Log-in ID (User ID) is John and the password is carrot. His status is Enabled, he does not have Administrator Rights (the checkbox is blank), and he is restricted to the Concept5 Database Folder (the general default data folder). The user Status allows the administrator to manually enable and disable a user's access. A user is automatically disabled if five incorrect passwords are entered at login. The Data Access Rights tab specifies the default and restrictions to ingredient, product, and plant data. The scroll box in each frame allows you to define the default setting as Unlimited, Read Only, or No Access. If desired, the default can be qualified by setting exceptions by code range – select the Yes option and enter the code range in the From and Thru columns and select the Rights from the scroll box. Delete will remove the entry (after exiting the screen). The Menu Item Restrictions tab notes any access restrictions to specific maintenance screens. Click a checkmark in the Cannot Use column for each restricted menu item.",
+    "source": "CFC5 Administration Features Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc5-administration-features-guide",
+    "section_id": "66e893b2-2879-44e6-afbc-ec83d00b3fab",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 2,
+    "score": 0.319203377,
+    "chunk_id": "45173b5b-5edf-4ff8-8541-a9cb86ca625b",
+    "text": "The Get User button will open the Select User ID menu popup. Existing users can be selected for editing. The First, Prev, Next, and Last buttons can also be used for scrolling through the user list. The Add New User button will open the Adding User popup requesting a User Login ID. Up to 8 alphanumeric characters are allowed – blanks are not allowed. Click the OK button after entry. The screen will open to the new user for editing. The Delete User button will delete the user shown. The Print button will print the entire profile of the user shown including all access rights and menu restrictions. The General tab of the User Maintenance screen lists the log-in identification of the user (User ID), the user name and password, the user status, whether or not this user has administration rights, and the identification of the database folder to which the user is restricted (the Concept5 multi-user system allows multiple data folders). It is not necessary to restrict a user to one database.",
+    "source": "CFC5 Administration Features Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc5-administration-features-guide",
+    "section_id": "66e893b2-2879-44e6-afbc-ec83d00b3fab",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 3,
+    "score": 0.318187714,
+    "chunk_id": "2d0282a5-9cce-43c0-9661-6de85cefad04",
+    "text": "USING THE CONCEPT5 ADMINISTRATION FEATURES The Concept5 multi-user system allows you to set access rights for each user. Security is maintained by at least one administrator who controls the user log and defines data access rights. Security includes: User name, login identification, and password. User status as enabled/disabled. User database access. User rights to ingredient, product, and plant data. User access to menu items. From the menu bar on the main menu, select File, Administration, then Define Users to open the User Maintenance screen. Once defined, only users with Administration Rights (see p.2) will be able to open the User Maintenance screen. When the screen is opened for the first time, the user, Admin, is automatically created, as shown below. Note that the User ID has already been defined as ADMIN and no password has been assigned to this user. From this point on, whenever Concept5 is opened a User Name (User ID) and password will be requested before access is allowed. You can continue to use ADMIN (without a password) to gain system access until your users have been set up. Once all users have been established, ADMIN can be deleted.",
+    "source": "CFC5 Administration Features Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc5-administration-features-guide",
+    "section_id": "66e893b2-2879-44e6-afbc-ec83d00b3fab",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 4,
+    "score": 0.304265976,
+    "chunk_id": "19d31800-4946-4e75-9674-8242289c6ef2",
+    "text": "User ID file. If the system is a Concept 5 “Multi-User” installation, the file containing user information may be copied from the old PC to the new one to eliminate the need to manually re-enter user ID’s, Passwords and other user specific security settings. This file is located within the same folder as the program executables (“CFC5”). The name of this file is: P5SYSTEM.UID Database Files. All of the database information is contained in a group of files located within the subfolder named Data (unless otherwise specified as discussed on page 2) Temporary User Settings and Work Files. Save the folder located on the ”C” drive named Pro5Work including all of the subfolders and files within it. Install the trial copy of the Concept 5 or Concept 5-M program onto the new PC. On the third step of the installation, leave the Data & Program Files checked, click the Data Options button and select the Blank Database option NOTE: The “Data and Program Files” option box is not available on the CFC5-M installation). Send CFC the “Installation Code” and use the “License Code” supplied to switch the program to license status per your previous license agreement.",
+    "source": "C5 Reinstallation Tutorial.doc",
+    "source_type": "document",
+    "doc_id": "c5-reinstallation-tutorial",
+    "section_id": "269096de-5b00-44dc-8b73-593373b59a4c",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 5,
+    "score": 0.231857792,
+    "chunk_id": "548dcf1d-dbc6-4f44-89d3-7cbfdfeb361b",
+    "text": "For more information, refer to the Help file: Contents tab>Administration/Security.",
+    "source": "CFC5 Administration Features Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc5-administration-features-guide",
+    "section_id": "66e893b2-2879-44e6-afbc-ec83d00b3fab",
+    "section_title": "Untitled"
+   }
+  ],
+  "context": "[CHUNK_ID: f1c3afa4-fca3-4a01-a50e-62424d85e86e]\nSource: CFC5 Administration Features Guide.DOC\nTitle: Untitled\nIn the example shown below, the Log-in ID (User ID) is John and the password is carrot. His status is Enabled, he does not have Administrator Rights (the checkbox is blank), and he is restricted to the Concept5 Database Folder (the general default data folder). The user Status allows the administrator to manually enable and disable a user's access. A user is automatically disabled if five incorrect passwords are entered at login. The Data Access Rights tab specifies the default and restrictions to ingredient, product, and plant data. The scroll box in each frame allows you to define the default setting as Unlimited, Read Only, or No Access. If desired, the default can be qualified by setting exceptions by code range – select the Yes option and enter the code range in the From and Thru columns and select the Rights from the scroll box. Delete will remove the entry (after exiting the screen). The Menu Item Restrictions tab notes any access restrictions to specific maintenance screens. Click a checkmark in the Cannot Use column for each restricted menu item.\n\n---\n[CHUNK_ID: 45173b5b-5edf-4ff8-8541-a9cb86ca625b]\nSource: CFC5 Administration Features Guide.DOC\nTitle: Untitled\nThe Get User button will open the Select User ID menu popup. Existing users can be selected for editing. The First, Prev, Next, and Last buttons can also be used for scrolling through the user list. The Add New User button will open the Adding User popup requesting a User Login ID. Up to 8 alphanumeric characters are allowed – blanks are not allowed. Click the OK button after entry. The screen will open to the new user for editing. The Delete User button will delete the user shown. The Print button will print the entire profile of the user shown including all access rights and menu restrictions. The General tab of the User Maintenance screen lists the log-in identification of the user (User ID), the user name and password, the user status, whether or not this user has administration rights, and the identification of the database folder to which the user is restricted (the Concept5 multi-user system allows multiple data folders). It is not necessary to restrict a user to one database.\n\n---\n[CHUNK_ID: 2d0282a5-9cce-43c0-9661-6de85cefad04]\nSource: CFC5 Administration Features Guide.DOC\nTitle: Untitled\nUSING THE CONCEPT5 ADMINISTRATION FEATURES The Concept5 multi-user system allows you to set access rights for each user. Security is maintained by at least one administrator who controls the user log and defines data access rights. Security includes: User name, login identification, and password. User status as enabled/disabled. User database access. User rights to ingredient, product, and plant data. User access to menu items. From the menu bar on the main menu, select File, Administration, then Define Users to open the User Maintenance screen. Once defined, only users with Administration Rights (see p.2) will be able to open the User Maintenance screen. When the screen is opened for the first time, the user, Admin, is automatically created, as shown below. Note that the User ID has already been defined as ADMIN and no password has been assigned to this user. From this point on, whenever Concept5 is opened a User Name (User ID) and password will be requested before access is allowed. You can continue to use ADMIN (without a password) to gain system access until your users have been set up. Once all users have been established, ADMIN can be deleted.\n"
+ },
+ {
+  "question": "What does DM% mean in the glossary?",
+  "chunks": [
+   {
+    "rank": 1,
+    "score": 0.398832321,
+    "chunk_id": "41b97425-e45e-4378-98ea-71ff71a0a5d7",
+    "text": "Concept5 Adjusted Dry Matter Option Full Screen Formulation Screen: Button “Adj DM” was added to the command line (to the right of the “Formulate” button). When this button is clicked, the “Adjusted Dry Matter Formula” screen will appear as shown on the next two pages. Adjusted Dry Matter Ingredient Screen: The Ingredients tab shows the “Air Dry” formula, the “As Feed” formula, and the 100% Dry Matter formula. You will be positioned to the “Adj DM%” column, and will be allowed to make changes to the Adjusted DM percent for any ingredient in the formula. Selection of the Nutrients tab will display the nutrient content of the formula(s) as shown on the following page. Adjusted Dry Matter Nutrient Screen: The nutritional content is presented for Air Dry, As Fed, and 100% DM formulas. If a “Dry Matter Base” is specified for the product, an additional column will appear showing the nutritional content at the specified dry matter base.",
+    "source": "Concept5 Adjusted Dry Matter Option.doc",
+    "source_type": "document",
+    "doc_id": "concept5-adjusted-dry-matter-option",
+    "section_id": "cfaf6056-4c39-4c4e-82bf-39e7bb983fec",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 2,
+    "score": 0.398832321,
+    "chunk_id": "f83bc35e-e4fe-453f-972f-11be584a9916",
+    "text": "Concept5 Adjusted Dry Matter Option Full Screen Formulation Screen: Button “Adj DM” was added to the command line (to the right of the “Formulate” button). When this button is clicked, the “Adjusted Dry Matter Formula” screen will appear as shown on the next two pages. Adjusted Dry Matter Ingredient Screen: The Ingredients tab shows the “Air Dry” formula, the “As Feed” formula, and the 100% Dry Matter formula. You will be positioned to the “Adj DM%” column, and will be allowed to make changes to the Adjusted DM percent for any ingredient in the formula. Selection of the Nutrients tab will display the nutrient content of the formula(s) as shown on the following page. Adjusted Dry Matter Nutrient Screen: The nutritional content is presented for Air Dry, As Fed, and 100% DM formulas. If a “Dry Matter Base” is specified for the product, an additional column will appear showing the nutritional content at the specified dry matter base.",
+    "source": "Concept5 Adjusted Dry Matter Option.doc",
+    "source_type": "document",
+    "doc_id": "concept5-adjusted-dry-matter-option",
+    "section_id": "8670c719-74db-4836-89ca-a7e75505261d",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 3,
+    "score": 0.398832321,
+    "chunk_id": "c81e15e3-28fb-4835-ae72-885353752337",
+    "text": "Concept5 Adjusted Dry Matter Option Full Screen Formulation Screen: Button “Adj DM” was added to the command line (to the right of the “Formulate” button). When this button is clicked, the “Adjusted Dry Matter Formula” screen will appear as shown on the next two pages. Adjusted Dry Matter Ingredient Screen: The Ingredients tab shows the “Air Dry” formula, the “As Feed” formula, and the 100% Dry Matter formula. You will be positioned to the “Adj DM%” column, and will be allowed to make changes to the Adjusted DM percent for any ingredient in the formula. Selection of the Nutrients tab will display the nutrient content of the formula(s) as shown on the following page. Adjusted Dry Matter Nutrient Screen: The nutritional content is presented for Air Dry, As Fed, and 100% DM formulas. If a “Dry Matter Base” is specified for the product, an additional column will appear showing the nutritional content at the specified dry matter base.",
+    "source": "Concept5 Adjusted Dry Matter Option.doc",
+    "source_type": "document",
+    "doc_id": "concept5-adjusted-dry-matter-option",
+    "section_id": "1bf3094c-620e-4a95-a3eb-f0cce6226787",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 4,
+    "score": 0.341004401,
+    "chunk_id": "46902054-785f-478d-8cc4-0ef2d8306c63",
+    "text": "indicates that the MOP restriction violates the current level in these formulas. A blue number in any of the MOP columns means that the MOP solution is meeting a MOP-designated limit. MOP Solution Report (cont.) The tab on the Multi-Product Optimization Solution screen shows the ingredients used in the formula solutions sorted by ingredient code. Ingredients designated as limited in the MOP run are listed first. The Minimum Tons and Maximum Tons columns refer to the MOP minimum and maximum restrictions imposed on the limited ingredients. A blue number in this column indicates that a MOP limit is being met. The column labeled Ingr Cost $/Ton lists the ingredient prices of the company default cost set - Owning or Market. The $/Ton column shows the price at which more of the ingredient will be used in the MOP solution. The $/Ton column shows the price at which less of the ingredient will be used in the MOP solution.",
+    "source": "Concept5MOP.doc",
+    "source_type": "document",
+    "doc_id": "concept5mop",
+    "section_id": "73561071-9e7f-45b4-8e60-b0138d3e3683",
+    "section_title": "CREATIVE FORMULATION CONCEPTS"
+   },
+   {
+    "rank": 5,
+    "score": 0.334166527,
+    "chunk_id": "d2846978-a9cd-49ec-b2fe-b0d35d632c8d",
+    "text": "used to compute product pricing.",
+    "source": "KenCPS.doc",
+    "source_type": "document",
+    "doc_id": "kencps",
+    "section_id": "264bb2f4-62d8-4c60-8523-da4700cd0c73",
+    "section_title": "is the cost resulting from the last cost save or Global Cost Roll-Up and is the cost"
+   }
+  ],
+  "context": "[CHUNK_ID: 41b97425-e45e-4378-98ea-71ff71a0a5d7]\nSource: Concept5 Adjusted Dry Matter Option.doc\nTitle: Untitled\nConcept5 Adjusted Dry Matter Option Full Screen Formulation Screen: Button “Adj DM” was added to the command line (to the right of the “Formulate” button). When this button is clicked, the “Adjusted Dry Matter Formula” screen will appear as shown on the next two pages. Adjusted Dry Matter Ingredient Screen: The Ingredients tab shows the “Air Dry” formula, the “As Feed” formula, and the 100% Dry Matter formula. You will be positioned to the “Adj DM%” column, and will be allowed to make changes to the Adjusted DM percent for any ingredient in the formula. Selection of the Nutrients tab will display the nutrient content of the formula(s) as shown on the following page. Adjusted Dry Matter Nutrient Screen: The nutritional content is presented for Air Dry, As Fed, and 100% DM formulas. If a “Dry Matter Base” is specified for the product, an additional column will appear showing the nutritional content at the specified dry matter base.\n\n---\n[CHUNK_ID: f83bc35e-e4fe-453f-972f-11be584a9916]\nSource: Concept5 Adjusted Dry Matter Option.doc\nTitle: Untitled\nConcept5 Adjusted Dry Matter Option Full Screen Formulation Screen: Button “Adj DM” was added to the command line (to the right of the “Formulate” button). When this button is clicked, the “Adjusted Dry Matter Formula” screen will appear as shown on the next two pages. Adjusted Dry Matter Ingredient Screen: The Ingredients tab shows the “Air Dry” formula, the “As Feed” formula, and the 100% Dry Matter formula. You will be positioned to the “Adj DM%” column, and will be allowed to make changes to the Adjusted DM percent for any ingredient in the formula. Selection of the Nutrients tab will display the nutrient content of the formula(s) as shown on the following page. Adjusted Dry Matter Nutrient Screen: The nutritional content is presented for Air Dry, As Fed, and 100% DM formulas. If a “Dry Matter Base” is specified for the product, an additional column will appear showing the nutritional content at the specified dry matter base.\n\n---\n[CHUNK_ID: c81e15e3-28fb-4835-ae72-885353752337]\nSource: Concept5 Adjusted Dry Matter Option.doc\nTitle: Untitled\nConcept5 Adjusted Dry Matter Option Full Screen Formulation Screen: Button “Adj DM” was added to the command line (to the right of the “Formulate” button). When this button is clicked, the “Adjusted Dry Matter Formula” screen will appear as shown on the next two pages. Adjusted Dry Matter Ingredient Screen: The Ingredients tab shows the “Air Dry” formula, the “As Feed” formula, and the 100% Dry Matter formula. You will be positioned to the “Adj DM%” column, and will be allowed to make changes to the Adjusted DM percent for any ingredient in the formula. Selection of the Nutrients tab will display the nutrient content of the formula(s) as shown on the following page. Adjusted Dry Matter Nutrient Screen: The nutritional content is presented for Air Dry, As Fed, and 100% DM formulas. If a “Dry Matter Base” is specified for the product, an additional column will appear showing the nutritional content at the specified dry matter base.\n"
+ },
+ {
+  "question": "formual not saving after i chnage ingredient prices",
+  "chunks": [
+   {
+    "rank": 1,
+    "score": 0.579217911,
+    "chunk_id": "b19be11b-f54a-46f0-b81f-07f53be39196",
+    "text": "[Select ‘Raw Mat (Ingredients)’ in the Purchase Cost Maintenance frame of the CPS Main Menu] The first step of the pricing cycle is updating the costs of ingredients and non-manufactured products. When and how often ingredient costs are updated is based on user preference. Once updated, however, it is recommended that the pricing cycle be completed so that the selling prices reflect the new costs. The Raw Material (Ingredient) Cost Maintenance screen is used to update ingredient purchase costs in CPS. This screen shows the Previous Cost (the costs stored and used for the last pricing cycle) and the Current Cost (the costs intended for the next pricing cycle) of each ingredient for the chosen cost set. Any established cost set can be referenced from the screen by clicking the Change Cost Set button and choosing from the list in the popup. Ingredient costs are edited by entering the new costs in the New Cost column. Costs may be stored in this column without effect by clicking the Save button, then selecting No to the Save New Costs popup.",
+    "source": "CPSMOD4.DOC",
+    "source_type": "document",
+    "doc_id": "cpsmod4",
+    "section_id": "b86dc4ae-195c-4fc9-8fb1-1b0eaf060915",
+    "section_title": "Purchase Cost Maintenance – Raw Material (Ingredients):"
+   },
+   {
+    "rank": 2,
+    "score": 0.579217911,
+    "chunk_id": "1cb44610-f80a-4ac0-9ebe-98c26c68b749",
+    "text": "[Select ‘Raw Mat (Ingredients)’ in the Purchase Cost Maintenance frame of the CPS Main Menu] The first step of the pricing cycle is updating the costs of ingredients and non-manufactured products. When and how often ingredient costs are updated is based on user preference. Once updated, however, it is recommended that the pricing cycle be completed so that the selling prices reflect the new costs. The Raw Material (Ingredient) Cost Maintenance screen is used to update ingredient purchase costs in CPS. This screen shows the Previous Cost (the costs stored and used for the last pricing cycle) and the Current Cost (the costs intended for the next pricing cycle) of each ingredient for the chosen cost set. Any established cost set can be referenced from the screen by clicking the Change Cost Set button and choosing from the list in the popup. Ingredient costs are edited by entering the new costs in the New Cost column. Costs may be stored in this column without effect by clicking the Save button, then selecting No to the Save New Costs popup.",
+    "source": "CFC5 Cost Pricing Description.DOC",
+    "source_type": "document",
+    "doc_id": "cfc5-cost-pricing-description",
+    "section_id": "84154368-c616-4c93-85a1-11b799eb1e60",
+    "section_title": "Purchase Cost Maintenance – Raw Material (Ingredients):"
+   },
+   {
+    "rank": 3,
+    "score": 0.569986343,
+    "chunk_id": "3b401448-7df2-4d62-91f8-8272c62b92db",
+    "text": "[From the CPS Main Menu, click the Costing System Options button.] See the Help file: Cost/Price System>Costing Defaults>Costing System Options. The System Defaults tab of the Costing Options screen allows you to choose the Ingredient Cost Units, activate and name the Ingredient Cost Sets and define the Default Raw and Finished Shrink factors (percent) for ingredients and manufactured products. Cost units are assigned in the Raw Material (Ingredient) Cost Units frame. Your selection of cost units does not effect the calculation of costs or selling prices throughout the CPS system. This setting merely states your preference of units with viewing and/or updating ingredient costs. If multiple ingredient cost sets are desired in addition to or instead of the default Owning and Market cost sets (e.g., Actual Cost, 90 day cost, Forward Cost), select the ‘Yes’ option and create up to 10 cost sets in the Multiple Ingredient Cost Set Options frame. In the Default Shrink (Percent) frame, designate the default shrink percentages for both ingredients and manufactured products. Both raw shrink (applied prior to processing) and finished shrink (applied after processing) are allowed.",
+    "source": "BillCPS.doc",
+    "source_type": "document",
+    "doc_id": "billcps",
+    "section_id": "405b1993-ebe9-48ac-b334-df493c993156",
+    "section_title": "Costing Defaults - Costing System Options"
+   },
+   {
+    "rank": 4,
+    "score": 0.569986343,
+    "chunk_id": "c0f2772e-8004-4849-8c27-c3700ec3dfc7",
+    "text": "[From the CPS Main Menu, click the Costing System Options button.] See the Help file: Cost/Price System>Costing Defaults>Costing System Options. The System Defaults tab of the Costing Options screen allows you to choose the Ingredient Cost Units, activate and name the Ingredient Cost Sets and define the Default Raw and Finished Shrink factors (percent) for ingredients and manufactured products. Cost units are assigned in the Raw Material (Ingredient) Cost Units frame. Your selection of cost units does not effect the calculation of costs or selling prices throughout the CPS system. This setting merely states your preference of units with viewing and/or updating ingredient costs. If multiple ingredient cost sets are desired in addition to or instead of the default Owning and Market cost sets (e.g., Actual Cost, 90 day cost, Forward Cost), select the ‘Yes’ option and create up to 10 cost sets in the Multiple Ingredient Cost Set Options frame. In the Default Shrink (Percent) frame, designate the default shrink percentages for both ingredients and manufactured products. Both raw shrink (applied prior to processing) and finished shrink (applied after processing) are allowed.",
+    "source": "AliceCPS.doc",
+    "source_type": "document",
+    "doc_id": "alicecps",
+    "section_id": "cf5b415f-7feb-4932-ad05-62f1f4618704",
+    "section_title": "Costing Defaults - Costing System Options"
+   },
+   {
+    "rank": 5,
+    "score": 0.559809208,
+    "chunk_id": "7cbbc523-24ac-4ab6-ac69-fac0fd6dd2e9",
+    "text": "USING THE CONCEPT5 EQUIVALENT INGREDIENT FEATURE The Equivalent Ingredient feature allows a product to be saved as an ingredient. To maintain accuracy, the system requires the ingredient to reference a plant/product combination, and the plant/product to reference the ingredient. Once the link is established, the system automatically updates the nutrient profile and price of the ingredient each time a Save request is made for the product. The feature requires two steps: setting up the ingredient, and then setting up the product. In this example, we will formulate a vitamin premix and link it to a new ingredient that we will create. We will start the process by building the ingredient. Click the Ingredient Maintenance button on the main menu to open the Base Ingredient Maintenance screen. The ingredient maintenance screen will open to the first ingredient. Because we are going to create a new ingredient, it doesn’t make any difference what ingredient is showing on the screen. Click the Add New Ingredient button to open the Adding Ingredient popup.",
+    "source": "CFC5 Equivalent Ingredient Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc5-equivalent-ingredient-guide",
+    "section_id": "96b4be9f-1b84-4344-89e6-5c8ccbe4dfe3",
+    "section_title": "Untitled"
+   }
+  ],
+  "context": "[CHUNK_ID: b19be11b-f54a-46f0-b81f-07f53be39196]\nSource: CPSMOD4.DOC\nTitle: Purchase Cost Maintenance – Raw Material (Ingredients):\n[Select ‘Raw Mat (Ingredients)’ in the Purchase Cost Maintenance frame of the CPS Main Menu] The first step of the pricing cycle is updating the costs of ingredients and non-manufactured products. When and how often ingredient costs are updated is based on user preference. Once updated, however, it is recommended that the pricing cycle be completed so that the selling prices reflect the new costs. The Raw Material (Ingredient) Cost Maintenance screen is used to update ingredient purchase costs in CPS. This screen shows the Previous Cost (the costs stored and used for the last pricing cycle) and the Current Cost (the costs intended for the next pricing cycle) of each ingredient for the chosen cost set. Any established cost set can be referenced from the screen by clicking the Change Cost Set button and choosing from the list in the popup. Ingredient costs are edited by entering the new costs in the New Cost column. Costs may be stored in this column without effect by clicking the Save button, then selecting No to the Save New Costs popup.\n\n---\n[CHUNK_ID: 1cb44610-f80a-4ac0-9ebe-98c26c68b749]\nSource: CFC5 Cost Pricing Description.DOC\nTitle: Purchase Cost Maintenance – Raw Material (Ingredients):\n[Select ‘Raw Mat (Ingredients)’ in the Purchase Cost Maintenance frame of the CPS Main Menu] The first step of the pricing cycle is updating the costs of ingredients and non-manufactured products. When and how often ingredient costs are updated is based on user preference. Once updated, however, it is recommended that the pricing cycle be completed so that the selling prices reflect the new costs. The Raw Material (Ingredient) Cost Maintenance screen is used to update ingredient purchase costs in CPS. This screen shows the Previous Cost (the costs stored and used for the last pricing cycle) and the Current Cost (the costs intended for the next pricing cycle) of each ingredient for the chosen cost set. Any established cost set can be referenced from the screen by clicking the Change Cost Set button and choosing from the list in the popup. Ingredient costs are edited by entering the new costs in the New Cost column. Costs may be stored in this column without effect by clicking the Save button, then selecting No to the Save New Costs popup.\n\n---\n[CHUNK_ID: 3b401448-7df2-4d62-91f8-8272c62b92db]\nSource: BillCPS.doc\nTitle: Costing Defaults - Costing System Options\n[From the CPS Main Menu, click the Costing System Options button.] See the Help file: Cost/Price System>Costing Defaults>Costing System Options. The System Defaults tab of the Costing Options screen allows you to choose the Ingredient Cost Units, activate and name the Ingredient Cost Sets and define the Default Raw and Finished Shrink factors (percent) for ingredients and manufactured products. Cost units are assigned in the Raw Material (Ingredient) Cost Units frame. Your selection of cost units does not effect the calculation of costs or selling prices throughout the CPS system. This setting merely states your preference of units with viewing and/or updating ingredient costs. If multiple ingredient cost sets are desired in addition to or instead of the default Owning and Market cost sets (e.g., Actual Cost, 90 day cost, Forward Cost), select the ‘Yes’ option and create up to 10 cost sets in the Multiple Ingredient Cost Set Options frame. In the Default Shrink (Percent) frame, designate the default shrink percentages for both ingredients and manufactured products. Both raw shrink (applied prior to processing) and finished shrink (applied after processing) are allowed.\n"
+ },
+ {
+  "question": "Can I set the mixer temperature to 72°F before adding the premix?",
+  "chunks": [
+   {
+    "rank": 1,
+    "score": 0.296978951,
+    "chunk_id": "20de049f-e303-4cb2-9c59-c81106917f39",
+    "text": "Controlling Ingredients as Percent of Finished Product The preceding example provides a solution to the issues of controlling nutrients and computing formula cost at the desired finished product moisture content. If, however, it is desired to control the concentration of Digest and Premix to a specified percent of the finished product weight, this example fails. By placing the limits on these ingredients “as mixed”, the actual concentration in the finished product will increase as the as mixed moisture content increases, as follows:",
+    "source": "MultiStepDefined.doc",
+    "source_type": "document",
+    "doc_id": "multistepdefined",
+    "section_id": "838c058e-ba18-4738-8f77-28eda5d74d07",
+    "section_title": "Introduction"
+   },
+   {
+    "rank": 2,
+    "score": 0.279280663,
+    "chunk_id": "88684444-9353-4973-a531-62b7f51f9253",
+    "text": "An intermediate feed, often called a premix, is a formula to be used as an ingredient in yet other formulas. A premix is therefore both a formula and an ingredient. You may maintain several levels or stages of intermediate feeds. When a premix formula is revised, the nutrient profile and cost of the equivalent ingredient is automatically updated. As a result, subsequent formulation of higher level feeds using the premix properly reflects premix revisions. This automatic, multi-level link between feeds is also important when projecting ingredient requirements based on finished feed tonnage forecasts. A correct computation of raw ingredient requirements must include the raw material components of each intermediate feed. Price Lists and Markups Standard pricing features in the CONCEPT5 series include package size, packing/bag cost, and two markup levels entered as % or $/ton. Price list includes ton and unit pricing for both price levels. Product History Notes This function allows text to be attached to a product. The date, time and user are recorded with each note. Notes may be accessed from product maintenance and single product formulation screens. Production Minimum Formulation",
+    "source": "GlossaryC5.DOC",
+    "source_type": "document",
+    "doc_id": "glossaryc5",
+    "section_id": "2c291c9c-be6c-48be-b0e2-c4caf40bf3a8",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 3,
+    "score": 0.279280663,
+    "chunk_id": "4f89b5f2-a72d-48e4-af28-3dc9dfa437c2",
+    "text": "An intermediate feed, often called a premix, is a formula to be used as an ingredient in yet other formulas. A premix is therefore both a formula and an ingredient. You may maintain several levels or stages of intermediate feeds. When a premix formula is revised, the nutrient profile and cost of the equivalent ingredient is automatically updated. As a result, subsequent formulation of higher level feeds using the premix properly reflects premix revisions. This automatic, multi-level link between feeds is also important when projecting ingredient requirements based on finished feed tonnage forecasts. A correct computation of raw ingredient requirements must include the raw material components of each intermediate feed. Price Lists and Markups Standard pricing features in the Concept5 series include package size, packing/bag cost, and two markup levels entered as % or $/ton. Price list includes ton and unit pricing for both price levels. Product History Notes This function allows text to be attached to a product. The date, time and user are recorded with each note. Notes may be accessed from product maintenance and single product formulation screens. Production Minimum Formulation",
+    "source": "GlossaryC5.DOC",
+    "source_type": "document",
+    "doc_id": "glossaryc5",
+    "section_id": "e0986ae4-655a-44ee-8434-813dc144ff39",
+    "section_title": "Untitled"
+   },
+   {
+    "rank": 4,
+    "score": 0.278916359,
+    "chunk_id": "00cae79b-73a7-4c9f-b6e4-22184a6f77e5",
+    "text": "Traditional least cost formulation software assumes a 100 percent yield of finished product per ton of ingredients mixed. The nutrient composition and cost of the finished product is therefore the same as the nutrient composition and cost of the “as mixed” formula. The formulation of products, which may undergo a significant change in moisture (usually loss) during the manufacturing process, creates several complex issues and challenges for formulators. Nutritional requirements must be met at the Finished Product moisture level, and the cost of the formula per ton of Finished Product must be determined. A means of controlling ingredient inclusion rates must be set up if the inclusion rate must be specified as a function of the finished product weight. Premixes and coatings are good examples of ingredients which should be controlled in this fashion. The formula which minimizes the cost per unit of Finished Product must be determined. This is NOT necessarily the formula which minimizes the cost per ton of the “Raw Mix”.",
+    "source": "MultiStepDefined.doc",
+    "source_type": "document",
+    "doc_id": "multistepdefined",
+    "section_id": "838c058e-ba18-4738-8f77-28eda5d74d07",
+    "section_title": "Introduction"
+   },
+   {
+    "rank": 5,
+    "score": 0.263680488,
+    "chunk_id": "05af6fcb-69f1-4f74-8b2e-11e0c646ee9a",
+    "text": "Although there are several tabs containing options which you may modify, only the “U.S. or Metric”, “Ingredient Cost Units”, and “Ingredient Min/Max” frames on the Default Units tab show above, and the selection of the “Default Cost Set” on the Formulation Controls tab are important to this getting started tutorial. More detailed information on all system options may be obtained from the on-line Help system. U.S. or Metric Option: This option informs Concept4 whether to use U.S. or Metric terminology and data units. It is recommended that this option be set only one time, that being prior to loading any data into the Concept4 database. Toggling this option from one setting to another will NOT perform any conversion of the data in the database. It will merely change the terminology used in communicating on the screens and printed reports. Ingredient Cost Units Option:",
+    "source": "CFC Concept4 User Guide.doc",
+    "source_type": "document",
+    "doc_id": "cfc-concept4-user-guide",
+    "section_id": "939866fd-bc3e-4864-90e5-833e8e4489b4",
+    "section_title": "Untitled"
+   }
+  ],
+  "context": "[CHUNK_ID: 20de049f-e303-4cb2-9c59-c81106917f39]\nSource: MultiStepDefined.doc\nTitle: Introduction\nControlling Ingredients as Percent of Finished Product The preceding example provides a solution to the issues of controlling nutrients and computing formula cost at the desired finished product moisture content. If, however, it is desired to control the concentration of Digest and Premix to a specified percent of the finished product weight, this example fails. By placing the limits on these ingredients “as mixed”, the actual concentration in the finished product will increase as the as mixed moisture content increases, as follows:\n\n---\n[CHUNK_ID: 88684444-9353-4973-a531-62b7f51f9253]\nSource: GlossaryC5.DOC\nTitle: Untitled\nAn intermediate feed, often called a premix, is a formula to be used as an ingredient in yet other formulas. A premix is therefore both a formula and an ingredient. You may maintain several levels or stages of intermediate feeds. When a premix formula is revised, the nutrient profile and cost of the equivalent ingredient is automatically updated. As a result, subsequent formulation of higher level feeds using the premix properly reflects premix revisions. This automatic, multi-level link between feeds is also important when projecting ingredient requirements based on finished feed tonnage forecasts. A correct computation of raw ingredient requirements must include the raw material components of each intermediate feed. Price Lists and Markups Standard pricing features in the CONCEPT5 series include package size, packing/bag cost, and two markup levels entered as % or $/ton. Price list includes ton and unit pricing for both price levels. Product History Notes This function allows text to be attached to a product. The date, time and user are recorded with each note. Notes may be accessed from product maintenance and single product formulation screens. Production Minimum Formulation\n\n---\n[CHUNK_ID: 4f89b5f2-a72d-48e4-af28-3dc9dfa437c2]\nSource: GlossaryC5.DOC\nTitle: Untitled\nAn intermediate feed, often called a premix, is a formula to be used as an ingredient in yet other formulas. A premix is therefore both a formula and an ingredient. You may maintain several levels or stages of intermediate feeds. When a premix formula is revised, the nutrient profile and cost of the equivalent ingredient is automatically updated. As a result, subsequent formulation of higher level feeds using the premix properly reflects premix revisions. This automatic, multi-level link between feeds is also important when projecting ingredient requirements based on finished feed tonnage forecasts. A correct computation of raw ingredient requirements must include the raw material components of each intermediate feed. Price Lists and Markups Standard pricing features in the Concept5 series include package size, packing/bag cost, and two markup levels entered as % or $/ton. Price list includes ton and unit pricing for both price levels. Product History Notes This function allows text to be attached to a product. The date, time and user are recorded with each note. Notes may be accessed from product maintenance and single product formulation screens. Production Minimum Formulation\n"
+ },
+ {
+  "question": "My ration shows \"infeasible\" — what does that mean and how do I fix it?",
+  "chunks": [
+   {
+    "rank": 1,
+    "score": 0.563425124,
+    "chunk_id": "7592f3b8-4ab2-4806-86dc-13ad8bb82e8a",
+    "text": "The resulting popup will show the ratio results (in the Ration Amount column) and the default settings for the ratios. The defaults can be overridden by clicking a check in the Override box and entering the new values in the Minimum and Maximum columns.",
+    "source": "CFC Horse Ration Guide Bak1.DOC",
+    "source_type": "document",
+    "doc_id": "cfc-horse-ration-guide-bak1",
+    "section_id": "a6546b77-8fc1-4f0b-9b40-1df33e20745a",
+    "section_title": "Balance Ration (cont.)"
+   },
+   {
+    "rank": 2,
+    "score": 0.563425124,
+    "chunk_id": "8ca1fccb-e477-4abb-91d5-74efd33e717d",
+    "text": "The resulting popup will show the ratio results (in the Ration Amount column) and the default settings for the ratios. The defaults can be overridden by clicking a check in the Override box and entering the new values in the Minimum and Maximum columns.",
+    "source": "CFC Horse Ration 89 Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc-horse-ration-89-guide",
+    "section_id": "ccdad56f-ebd5-4ce6-8d8f-d2b7e11a6bac",
+    "section_title": "Balance Ration (cont.)"
+   },
+   {
+    "rank": 3,
+    "score": 0.547607481,
+    "chunk_id": "b9b74d70-b375-43d3-bd49-ee2c36caf067",
+    "text": "The resulting popup will show the ratio results (in the Ration Amount column) and the default settings for the ratios. Clicking a check in the Override box and entering the new values in the Minimum and Maximum columns can override the defaults. After defining any ingredient/component bounds, nutrient concentrations, and/or nutrient ratios, click the Formulate button to optimize the solution.",
+    "source": "CFC HORSE RATION 2007 GUIDE.doc",
+    "source_type": "document",
+    "doc_id": "cfc-horse-ration-2007-guide",
+    "section_id": "06164f97-b73a-4f70-81ae-c2db37add64f",
+    "section_title": "Balance Ration (cont.)"
+   },
+   {
+    "rank": 4,
+    "score": 0.517504752,
+    "chunk_id": "6f01a9fb-479d-40f0-802e-0c1f38f296fa",
+    "text": "When the Formulate button is clicked, the ratio results will appear in the solution amount column (Sol Amt). If the ratio is limiting, i.e., it is hitting either the maximum or minimum limit of the ratio, a blue number will be showing in the Minimum or Maximum columns, and a restriction cost will appear in the Rest Cost column. The restriction cost is a per ton cost that applies to a change of one unit (1.0) of the limiting nutrient (numerator) in the ratio. A red number in the either the Minimum or Maximum column means that the ratio cannot be met and the formula is infeasible. Ingredient Ratios tab The Ingredient Ratios tab allows you to establish relationships between any ingredient or ingredient type to any other ingredient or ingredient type. (For more information about Ingredient Types, see the Help file: Contents tab>Ingredients>Ingredient Type.) Again, while these relationships can be simple ratios, the system allows a greater level of flexibility because neither units of measure nor absolute inclusion rates are defined. (For example, a ratio between two components of 1 to 1000 or 10 to 10,000 will produce the same result.)",
+    "source": "CFC5 Buffered Least Cost Screen Guide.DOC",
+    "source_type": "document",
+    "doc_id": "cfc5-buffered-least-cost-screen-guide",
+    "section_id": "035d7917-cd0c-4f85-9e16-33877017ab1d",
+    "section_title": "USING THE CONCEPT5 BUFFERED LEAST COST FORMULATION SCREEN"
+   },
+   {
+    "rank": 5,
+    "score": 0.517504752,
+    "chunk_id": "04f1620c-a3b9-49ae-8ccc-3faaffb072db",
+    "text": "When the Formulate button is clicked, the ratio results will appear in the solution amount column (Sol Amt). If the ratio is limiting, i.e., it is hitting either the maximum or minimum limit of the ratio, a blue number will be showing in the Minimum or Maximum columns, and a restriction cost will appear in the Rest Cost column. The restriction cost is a per ton cost that applies to a change of one unit (1.0) of the limiting nutrient (numerator) in the ratio. A red number in the either the Minimum or Maximum column means that the ratio cannot be met and the formula is infeasible. Ingredient Ratios tab The Ingredient Ratios tab allows you to establish relationships between any ingredient or ingredient type to any other ingredient or ingredient type. (For more information about Ingredient Types, see the Help file: Contents tab>Ingredients>Ingredient Type.) Again, while these relationships can be simple ratios, the system allows a greater level of flexibility because neither units of measure nor absolute inclusion rates are defined. (For example, a ratio between two components of 1 to 1000 or 10 to 10,000 will produce the same result.)",
+    "source": "CFC5 Buffered Least Cost Screen Guide.docx",
+    "source_type": "document",
+    "doc_id": "cfc5-buffered-least-cost-screen-guide",
+    "section_id": "cd68e8e9-856c-4cb7-bd66-fa60284ec694",
+    "section_title": "USING THE CONCEPT5 BUFFERED LEAST COST FORMULATION SCREEN"
+   }
+  ],
+  "context": "[CHUNK_ID: 7592f3b8-4ab2-4806-86dc-13ad8bb82e8a]\nSource: CFC Horse Ration Guide Bak1.DOC\nTitle: Balance Ration (cont.)\nThe resulting popup will show the ratio results (in the Ration Amount column) and the default settings for the ratios. The defaults can be overridden by clicking a check in the Override box and entering the new values in the Minimum and Maximum columns.\n\n---\n[CHUNK_ID: 8ca1fccb-e477-4abb-91d5-74efd33e717d]\nSource: CFC Horse Ration 89 Guide.DOC\nTitle: Balance Ration (cont.)\nThe resulting popup will show the ratio results (in the Ration Amount column) and the default settings for the ratios. The defaults can be overridden by clicking a check in the Override box and entering the new values in the Minimum and Maximum columns.\n\n---\n[CHUNK_ID: b9b74d70-b375-43d3-bd49-ee2c36caf067]\nSource: CFC HORSE RATION 2007 GUIDE.doc\nTitle: Balance Ration (cont.)\nThe resulting popup will show the ratio results (in the Ration Amount column) and the default settings for the ratios. Clicking a check in the Override box and entering the new values in the Minimum and Maximum columns can override the defaults. After defining any ingredient/component bounds, nutrient concentrations, and/or nutrient ratios, click the Formulate button to optimize the solution.\n\n---\n[CHUNK_ID: 6f01a9fb-479d-40f0-802e-0c1f38f296fa]\nSource: CFC5 Buffered Least Cost Screen Guide.DOC\nTitle: USING THE CONCEPT5 BUFFERED LEAST COST FORMULATION SCREEN\nWhen the Formulate button is clicked, the ratio results will appear in the solution amount column (Sol Amt). If the ratio is limiting, i.e., it is hitting either the maximum or minimum limit of the ratio, a blue number will be showing in the Minimum or Maximum columns, and a restriction cost will appear in the Rest Cost column. The restriction cost is a per ton cost that applies to a change of one unit (1.0) of the limiting nutrient (numerator) in the ratio. A red number in the either the Minimum or Maximum column means that the ratio cannot be met and the formula is infeasible. Ingredient Ratios tab The Ingredient Ratios tab allows you to establish relationships between any ingredient or ingredient type to any other ingredient or ingredient type. (For more information about Ingredient Types, see the Help file: Contents tab>Ingredients>Ingredient Type.) Again, while these relationships can be simple ratios, the system allows a greater level of flexibility because neither units of measure nor absolute inclusion rates are defined. (For example, a ratio between two components of 1 to 1000 or 10 to 10,000 will produce the same result.)\n\n---\n[CHUNK_ID: 04f1620c-a3b9-49ae-8ccc-3faaffb072db]\nSource: CFC5 Buffered Least Cost Screen Guide.docx\nTitle: USING THE CONCEPT5 BUFFERED LEAST COST FORMULATION SCREEN\nWhen the Formulate button is clicked, the ratio results will appear in the solution amount column (Sol Amt). If the ratio is limiting, i.e., it is hitting either the maximum or minimum limit of the ratio, a blue number will be showing in the Minimum or Maximum columns, and a restriction cost will appear in the Rest Cost column. The restriction cost is a per ton cost that applies to a change of one unit (1.0) of the limiting nutrient (numerator) in the ratio. A red number in the either the Minimum or Maximum column means that the ratio cannot be met and the formula is infeasible. Ingredient Ratios tab The Ingredient Ratios tab allows you to establish relationships between any ingredient or ingredient type to any other ingredient or ingredient type. (For more information about Ingredient Types, see the Help file: Contents tab>Ingredients>Ingredient Type.) Again, while these relationships can be simple ratios, the system allows a greater level of flexibility because neither units of measure nor absolute inclusion rates are defined. (For example, a ratio between two components of 1 to 1000 or 10 to 10,000 will produce the same result.)\n"
+ }
+]

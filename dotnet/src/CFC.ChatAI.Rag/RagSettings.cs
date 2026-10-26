@@ -9,7 +9,7 @@ public sealed record RagSettings
 {
     public const string DefaultIndexName = "cfc-rag-chatbot";
     public static readonly string DefaultModelPath = Path.Combine("models", "model.onnx");
-    public static readonly string DefaultVocabPath = Path.Combine("modles", "vocab.txt");
+    public static readonly string DefaultVocabPath = Path.Combine("models", "vocab.txt");
 
     public required string PineconeApiKey { get; init; }
     public string PineconeIndexName { get; init; } = DefaultIndexName;

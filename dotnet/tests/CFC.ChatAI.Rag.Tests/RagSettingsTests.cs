@@ -24,7 +24,9 @@ public class RagSettingsTests
         Assert.Equal("cfc-rag-chatbot", settings.PineconeIndexName);
         Assert.Equal("cfc-rag-chatbot", settings.PineconeVideoIndexName);   // falls back to the document index
         Assert.Null(settings.PineconeNamespace);
-        Assert.Equal(RagSettings.DefaultModelPath, settings.ModelPath);
+        Assert.Equal(Path.Combine("models", "model.onnx"), settings.ModelPath);
+        Assert.Equal(Path.Combine("models", "vocab.txt"), settings.VocabPath);
+
     }
 
     [Fact]
