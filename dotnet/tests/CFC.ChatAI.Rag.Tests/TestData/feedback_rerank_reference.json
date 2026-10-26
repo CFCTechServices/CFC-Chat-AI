@@ -1,0 +1,371 @@
+[
+ {
+  "name": "no_feedback",
+  "settings": {
+   "alpha": 0.3,
+   "scale": 5.0,
+   "alpha_query": 0.15,
+   "scale_query": 3.0
+  },
+  "chunks": [
+   {
+    "chunk_id": "a",
+    "score": 0.8
+   },
+   {
+    "chunk_id": "b",
+    "score": 0.7
+   },
+   {
+    "chunk_id": "c",
+    "score": 0.6
+   }
+  ],
+  "global": {},
+  "query": {},
+  "expected": [
+   {
+    "chunk_id": "a",
+    "rank": 1,
+    "adjusted_score": 0.8
+   },
+   {
+    "chunk_id": "b",
+    "rank": 2,
+    "adjusted_score": 0.7
+   },
+   {
+    "chunk_id": "c",
+    "rank": 3,
+    "adjusted_score": 0.6
+   }
+  ]
+ },
+ {
+  "name": "upvotes_lift_lower_chunk",
+  "settings": {
+   "alpha": 0.3,
+   "scale": 5.0,
+   "alpha_query": 0.15,
+   "scale_query": 3.0
+  },
+  "chunks": [
+   {
+    "chunk_id": "a",
+    "score": 0.8
+   },
+   {
+    "chunk_id": "b",
+    "score": 0.7
+   },
+   {
+    "chunk_id": "c",
+    "score": 0.6
+   }
+  ],
+  "global": {
+   "c": 5
+  },
+  "query": {},
+  "expected": [
+   {
+    "chunk_id": "a",
+    "rank": 1,
+    "adjusted_score": 0.8
+   },
+   {
+    "chunk_id": "c",
+    "rank": 2,
+    "adjusted_score": 0.7370869480720377
+   },
+   {
+    "chunk_id": "b",
+    "rank": 3,
+    "adjusted_score": 0.7
+   }
+  ]
+ },
+ {
+  "name": "downvotes_demote_top_chunk",
+  "settings": {
+   "alpha": 0.3,
+   "scale": 5.0,
+   "alpha_query": 0.15,
+   "scale_query": 3.0
+  },
+  "chunks": [
+   {
+    "chunk_id": "a",
+    "score": 0.8
+   },
+   {
+    "chunk_id": "b",
+    "score": 0.7
+   },
+   {
+    "chunk_id": "c",
+    "score": 0.6
+   }
+  ],
+  "global": {
+   "a": -4
+  },
+  "query": {},
+  "expected": [
+   {
+    "chunk_id": "b",
+    "rank": 1,
+    "adjusted_score": 0.7
+   },
+   {
+    "chunk_id": "a",
+    "rank": 2,
+    "adjusted_score": 0.6406311751357163
+   },
+   {
+    "chunk_id": "c",
+    "rank": 3,
+    "adjusted_score": 0.6
+   }
+  ]
+ },
+ {
+  "name": "query_aware_only",
+  "settings": {
+   "alpha": 0.3,
+   "scale": 5.0,
+   "alpha_query": 0.15,
+   "scale_query": 3.0
+  },
+  "chunks": [
+   {
+    "chunk_id": "a",
+    "score": 0.8
+   },
+   {
+    "chunk_id": "b",
+    "score": 0.7
+   },
+   {
+    "chunk_id": "c",
+    "score": 0.6
+   }
+  ],
+  "global": {},
+  "query": {
+   "b": 1.8
+  },
+  "expected": [
+   {
+    "chunk_id": "a",
+    "rank": 1,
+    "adjusted_score": 0.8
+   },
+   {
+    "chunk_id": "b",
+    "rank": 2,
+    "adjusted_score": 0.7563902045347937
+   },
+   {
+    "chunk_id": "c",
+    "rank": 3,
+    "adjusted_score": 0.6
+   }
+  ]
+ },
+ {
+  "name": "both_signals_and_negative_query",
+  "settings": {
+   "alpha": 0.3,
+   "scale": 5.0,
+   "alpha_query": 0.15,
+   "scale_query": 3.0
+  },
+  "chunks": [
+   {
+    "chunk_id": "a",
+    "score": 0.8
+   },
+   {
+    "chunk_id": "b",
+    "score": 0.7
+   },
+   {
+    "chunk_id": "c",
+    "score": 0.6
+   }
+  ],
+  "global": {
+   "a": 2,
+   "c": -1
+  },
+  "query": {
+   "a": -1.5,
+   "b": 2.4
+  },
+  "expected": [
+   {
+    "chunk_id": "a",
+    "rank": 1,
+    "adjusted_score": 0.8357336920700528
+   },
+   {
+    "chunk_id": "b",
+    "rank": 2,
+    "adjusted_score": 0.7697238608781242
+   },
+   {
+    "chunk_id": "c",
+    "rank": 3,
+    "adjusted_score": 0.5644724423595172
+   }
+  ]
+ },
+ {
+  "name": "large_vote_count_saturates",
+  "settings": {
+   "alpha": 0.3,
+   "scale": 5.0,
+   "alpha_query": 0.15,
+   "scale_query": 3.0
+  },
+  "chunks": [
+   {
+    "chunk_id": "a",
+    "score": 0.8
+   },
+   {
+    "chunk_id": "b",
+    "score": 0.5
+   }
+  ],
+  "global": {
+   "b": 100
+  },
+  "query": {},
+  "expected": [
+   {
+    "chunk_id": "a",
+    "rank": 1,
+    "adjusted_score": 0.8
+   },
+   {
+    "chunk_id": "b",
+    "rank": 2,
+    "adjusted_score": 0.65
+   }
+  ]
+ },
+ {
+  "name": "ties_keep_original_order",
+  "settings": {
+   "alpha": 0.3,
+   "scale": 5.0,
+   "alpha_query": 0.15,
+   "scale_query": 3.0
+  },
+  "chunks": [
+   {
+    "chunk_id": "a",
+    "score": 0.7
+   },
+   {
+    "chunk_id": "b",
+    "score": 0.7
+   },
+   {
+    "chunk_id": "c",
+    "score": 0.7
+   }
+  ],
+  "global": {},
+  "query": {},
+  "expected": [
+   {
+    "chunk_id": "a",
+    "rank": 1,
+    "adjusted_score": 0.7
+   },
+   {
+    "chunk_id": "b",
+    "rank": 2,
+    "adjusted_score": 0.7
+   },
+   {
+    "chunk_id": "c",
+    "rank": 3,
+    "adjusted_score": 0.7
+   }
+  ]
+ },
+ {
+  "name": "missing_chunk_id",
+  "settings": {
+   "alpha": 0.3,
+   "scale": 5.0,
+   "alpha_query": 0.15,
+   "scale_query": 3.0
+  },
+  "chunks": [
+   {
+    "chunk_id": null,
+    "score": 0.9
+   },
+   {
+    "chunk_id": "b",
+    "score": 0.5
+   }
+  ],
+  "global": {
+   "b": 3
+  },
+  "query": {},
+  "expected": [
+   {
+    "chunk_id": null,
+    "rank": 1,
+    "adjusted_score": 0.9
+   },
+   {
+    "chunk_id": "b",
+    "rank": 2,
+    "adjusted_score": 0.5805574350497053
+   }
+  ]
+ },
+ {
+  "name": "scale_zero_disables_global",
+  "settings": {
+   "alpha": 0.3,
+   "scale": 0.0,
+   "alpha_query": 0.15,
+   "scale_query": 3.0
+  },
+  "chunks": [
+   {
+    "chunk_id": "a",
+    "score": 0.8
+   },
+   {
+    "chunk_id": "b",
+    "score": 0.7
+   }
+  ],
+  "global": {
+   "b": 10
+  },
+  "query": {},
+  "expected": [
+   {
+    "chunk_id": "a",
+    "rank": 1,
+    "adjusted_score": 0.8
+   },
+   {
+    "chunk_id": "b",
+    "rank": 2,
+    "adjusted_score": 0.7
+   }
+  ]
+ }
+]

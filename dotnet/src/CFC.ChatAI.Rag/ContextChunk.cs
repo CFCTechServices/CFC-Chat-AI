@@ -8,7 +8,9 @@ public sealed record ContextChunk
 {
     public required int Rank { get; init;}
     public double Score { get; init; }
-    
+    /// <summary> Score after feedback re-ranking, (Python's "adjusted_score"); null when no re-ranking was applied </summary> 
+    public double? AdjustedScore { get; init;}
+
     public string Text { get; init; } = "";
     public string Source { get; init; } = "";
     public string SourceType { get; init; } = "document";
