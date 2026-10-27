@@ -11,17 +11,17 @@ If and endpoint is non-used, don't worry about it for now.
 
 ## Both
 Independent - GET /api/health/detailed
-Not-used - POST /api/chat/search - Probably feedback. Yeah this is just the query but is also accounts for feedback. Also not even used by the current frontend, only the old one
-Not-used - POST /api/chat/ask - Provides the chatbot answer, the context it used, relevant images. Everything tied together.
+Non-used - POST /api/chat/search - Probably feedback. Yeah this is just the query but is also accounts for feedback. Also not even used by the current frontend, only the old one
+Non-used - POST /api/chat/ask - Provides the chatbot answer, the context it used, relevant images. Everything tied together.
 Non-used - POST /api/chat/ask/video - This just isn't used by the front-end. And through questioning I'm not even sure if it works. Probably skip for now.
 Non-used - POST /api/chat/recommendations - Never called anywhere.
-ChatService - POST /api/chat/message - This is the big one that is currently used. So much noise.
+ChatService - POST /api/chat/message - This is the big one that is actually in use. So much noise.
 DocumentHandler - POST /api/files/upload - Used by the frontend
-Non-used - POST /api/files/bulk - Unused and not necessary. A single endpoint can one or more files
+Non-used - POST /api/files/bulk - Unused and not necessary. A single endpoint can input one or more files
 DocumentHandler - POST /api/ingest/document - Not used, but might be nice to manually call this though.
 Non-used POST /api/ingest/bulk - No need for an extra endpoint
 DocumentHandler - DELETE /api/admin/documents/{doc_id} - Renamed to handler to support both adding and deleting
-DocumentHandler - PUT /api/admin/documents/{doc_id}/replace
+DocumentHandler - PUT /api/admin/documents/{doc_id}/replace - Just calls the DocumentHandler delete and then ingest
 DocumentHandler - POST /api/videos/upload - Then have a separate VideoProcessor
 
 DocumentProcessor isn't listed but likely deserves it's own folder and interface. Just turns various file types into text chunks
@@ -57,7 +57,7 @@ Three rules should be applied to each component:
 3. Only 3 files in component root
 
 ## Non-interface prefix
-Any implementation files/folders, or anything not important to a user wanting to use the Supabase layer, should be prefixed with '_'. If someone wants to make a call to Supabase, it should be very obvious where to look. They shouldn't have to guess, or block out irrelevant information for their use. The result of this rule:
+Any implementation files/folders, or anything not important to a user wanting to use a given layer, should be prefixed with '_'. If someone wants to make a call to Supabase, it should be very obvious where to look. They shouldn't have to guess, or block out irrelevant information for their use. The result of this rule:
 1. All implementations of the interface are under _Internal/
 2. Properties/ is renamed to _Properties/
 
