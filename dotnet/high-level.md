@@ -7,7 +7,7 @@ Results in dotnet\docs\pinecone-supabase-both-or-none.md
 
 The endpoints that need extra consideration are the BOTH endpoints.
 
-If and endpoint is non-used, don't worry about it for now.
+If an endpoint is non-used, don't worry about it for now.
 
 ## Both
 Independent - GET /api/health/detailed
