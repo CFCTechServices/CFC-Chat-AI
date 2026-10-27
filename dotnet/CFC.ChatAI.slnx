@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/CFC.ChatAI.Api/CFC.ChatAI.Api.csproj" />
     <Project Path="src/CFC.ChatAI.DocumentProcessor/CFC.ChatAI.DocumentProcessor.csproj" />
+    <Project Path="src/CFC.ChatAI.VideoProcessor/CFC.ChatAI.VideoProcessor.csproj" />
     <Project Path="src/CFC.ChatAI.Feedback/CFC.ChatAI.Feedback.csproj" />
     <Project Path="src/CFC.ChatAI.Pinecone/CFC.ChatAI.Pinecone.csproj" />
     <Project Path="src/CFC.ChatAI.Supabase/CFC.ChatAI.Supabase.csproj" />
@@ -9,6 +10,7 @@
   <Folder Name="/tests/">
     <Project Path="tests/CFC.ChatAI.Api.Tests/CFC.ChatAI.Api.Tests.csproj" />
     <Project Path="tests/CFC.ChatAI.DocumentProcessor.Tests/CFC.ChatAI.DocumentProcessor.Tests.csproj" />
+    <Project Path="tests/CFC.ChatAI.VideoProcessor.Tests/CFC.ChatAI.VideoProcessor.Tests.csproj" />
     <Project Path="tests/CFC.ChatAI.Feedback.Tests/CFC.ChatAI.Feedback.Tests.csproj" />
     <Project Path="tests/CFC.ChatAI.Pinecone.Tests/CFC.ChatAI.Pinecone.Tests.csproj" />
     <Project Path="tests/CFC.ChatAI.Supabase.Tests/CFC.ChatAI.Supabase.Tests.csproj" />
