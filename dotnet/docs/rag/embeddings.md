@@ -7,7 +7,10 @@
 ## What it does
 Turns text (user questions and document chunks) into 384-dimension vectors
 using the `sentence-transformers/all-MiniLM-L6-v2` model. These vectors are
-what Pinecone searches, and what FeedbackService stores for query-aware re-ranking.
+what Pinecone searches, and what FeedbackService stores for query-aware re-ranking. In .NET,
+`IPineconeService.SearchAsync` returns that exact query vector with its matches, so the
+[`CFC.ChatAI.Feedback`](../feedback.md) component can reuse it for query-aware score retrieval
+without embedding the query a second time.
 
 ## Used by (Python)
 - `app/core/rag.py`: embeds the user's query before searching Pinecone
