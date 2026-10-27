@@ -6,7 +6,7 @@ using Pinecone;
 namespace CFC.ChatAI.Pinecone.Internal;
 
 /// <summary>Single public-facing facade; embeddings, SDK models, and mapping stay internal.</summary>
-internal sealed class PineconeService : IPineconeService
+internal sealed class PineconeService : IPineconeService, IQueryEmbeddingService
 {
     private readonly IEmbeddingModel _embedder;
     private readonly IVectorStore _vectors;
@@ -15,6 +15,13 @@ internal sealed class PineconeService : IPineconeService
     {
         _embedder = embedder ?? throw new ArgumentNullException(nameof(embedder));
         _vectors = vectors ?? throw new ArgumentNullException(nameof(vectors));
+    }
+
+    public Task<IReadOnlyList<float>> EmbedQueryAsync(string query, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(query);
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult<IReadOnlyList<float>>(_embedder.EncodeQuery(query));
     }
 
     public async Task<PineconeSearchResult> SearchAsync(

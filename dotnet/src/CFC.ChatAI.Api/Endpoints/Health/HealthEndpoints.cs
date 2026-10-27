@@ -1,4 +1,4 @@
-using System.Net.Http.Headers;
+using CFC.ChatAI.Supabase.Common;
 using CFC.ChatAI.Api.Configuration;
 using Microsoft.Extensions.Options;
 
@@ -18,13 +18,14 @@ public static class HealthEndpoints
         app.MapGet("/api/health/detailed", async (
                 IConfiguration configuration,
                 IHttpClientFactory httpClientFactory,
+                IServiceProvider services,
                 IOptions<ApiOptions> options,
                 CancellationToken cancellationToken) =>
             {
                 var checks = new Dictionary<string, object?>
                 {
                     ["pinecone"] = await CheckPineconeAsync(configuration, httpClientFactory, cancellationToken),
-                    ["supabase"] = await CheckSupabaseAsync(configuration, httpClientFactory, cancellationToken),
+                    ["supabase"] = await CheckSupabaseAsync(configuration, services.GetService<ISupabaseHealthGateway>(), cancellationToken),
                     ["azure_openai"] = CheckAzureOpenAi(configuration),
                     ["embedding_model"] = CheckEmbeddingModel(configuration)
                 };
@@ -67,38 +68,28 @@ public static class HealthEndpoints
         catch (Exception exception) when (exception is not OperationCanceledException ||
                                            !cancellationToken.IsCancellationRequested)
         {
-            return Status("error", ("detail", exception.Message));
+            return Status("error", ("detail", "Pinecone check failed"));
         }
     }
 
     private static async Task<IReadOnlyDictionary<string, object?>> CheckSupabaseAsync(
         IConfiguration configuration,
-        IHttpClientFactory httpClientFactory,
+        ISupabaseHealthGateway? gateway,
         CancellationToken cancellationToken)
     {
-        var url = configuration["SUPABASE_URL"];
-        var serviceRoleKey = configuration["SUPABASE_SERVICE_ROLE_KEY"];
-        if (string.IsNullOrWhiteSpace(url) || string.IsNullOrWhiteSpace(serviceRoleKey))
-            return Status("not_configured", ("detail", "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set"));
-
+        if (gateway is null)
+            return Status("not_configured", ("detail", "Supabase not configured"));
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        timeout.CancelAfter(TimeSpan.FromSeconds(5));
         try
         {
-            var endpoint = new Uri($"{url.TrimEnd('/')}/rest/v1/profiles?select=id&limit=1");
-            using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
-            request.Headers.TryAddWithoutValidation("apikey", serviceRoleKey);
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", serviceRoleKey);
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeout.CancelAfter(TimeSpan.FromSeconds(5));
-            using var response = await httpClientFactory.CreateClient().SendAsync(request, timeout.Token);
-            if (response.IsSuccessStatusCode)
-                return Status("ok", ("url", url));
-
-            return Status("error", ("detail", $"Supabase returned HTTP {(int)response.StatusCode} ({response.ReasonPhrase})."));
+            return await gateway.CheckAsync(timeout.Token)
+                ? Status("ok", ("url", configuration["SUPABASE_URL"]))
+                : Status("error", ("detail", "Supabase check failed"));
         }
-        catch (Exception exception) when (exception is not OperationCanceledException ||
-                                           !cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return Status("error", ("detail", exception.Message));
+            return Status("error", ("detail", "Supabase check timed out"));
         }
     }
 

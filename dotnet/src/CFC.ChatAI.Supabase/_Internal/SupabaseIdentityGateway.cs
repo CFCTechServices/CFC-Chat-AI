@@ -40,6 +40,13 @@ internal sealed class SupabaseIdentityGateway(SupabaseTransport transport) : IId
             ? "recover"
             : $"recover?redirect_to={SupabaseTransport.Escape(redirectTo.ToString())}";
         using var request = SupabaseTransport.JsonRequest(HttpMethod.Post, transport.AuthUri(suffix), new { email });
-        using var response = await transport.SendAnonAsync(request, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            using var response = await transport.SendAnonAsync(request, cancellationToken).ConfigureAwait(false);
+        }
+        catch (SupabaseRequestException ex) when (ex.StatusCode == HttpStatusCode.TooManyRequests)
+        {
+            throw new PasswordRecoveryRateLimitedException();
+        }
     }
 }

@@ -1,4 +1,5 @@
 using CFC.ChatAI.Supabase.Chunks;
+using CFC.ChatAI.Supabase.Common;
 using CFC.ChatAI.Supabase.Conversations;
 using CFC.ChatAI.Supabase.Feedback;
 using CFC.ChatAI.Supabase.Identity;
@@ -29,6 +30,7 @@ public static class DependencyInjection
         services.AddSingleton(serviceProvider => new SupabaseTransport(
             serviceProvider.GetRequiredService<IHttpClientFactory>(),
             serviceProvider.GetRequiredService<SupabaseOptions>()));
+        services.AddSingleton<ISupabaseHealthGateway, SupabaseHealthGateway>();
         services.AddSingleton<IIdentityGateway>(serviceProvider =>
             new SupabaseIdentityGateway(serviceProvider.GetRequiredService<SupabaseTransport>()));
         services.AddSingleton<IAdminIdentityGateway>(serviceProvider =>

@@ -23,10 +23,12 @@ public static class DependencyInjection
             new OnnxEmbeddingModel(options.ModelPath, options.VocabularyPath));
         services.AddSingleton<IVectorStore>(_ =>
             new PineconeVectorStore(options.ApiKey, options.IndexName, options.Namespace));
-        services.AddSingleton<IPineconeService>(provider =>
+        services.AddSingleton<PineconeService>(provider =>
             new PineconeService(
                 provider.GetRequiredService<IEmbeddingModel>(),
                 provider.GetRequiredService<IVectorStore>()));
+        services.AddSingleton<IPineconeService>(provider => provider.GetRequiredService<PineconeService>());
+        services.AddSingleton<IQueryEmbeddingService>(provider => provider.GetRequiredService<PineconeService>());
         return services;
     }
 }
