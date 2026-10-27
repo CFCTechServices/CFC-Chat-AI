@@ -30,9 +30,9 @@ The supplied `schema.sql` is contextual only and does not prove it is the active
 
 - [ ] Record the application-owner decision on observed Python-vs-.NET auth behavior: token-validation credential mode, password-recovery key mode, and service-role versus caller-token access for chat message/feedback flows. Do not treat the differing behavior as equivalent without approval and tests.
 - [ ] Confirm whether chat/message workflows keep caller-token/RLS access or preserve existing Python service-role access with explicit user/session filters and application authorization. Verify the selected model end-to-end.
-- [ ] Move the detailed-health endpoint's direct `GET /rest/v1/profiles` request (`dotnet/src/CFC.ChatAI.Api/Endpoints/Health/HealthEndpoints.cs`) behind a focused Supabase health capability, or explicitly document/approve an exception. Keep Pinecone/model health probes outside the Supabase package.
-- [ ] Run a dependency-boundary check that `CFC.ChatAI.Supabase` has no API/application/provider project references or non-Supabase provider namespaces. Add/retain a lightweight CI architecture check if not already enforced.
-- [ ] Review active endpoints for any direct Supabase SDK/REST/Auth/Storage call paths outside the package; migrate each to a focused contract or mark it intentionally host-owned.
+- [x] Move the detailed-health endpoint's direct `GET /rest/v1/profiles` request (`dotnet/src/CFC.ChatAI.Api/Endpoints/Health/HealthEndpoints.cs`) behind a focused Supabase health capability, or explicitly document/approve an exception. Keep Pinecone/model health probes outside the Supabase package. The endpoint now uses `ISupabaseHealthGateway`.
+- [x] Run a dependency-boundary check that `CFC.ChatAI.Supabase` has no API/application/provider project references or non-Supabase provider namespaces. A lightweight check is enforced in CI by `dotnet/tools/check_supabase_boundary.py`.
+- [x] Review active endpoints for any direct Supabase SDK/REST/Auth/Storage call paths outside the package; migrate each to a focused contract or mark it intentionally host-owned. The source review found the detailed-health probe behind `ISupabaseHealthGateway` and no other direct provider call paths outside the package.
 
 ## Priority 3 — consuming application behavior and integration tests
 
@@ -54,4 +54,4 @@ The adapter contracts do not implement endpoint business policy. Complete/verify
 
 ## Current status
 
-The Supabase persistence module and its HTTP-handler unit tests are implemented; the Phase 6 documentation/configuration checks are complete. The latest adapter test run passed **25/25** tests, but no live Supabase integration tests were run. The profile self-write ACL issue, target-project identity/schema/RLS/RPC/Storage verification, user/service scope decisions, detailed-health boundary call, and application-level endpoint verification remain unresolved. Do not declare production readiness until the priority 0 and priority 1 gates are closed and the relevant application/integration tests pass.
+The Supabase persistence module and its HTTP-handler unit tests are implemented; the Phase 6 documentation/configuration checks are complete. The detailed-health Supabase request is behind `ISupabaseHealthGateway`, and the package dependency boundary is checked in CI. No live Supabase integration tests were run. The profile self-write ACL issue, target-project identity/schema/RLS/RPC/Storage verification, user/service scope decisions, and application-level endpoint verification remain unresolved. Do not declare production readiness until the priority 0 and priority 1 gates are closed and the relevant application/integration tests pass.
