@@ -1,3 +1,5 @@
+Agents don't touch.
+
 # Pinecone, Supabase, Both, or None?
 Does an endpoint use Pinecone, Supabase both, or none? This is useful to ask.
 
@@ -34,7 +36,7 @@ Both Pinecone and Supabase are completely isolated and do not touch anything els
 Should only use Pinecone and Supabase. Input a query, return reranked chunks.
 
 ## DocumentProcessor
-Independent. Should input a supported document and extract text chunks from it.
+Independent. Inputs a supported document type and outputs text chunks. Should not touch anything else.
 
 ## VideoProcessor
 Independent. Should input a video and extract text chunks from it using transcription.
@@ -47,3 +49,28 @@ Uses everything besides direct calls to DocumentProcessor and VideoProcessor. Ti
 
 ## Api
 Uses everything including ChatService, excluding direct calls to Document/VideoProcessor. Defines the internal endpoints.
+
+# Folder Structure
+Three rules should be applied to each component:
+1. Non-interface prefix
+2. One data-structure per file
+3. Only 3 files in component root
+
+## Non-interface prefix
+Any implementation files/folders, or anything not important to a user wanting to use the Supabase layer, should be prefixed with '_'. If someone wants to make a call to Supabase, it should be very obvious where to look. They shouldn't have to guess, or block out irrelevant information for their use. The result of this rule:
+1. All implementations of the interface are under _Internal/
+2. Properties/ is renamed to _Properties/
+
+## One data-structure per file
+Any public data-structure should have one file named exactly the same as it's class/record. Why? Because that means from the file-tree I can immediately see where every data structure is. No sifting through a large 200 line file of 5 data structures to find the definition of the one you need.
+This applies for interfaces too, the great thing is that every interface starts with a 'I' (ex: IPineconeService.cs), that means that you can immediately tell the difference between a data structure and an interface directly from the file-tree. On top of knowing there is no hidden structures within those files.
+
+## Only 3 files in component root
+For the purposes of keeping things organized, only 3 files are allowed in the folder root. Everything else should be organized in folders.
+
+The 3 files are:
+1. DepencyInjection.cs
+2. <ComponentName>Options.cs
+2. CFC.ChatAI.<ComponentName>.csproj
+
+Let's not sprawl out 10 files in the root. DependencyInjection and the Options file are the two main files that tie everything together into the actual app, that's why it makes sense for them to be kept outside of a folder.

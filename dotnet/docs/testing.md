@@ -26,3 +26,12 @@ Conventions:
 2. Save them to `tests/CFC.ChatAI.Pinecone.Tests/TestData/`
 3. Write a C# test class that compares the port against that file
 4. Document it in the component's `docs/migration/*.md` under "How it's tested"
+
+## DocumentProcessor tests
+`tests/CFC.ChatAI.DocumentProcessor.Tests` uses in-memory fixtures for TXT, Markdown, DOCX, PDF, and MIME email. It verifies extraction, section metadata, chunk bounds, validation, and DI registration. The generated PDF fixture avoids depending on external files; legacy `.doc` conversion is environment-dependent and requires LibreOffice, so it is documented but not part of the default test run.
+
+Run just this suite from `dotnet/`:
+
+```sh
+dotnet test tests/CFC.ChatAI.DocumentProcessor.Tests/CFC.ChatAI.DocumentProcessor.Tests.csproj
+```
