@@ -18,7 +18,8 @@ using Microsoft.AspNetCore.RateLimiting;
 DotNetEnv.Env.NoClobber().Load(".env");
 
 var builder = WebApplication.CreateBuilder(args);
-builder.WebHost.UseUrls(builder.Configuration["Api:Urls"] ?? "http://127.0.0.1:5000");
+var apiPort = builder.Configuration["DOTNET_API_PORT"] ?? "5000";
+builder.WebHost.UseUrls(builder.Configuration["Api:Urls"] ?? $"http://127.0.0.1:{apiPort}");
 
 builder.Services.Configure<ApiOptions>(builder.Configuration.GetSection(ApiOptions.SectionName));
 builder.Services.AddHttpClient();
