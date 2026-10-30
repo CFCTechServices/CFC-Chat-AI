@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../CFC.ChatAI.Supabase/CFC.ChatAI.Supabase.csproj" />
+    <ProjectReference Include="../CFC.ChatAI.Pinecone/CFC.ChatAI.Pinecone.csproj" />
+    <ProjectReference Include="../CFC.ChatAI.Feedback/CFC.ChatAI.Feedback.csproj" />
+    <ProjectReference Include="../CFC.ChatAI.ChatService/CFC.ChatAI.ChatService.csproj" />
+    <ProjectReference Include="../CFC.ChatAI.DocumentHandler/CFC.ChatAI.DocumentHandler.csproj" />
+    <ProjectReference Include="../CFC.ChatAI.DocumentProcessor/CFC.ChatAI.DocumentProcessor.csproj" />
+    <ProjectReference Include="../CFC.ChatAI.VideoProcessor/CFC.ChatAI.VideoProcessor.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,5 +1,5 @@
 ﻿using System.Text.Json;
-using CFC.ChatAI.Rag;
+using CFC.ChatAI.Pinecone.Internal;
 
 // Live parity check for the full C# RAG pipeline (read-only).
 // Runs the questions recorded by tools/make_pipeline_reference.py through RagPipelines.Documents

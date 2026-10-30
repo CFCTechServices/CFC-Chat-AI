@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\CFC.ChatAI.DocumentProcessor\CFC.ChatAI.DocumentProcessor.csproj" />
+    <ProjectReference Include="..\CFC.ChatAI.VideoProcessor\CFC.ChatAI.VideoProcessor.csproj" />
+    <ProjectReference Include="..\CFC.ChatAI.Pinecone\CFC.ChatAI.Pinecone.csproj" />
+    <ProjectReference Include="..\CFC.ChatAI.Supabase\CFC.ChatAI.Supabase.csproj" />
+  </ItemGroup>
+
+</Project>
