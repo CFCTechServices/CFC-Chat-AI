@@ -63,7 +63,7 @@ public class RagSettingsTests
         Assert.Contains(missingKey, error.Message);
     }
 
-    [Fact]
+    [RequiresEmbeddingModelFact]
     public void RagPipelines_Create_BuildsBothPipelinesWithTheRealModel()
     {
         var settings = RagSettings.FromEnvironment(Env([.. RequiredOnly,

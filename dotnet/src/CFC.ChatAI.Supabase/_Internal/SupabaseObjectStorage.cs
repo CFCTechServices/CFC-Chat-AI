@@ -144,7 +144,7 @@ internal sealed class SupabaseObjectStorage(SupabaseTransport transport, Supabas
             signedUrl = alternate.GetString();
         if (string.IsNullOrWhiteSpace(signedUrl))
             throw new InvalidDataException("Supabase did not return a signed URL.");
-        if (Uri.TryCreate(signedUrl, UriKind.Absolute, out var absolute)) return absolute;
+        if (Uri.TryCreate(signedUrl, UriKind.Absolute, out var absolute) && (absolute.Scheme == Uri.UriSchemeHttps || absolute.Scheme == Uri.UriSchemeHttp)) return absolute;
         var relativePath = signedUrl.TrimStart('/');
         return relativePath.StartsWith("storage/v1/", StringComparison.Ordinal)
             ? new Uri(new Uri(options.Url.TrimEnd('/') + "/"), relativePath)
