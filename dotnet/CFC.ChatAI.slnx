@@ -21,6 +21,7 @@
   </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/CFC.ChatAI.Rag.Harness/CFC.ChatAI.Rag.Harness.csproj" />
+    <Project Path="tools/CFC.ChatAI.Rag.PipelineCheck/CFC.ChatAI.Rag.PipelineCheck.csproj" />
     <Project Path="tools/CFC.ChatAI.Rag.VectorStoreCheck/CFC.ChatAI.Rag.VectorStoreCheck.csproj" />
   </Folder>
 </Solution>
