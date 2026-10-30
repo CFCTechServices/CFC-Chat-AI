@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="DotNetEnv" Version="3.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../CFC.ChatAI.Supabase/CFC.ChatAI.Supabase.csproj" />
     <ProjectReference Include="../CFC.ChatAI.Pinecone/CFC.ChatAI.Pinecone.csproj" />
     <ProjectReference Include="../CFC.ChatAI.Feedback/CFC.ChatAI.Feedback.csproj" />
