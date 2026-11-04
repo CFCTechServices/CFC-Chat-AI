@@ -35,9 +35,26 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.Never;
 });
 
+// Paths in the repository .env are relative to that file, not necessarily to the process
+// working directory (which varies between `dotnet run`, IDEs, and service managers).
+var config = builder.Configuration;
+var pathBase = File.Exists(envPath)
+    ? Path.GetDirectoryName(Path.GetFullPath(envPath))!
+    : builder.Environment.ContentRootPath;
+ResolveConfiguredPath("Embedding:ModelPath");
+ResolveConfiguredPath("Embedding:VocabularyPath");
+ResolveConfiguredPath("Pinecone:ModelPath");
+ResolveConfiguredPath("Pinecone:VocabularyPath");
+
+void ResolveConfiguredPath(string key)
+{
+    var path = config[key];
+    if (!string.IsNullOrWhiteSpace(path) && !Path.IsPathRooted(path))
+        config[key] = Path.GetFullPath(path, pathBase);
+}
+
 // Keep health available without credentials. Provider-backed routes are never mapped without
 // their complete configuration: no mock successes and no half-configured adapters.
-var config = builder.Configuration;
 var hasSupabase = new[] { "SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY" }
     .All(key => !string.IsNullOrWhiteSpace(config[key]));
 var hasPinecone = new[] { "PINECONE_API_KEY", "PINECONE_INDEX_NAME", "Embedding:ModelPath", "Embedding:VocabularyPath" }

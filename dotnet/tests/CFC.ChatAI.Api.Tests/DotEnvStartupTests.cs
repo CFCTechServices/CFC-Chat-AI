@@ -23,14 +23,22 @@ public sealed class DotEnvStartupTests
         listener.Stop();
 
         if (createEnvFile)
+        {
+            var modelDirectory = Path.Combine(directory, "dotnet", "models");
+            Directory.CreateDirectory(modelDirectory);
+            await File.WriteAllTextAsync(Path.Combine(modelDirectory, "model.onnx"), "test model");
+            await File.WriteAllTextAsync(Path.Combine(modelDirectory, "vocab.txt"), "test vocabulary");
             await File.WriteAllTextAsync(Path.Combine(directory, ".env"),
-                $"# Test settings\nDOTNET_API_PORT={port}\nSUPABASE_URL=\"https://dotenv.example\"\nSUPABASE_ANON_KEY=file-key\nSUPABASE_SERVICE_ROLE_KEY=service-key\n");
+                $"# Test settings\nDOTNET_API_PORT={port}\nSUPABASE_URL=\"https://dotenv.example\"\nSUPABASE_ANON_KEY=file-key\nSUPABASE_SERVICE_ROLE_KEY=service-key\nEmbedding__ModelPath=dotnet/models/model.onnx\nEmbedding__VocabularyPath=dotnet/models/vocab.txt\n");
+        }
 
         var start = new ProcessStartInfo("dotnet") { WorkingDirectory = workingDirectory, UseShellExecute = false };
         start.ArgumentList.Add(typeof(Program).Assembly.Location);
         start.Environment.Remove("SUPABASE_URL");
         start.Environment.Remove("SUPABASE_SERVICE_ROLE_KEY");
         start.Environment.Remove("PINECONE_API_KEY");
+        start.Environment.Remove("Embedding__ModelPath");
+        start.Environment.Remove("Embedding__VocabularyPath");
         start.Environment.Remove("API_PORT");
         start.Environment.Remove("DOTNET_API_PORT");
         start.Environment["SUPABASE_ANON_KEY"] = "environment-key";
@@ -57,6 +65,11 @@ public sealed class DotEnvStartupTests
                     var json = await response.Content.ReadFromJsonAsync<JsonElement>();
                     Assert.Equal("https://dotenv.example", json.GetProperty("supabaseUrl").GetString());
                     Assert.Equal("environment-key", json.GetProperty("supabaseKey").GetString());
+
+                    using var detailed = await client.GetAsync("/api/health/detailed");
+                    using var health = JsonDocument.Parse(await detailed.Content.ReadAsStringAsync());
+                    Assert.Equal("ok", health.RootElement.GetProperty("services")
+                        .GetProperty("embedding_model").GetProperty("status").GetString());
                 }
             }
         }
