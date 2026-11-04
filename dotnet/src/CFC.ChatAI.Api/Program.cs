@@ -14,8 +14,14 @@ using CFC.ChatAI.Supabase.Conversations;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.RateLimiting;
 
-// The server is launched from the repository root. Preserve explicitly set environment variables.
-DotNetEnv.Env.NoClobber().Load(".env");
+// `dotnet run --project ...` may launch the app with the project directory as its working
+// directory. In that case, resolve the repository-root .env relative to this API project.
+var workingDirectory = Directory.GetCurrentDirectory();
+var envPath = Path.Combine(workingDirectory, ".env");
+if (!File.Exists(envPath) && File.Exists(Path.Combine(workingDirectory, "CFC.ChatAI.Api.csproj")))
+    envPath = Path.GetFullPath(Path.Combine(workingDirectory, "../../../.env"));
+if (File.Exists(envPath))
+    DotNetEnv.Env.NoClobber().Load(envPath);
 
 var builder = WebApplication.CreateBuilder(args);
 var apiPort = builder.Configuration["DOTNET_API_PORT"] ?? "5000";

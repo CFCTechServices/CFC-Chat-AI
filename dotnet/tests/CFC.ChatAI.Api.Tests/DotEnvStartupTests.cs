@@ -11,10 +11,12 @@ public sealed class DotEnvStartupTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task ServerLoadsOptionalDotEnvFromWorkingDirectory(bool createEnvFile)
+    public async Task ServerLoadsOptionalDotEnvFromWorkingDirectoryOrParent(bool createEnvFile)
     {
         var directory = Path.Combine(Path.GetTempPath(), $"cfc-dotenv-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(directory);
+        var workingDirectory = Path.Combine(directory, "dotnet", "src", "CFC.ChatAI.Api");
+        Directory.CreateDirectory(workingDirectory);
+        await File.WriteAllTextAsync(Path.Combine(workingDirectory, "CFC.ChatAI.Api.csproj"), "");
         using var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
@@ -24,7 +26,7 @@ public sealed class DotEnvStartupTests
             await File.WriteAllTextAsync(Path.Combine(directory, ".env"),
                 $"# Test settings\nDOTNET_API_PORT={port}\nSUPABASE_URL=\"https://dotenv.example\"\nSUPABASE_ANON_KEY=file-key\nSUPABASE_SERVICE_ROLE_KEY=service-key\n");
 
-        var start = new ProcessStartInfo("dotnet") { WorkingDirectory = directory, UseShellExecute = false };
+        var start = new ProcessStartInfo("dotnet") { WorkingDirectory = workingDirectory, UseShellExecute = false };
         start.ArgumentList.Add(typeof(Program).Assembly.Location);
         start.Environment.Remove("SUPABASE_URL");
         start.Environment.Remove("SUPABASE_SERVICE_ROLE_KEY");
