@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>.NET component connections</title>
+<style>
+  :root{--bg:#0b1020;--panel:#111a2e;--ink:#edf3ff;--muted:#98a8c4;--line:#27334b;--cyan:#65d9d0;--violet:#b5a1ff;--amber:#ffbd69;--pink:#ff91b9;--blue:#84b9ff}
+  *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 49% -18%,#202d4c 0,transparent 52%),var(--bg);color:var(--ink);font:15px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+  main{max-width:1440px;margin:auto;padding:42px clamp(18px,4vw,58px) 36px}
+  .eyebrow{color:var(--cyan);font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+  header{display:flex;justify-content:space-between;gap:26px;align-items:flex-end;margin-bottom:24px}h1{font-size:clamp(30px,4.3vw,52px);line-height:1.08;letter-spacing:-.045em;margin:10px 0 12px}header p{max-width:750px;color:var(--muted);margin:0}.source{white-space:nowrap;color:#8999b7;font-size:12px;padding-bottom:4px}
+  .toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-bottom:12px}.toolbar-label{font-size:12px;font-weight:700;color:var(--muted);margin-right:4px}.filter{border:1px solid #33415d;border-radius:999px;background:#111a2c;color:#d8e2f5;padding:8px 13px;font:inherit;font-size:12px;cursor:pointer;transition:.18s}.filter:hover,.filter[aria-pressed="true"]{border-color:#637da8;background:#1b2943;color:#fff}.filter .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px}.reset{margin-left:auto;color:var(--muted)}
+  .canvas{border:1px solid #27344d;border-radius:18px;background:linear-gradient(135deg,rgba(21,32,54,.96),rgba(12,19,34,.96));box-shadow:0 22px 70px #03071266;overflow:hidden}.canvas-top{padding:14px 20px;border-bottom:1px solid #26334a;display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:12px}.canvas-top strong{color:#dbe6fa;font-weight:650}.pan-hint{opacity:.8}svg{display:block;width:100%;height:auto;min-width:850px}.viewport{overflow-x:auto}
+  .edge{fill:none;stroke-width:2.5;opacity:.76;transition:opacity .2s,stroke-width .2s}.edge.api{stroke:var(--violet);stroke-dasharray:7 7}.edge.chat{stroke:var(--cyan)}.edge.ingest{stroke:var(--amber)}.edge.feedback{stroke:var(--pink)}.edge.dim,.edge.unrelated{opacity:.08}.edge.active{opacity:1;stroke-width:4}
+  .node{cursor:pointer;transition:opacity .2s,filter .2s}.node rect{fill:#121d32;stroke:#34425d;stroke-width:1.5;rx:15;transition:.2s}.node:hover rect,.node.selected rect{stroke:#d6e2ff;filter:drop-shadow(0 0 12px #81aaff55)}.node.dim{opacity:.34}.node .title{fill:#f1f5ff;font-weight:750;font-size:17px}.node .sub{fill:#9eafcb;font-size:12px}.node .tag{font-size:10px;font-weight:800;letter-spacing:.08em}.node .glyph{font-size:17px;font-weight:700}.node.api rect{stroke:#8068be}.node.chat rect{stroke:#318b8d}.node.ingest rect,.node.handler rect{stroke:#a5783e}.node.feedback rect{stroke:#9a5373}.node.data rect{fill:#101a2b;stroke:#536481}.group-label{fill:#7183a2;font-size:10px;font-weight:800;letter-spacing:.16em}.zone{fill:#ffffff05;stroke:#ffffff10;stroke-dasharray:4 8;rx:18}
+  .legend{display:flex;gap:20px;flex-wrap:wrap;padding:13px 19px;border-top:1px solid #26334a;color:#a9b8d1;font-size:11px}.legend span{display:flex;align-items:center;gap:7px}.swatch{width:20px;height:2px;display:inline-block}.swatch.dashed{height:0;border-top:2px dashed var(--violet)}
+  .below{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;margin-top:14px}.note,.detail{background:var(--panel);border:1px solid #27344d;border-radius:14px;padding:17px 19px}.note h2,.detail h2{font-size:14px;margin:0 0 7px}.note p,.detail p{margin:0;color:var(--muted);font-size:13px}.note strong{color:#e7edfa}.detail{min-height:94px}.detail h2{color:var(--cyan)}.detail p{line-height:1.65}.foot{font-size:11px;color:#7788a5;margin-top:16px}
+  @media(max-width:700px){main{padding-top:28px}header{display:block}.source{margin-top:12px}.below{grid-template-columns:1fr}.reset{margin-left:0}.canvas-top{align-items:flex-start;gap:8px;flex-direction:column}}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div><div class="eyebrow">Architecture · .NET</div><h1>Components, connected.</h1><p>A map of who calls whom across the high-level design. Select a component for its role, or filter the wiring to follow one path at a time.</p></div>
+    <div class="source">BASED ON <strong>dotnet/high-level.md</strong></div>
+  </header>
+  <nav class="toolbar" aria-label="Filter connections">
+    <span class="toolbar-label">Show wiring</span>
+    <button class="filter" data-filter="api" aria-pressed="true"><i class="dot" style="background:var(--violet)"></i>API access</button>
+    <button class="filter" data-filter="chat" aria-pressed="true"><i class="dot" style="background:var(--cyan)"></i>Chat</button>
+    <button class="filter" data-filter="ingest" aria-pressed="true"><i class="dot" style="background:var(--amber)"></i>Ingestion</button>
+    <button class="filter" data-filter="feedback" aria-pressed="true"><i class="dot" style="background:var(--pink)"></i>Feedback</button>
+    <button class="filter reset" id="reset">Reset view</button>
+  </nav>
+  <section class="canvas" aria-label="Interactive component architecture diagram">
+    <div class="canvas-top"><strong>High-level component connections</strong><span class="pan-hint">Arrows indicate dependency / use · Click any component for details</span></div>
+    <div class="viewport">
+    <svg id="diagram" viewBox="0 0 1200 720" role="img" aria-labelledby="diagramTitle diagramDesc">
+      <title id="diagramTitle">.NET high-level component connection diagram</title><desc id="diagramDesc">Api uses ChatService, DocumentHandler, Feedback, Pinecone, and Supabase, but does not directly call DocumentProcessor or VideoProcessor. ChatService uses Feedback for retrieval and Supabase for conversation persistence; it has no connection to DocumentHandler and does not call Pinecone directly. DocumentHandler uses DocumentProcessor, VideoProcessor, Pinecone, and Supabase. Feedback uses Pinecone and Supabase. Pinecone and Supabase are isolated services.</desc>
+      <defs>
+        <marker id="arrow-api" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#b5a1ff"/></marker>
+        <marker id="arrow-chat" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#65d9d0"/></marker>
+        <marker id="arrow-ingest" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ffbd69"/></marker>
+        <marker id="arrow-feedback" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ff91b9"/></marker>
+      </defs>
+      <rect class="zone" x="35" y="62" width="745" height="575"/>
+      <text class="group-label" x="58" y="86">APPLICATION &amp; ORCHESTRATION</text>
+      <text class="group-label" x="865" y="86">ISOLATED SERVICES</text>
+      <!-- Edges are behind the nodes. ChatService reaches vector search through Feedback; it has no direct connection to DocumentHandler or Pinecone. -->
+      <g class="edge-group" data-layer="api">
+        <path class="edge api" data-from="api" data-to="chat" d="M250 286 C290 250 300 190 340 181" marker-end="url(#arrow-api)"/>
+        <path class="edge api" data-from="api" data-to="handler" d="M250 345 C296 370 299 458 340 470" marker-end="url(#arrow-api)"/>
+        <path class="edge api" data-from="api" data-to="feedback" d="M248 277 C365 115 510 101 605 121" marker-end="url(#arrow-api)"/>
+        <path class="edge api" data-from="api" data-to="pinecone" d="M248 265 C330 35 780 35 895 144" marker-end="url(#arrow-api)"/>
+        <path class="edge api" data-from="api" data-to="supabase" d="M250 360 C276 438 271 666 305 680 L840 680 C875 680 875 490 895 430" marker-end="url(#arrow-api)"/>
+      </g>
+      <g class="edge-group" data-layer="chat">
+        <path class="edge chat" data-from="chat" data-to="feedback" d="M500 155 C543 137 562 130 605 130" marker-end="url(#arrow-chat)"/>
+        <path class="edge chat" data-from="chat" data-to="supabase" d="M500 205 C647 333 781 383 895 403" marker-end="url(#arrow-chat)"/>
+      </g>
+      <g class="edge-group" data-layer="ingest">
+        <path class="edge ingest" data-from="handler" data-to="docprocessor" d="M500 471 C545 471 560 480 605 480" marker-end="url(#arrow-ingest)"/>
+        <path class="edge ingest" data-from="handler" data-to="videoprocessor" d="M490 510 C542 559 557 592 605 598" marker-end="url(#arrow-ingest)"/>
+        <path class="edge ingest" data-from="handler" data-to="pinecone" d="M500 453 C680 340 804 206 895 168" marker-end="url(#arrow-ingest)"/>
+        <path class="edge ingest" data-from="handler" data-to="supabase" d="M500 515 C522 558 526 632 552 650 L840 650 C870 650 878 485 895 430" marker-end="url(#arrow-ingest)"/>
+      </g>
+      <g class="edge-group" data-layer="feedback">
+        <path class="edge feedback" data-from="feedback" data-to="pinecone" d="M780 129 C823 129 849 145 895 153" marker-end="url(#arrow-feedback)"/>
+        <path class="edge feedback" data-from="feedback" data-to="supabase" d="M757 166 C808 241 849 354 895 399" marker-end="url(#arrow-feedback)"/>
+      </g>
+      <!-- Nodes -->
+      <g class="node api" data-id="api" tabindex="0" role="button" aria-label="Api component">
+        <rect x="70" y="274" width="180" height="100"/><text class="glyph" x="91" y="307" fill="#b5a1ff">◇</text><text class="tag" x="118" y="306" fill="#b5a1ff">ENTRY POINT</text><text class="title" x="91" y="337">Api</text><text class="sub" x="91" y="357">Internal endpoints</text>
+      </g>
+      <g class="node chat" data-id="chat" tabindex="0" role="button" aria-label="ChatService component">
+        <rect x="340" y="135" width="160" height="90"/><text class="glyph" x="359" y="166" fill="#65d9d0">✳</text><text class="tag" x="386" y="165" fill="#65d9d0">ORCHESTRATION</text><text class="title" x="359" y="192">ChatService</text><text class="sub" x="359" y="211">POST /api/chat/message</text>
+      </g>
+      <g class="node feedback" data-id="feedback" tabindex="0" role="button" aria-label="Feedback component">
+        <rect x="605" y="95" width="175" height="76"/><text class="glyph" x="624" y="125" fill="#ff91b9">↗</text><text class="tag" x="651" y="124" fill="#ff91b9">RETRIEVAL</text><text class="title" x="624" y="149">Feedback</text><text class="sub" x="715" y="149">rerank chunks</text>
+      </g>
+      <g class="node handler" data-id="handler" tabindex="0" role="button" aria-label="DocumentHandler component">
+        <rect x="340" y="430" width="160" height="94"/><text class="glyph" x="359" y="462" fill="#ffbd69">⇅</text><text class="tag" x="386" y="461" fill="#ffbd69">INGESTION</text><text class="title" x="359" y="488">DocumentHandler</text><text class="sub" x="359" y="508">ingest · replace · delete</text>
+      </g>
+      <g class="node ingest" data-id="docprocessor" tabindex="0" role="button" aria-label="DocumentProcessor component">
+        <rect x="605" y="444" width="175" height="76"/><text class="glyph" x="624" y="474" fill="#ffbd69">▤</text><text class="tag" x="651" y="473" fill="#ffbd69">TRANSFORM</text><text class="title" x="624" y="498">DocumentProcessor</text><text class="sub" x="624" y="515">documents → text chunks</text>
+      </g>
+      <g class="node ingest" data-id="videoprocessor" tabindex="0" role="button" aria-label="VideoProcessor component">
+        <rect x="605" y="562" width="175" height="76"/><text class="glyph" x="624" y="592" fill="#ffbd69">▶</text><text class="tag" x="651" y="591" fill="#ffbd69">TRANSFORM</text><text class="title" x="624" y="616">VideoProcessor</text><text class="sub" x="624" y="633">video → transcription chunks</text>
+      </g>
+      <g class="node data" data-id="pinecone" tabindex="0" role="button" aria-label="Pinecone component">
+        <rect x="895" y="118" width="220" height="88"/><text class="glyph" x="916" y="151" fill="#84b9ff">◈</text><text class="tag" x="945" y="150" fill="#84b9ff">VECTOR STORE</text><text class="title" x="916" y="177">Pinecone</text><text class="sub" x="916" y="195">vectors · similarity search</text>
+      </g>
+      <g class="node data" data-id="supabase" tabindex="0" role="button" aria-label="Supabase component">
+        <rect x="895" y="368" width="220" height="88"/><text class="glyph" x="916" y="401" fill="#84b9ff">▦</text><text class="tag" x="945" y="400" fill="#84b9ff">APPLICATION DATA</text><text class="title" x="916" y="427">Supabase</text><text class="sub" x="916" y="445">data / persistence service</text>
+      </g>
+    </svg>
+    </div>
+    <div class="legend"><span><i class="swatch dashed"></i>API exposure / wiring</span><span><i class="swatch" style="background:var(--cyan)"></i>Chat orchestration</span><span><i class="swatch" style="background:var(--amber)"></i>Document &amp; video ingestion</span><span><i class="swatch" style="background:var(--pink)"></i>Feedback retrieval</span></div>
+  </section>
+  <section class="below">
+    <article class="note"><h2>Boundaries worth noticing</h2><p><strong>ChatService has no connection to DocumentHandler.</strong> DocumentHandler independently ingests documents into the stores; when handling a chat message, ChatService searches existing indexed content through Feedback. Pinecone and Supabase do not call one another or application components. ChatService reaches vector retrieval through Feedback, not directly through Pinecone. DocumentProcessor and VideoProcessor are independent; only DocumentHandler orchestrates them for ingestion.</p></article>
+    <article class="detail" aria-live="polite"><h2 id="detail-title">Explore the diagram</h2><p id="detail-copy">Choose a component above to see its responsibility and the connections described in the high-level design.</p></article>
+  </section>
+  <p class="foot">Conceptual wiring from <code>dotnet/high-level.md</code>; this illustrates component relationships, not runtime sequencing or every endpoint.</p>
+</main>
+<script>
+(() => {
+  const descriptions = {
+    api: ["Api", "Defines the internal endpoints and uses all components except for direct calls to DocumentProcessor and VideoProcessor. The current frontend's main chat route is POST /api/chat/message."],
+    chat: ["ChatService", "The chatbot orchestration layer for POST /api/chat/message. It uses Feedback for retrieval and Supabase for conversation persistence. It does not call DocumentHandler; it searches content already indexed by ingestion through Feedback, and does not call Pinecone directly."],
+    handler: ["DocumentHandler", "Owns document and video ingestion workflows, plus deletion/replacement. It calls the relevant processor to produce text chunks, then ingests them into Pinecone and Supabase."],
+    docprocessor: ["DocumentProcessor", "Independent transformation component: accepts a supported document type and returns text chunks. It should not call other components."],
+    videoprocessor: ["VideoProcessor", "Independent transformation component: takes a video and extracts text chunks using transcription."],
+    feedback: ["Feedback", "Takes a query and returns reranked chunks. Its only dependencies are the Pinecone and Supabase services."],
+    pinecone: ["Pinecone", "An isolated vector service. Other components may use it for vector operations, but it does not call Supabase or application components."],
+    supabase: ["Supabase", "An isolated data service. Other components may use it for persistence, but it does not call Pinecone or application components."]
+  };
+  const buttons = [...document.querySelectorAll(".filter[data-filter]")];
+  const nodes = [...document.querySelectorAll(".node")];
+  const edges = [...document.querySelectorAll(".edge")];
+  let selected = null;
+  function filterEdges() {
+    const enabled = new Set(buttons.filter(b => b.getAttribute("aria-pressed") === "true").map(b => b.dataset.filter));
+    edges.forEach(e => e.classList.toggle("dim", !enabled.has(e.parentElement.dataset.layer)));
+    highlightSelection();
+  }
+  function highlightSelection() {
+    edges.forEach(e => e.classList.toggle("unrelated", !!selected && e.dataset.from !== selected && e.dataset.to !== selected));
+    nodes.forEach(n => n.classList.toggle("dim", !!selected && n.dataset.id !== selected && !edges.some(e => (e.dataset.from === selected && e.dataset.to === n.dataset.id || e.dataset.to === selected && e.dataset.from === n.dataset.id) && !e.classList.contains("dim"))));
+    edges.forEach(e => e.classList.toggle("active", !!selected && (e.dataset.from === selected || e.dataset.to === selected) && !e.classList.contains("dim")));
+  }
+  function select(id) {
+    selected = selected === id ? null : id;
+    nodes.forEach(n => n.classList.toggle("selected", n.dataset.id === selected));
+    document.getElementById("detail-title").textContent = selected ? descriptions[selected][0] : "Explore the diagram";
+    document.getElementById("detail-copy").textContent = selected ? descriptions[selected][1] : "Choose a component above to see its responsibility and the connections described in the high-level design.";
+    highlightSelection();
+  }
+  buttons.forEach(b => b.addEventListener("click", () => { b.setAttribute("aria-pressed", b.getAttribute("aria-pressed") !== "true"); filterEdges(); }));
+  nodes.forEach(n => { n.addEventListener("click", () => select(n.dataset.id)); n.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(n.dataset.id); } }); });
+  document.getElementById("reset").addEventListener("click", () => { buttons.forEach(b => b.setAttribute("aria-pressed", "true")); selected = null; nodes.forEach(n => n.classList.remove("selected", "dim")); document.getElementById("detail-title").textContent = "Explore the diagram"; document.getElementById("detail-copy").textContent = "Choose a component above to see its responsibility and the connections described in the high-level design."; filterEdges(); });
+  filterEdges();
+})();
+</script>
+</body>
+</html>
