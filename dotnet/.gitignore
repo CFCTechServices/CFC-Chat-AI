@@ -485,3 +485,7 @@ models/
 
 # Parity test data (root .gitignore ignores *.json)
 !tests/**/TestData/*.json
+
+
+# DocumentProcessor parity data is client documents - never commit
+tests/CFC.ChatAI.DocumentProcessor.Tests/TestData/
