@@ -1,0 +1,243 @@
+﻿@page "/chat"
+@rendermode InteractiveServer
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+ 
+<div class="cfc-header">
+    <img src="images/logo-cfc.png"
+         alt="CFC Tech Services Logo"
+         class="cfc-logo"
+         style="width:160px; height:auto;" />
+
+
+    <div class="cfc-header-title">
+        <h3>CFC Chat AI</h3>
+        <p>Your Software Assistant</p>
+    </div>
+</div>
+
+
+<div class="chat-layout">
+    <div class="chat-sidebar">
+
+        <button type="button"
+                class="sidebar-new-chat"
+                @onclick="StartNewChat">
+            + New Chat
+        </button>
+
+        <h4>Chat History</h4>
+
+        <div class="sidebar-history">
+            @if (conversations.Count == 0)
+            {
+                <p>Your conversations will appear here.</p>
+            }
+            else
+            {
+
+                @foreach (var conversation in conversations)
+                {
+                    <div class="sidebar-chat-row">
+                        <button type="button"
+                                class="sidebar-chat-item @(activeConversation == conversation ? "active" : "")"
+                                @onclick="() => SelectChat(conversation)">
+                            @conversation.Title
+                        </button>
+
+                        <button type="button"
+                                class="sidebar-delete-chat"
+                                title="Delete chat"
+                                aria-label="Delete conversation"
+                                @onclick="() => DeleteChat(conversation)">
+                            &#x2715;
+                        </button>
+                    </div>
+                }
+
+            }
+        </div>
+    </div>
+
+    <div class="chat-main">
+        <h4>Chat with CFC AI</h4>
+        <p>Ask questions about your software.</p>
+
+      
+        <div class="chat-thread" @ref="chatThreadElement">
+            @if (activeConversation != null)
+            {
+                @foreach (var message in activeConversation.Messages)
+                {
+                    <ChatMessage Sender="@message.Sender"
+                                 Text="@message.Text" />
+                }
+
+                @if (activeConversation.IsThinking)
+                {
+                    <div class="chat-message bot"
+                         role="status"
+                         aria-live="polite">
+                        <div class="chat-bubble cfc-thinking">
+                            <span>CFC AI is thinking</span>
+                            <span class="thinking-dots" aria-hidden="true">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </span>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+
+
+        
+        <ChatComposer @ref="chatComposer"
+                      OnSend="HandleSendMessage" />
+
+    </div>
+</div>
+
+@code {
+    private List<Conversation> conversations = new();
+    private Conversation? activeConversation;
+    private ChatComposer? chatComposer;
+
+    private Conversation CreateConversation()
+    {
+        var conversation = new Conversation();
+        conversations.Insert(0, conversation);
+        activeConversation = conversation;
+        return conversation;
+    }
+
+
+    private async Task StartNewChat()
+    {
+        CreateConversation();
+
+        if (chatComposer is not null)
+        {
+            await chatComposer.FocusInputAsync();
+        }
+    }
+
+
+    private void SelectChat(Conversation conversation)
+    {
+        activeConversation = conversation;
+        shouldScrollToBottom = true;
+    }
+
+
+    private async Task DeleteChat(Conversation conversation)
+    {
+        bool confirmed = await JS.InvokeAsync<bool>(
+            "confirm",
+            $"Are you sure you want to delete '{conversation.Title}'?"
+        );
+
+        if (!confirmed)
+            return;
+
+        bool wasActive = activeConversation == conversation;
+
+        conversations.Remove(conversation);
+
+        if (wasActive)
+        {
+            activeConversation = conversations.FirstOrDefault();
+            shouldScrollToBottom = true;
+        }
+    }
+
+
+  
+    private async Task HandleSendMessage(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            return;
+
+        var conversation = activeConversation ?? CreateConversation();
+
+        if (conversation.IsThinking)
+            return;
+
+        if (conversation.Messages.Count == 0)
+        {
+            string title = message.Trim();
+
+            conversation.Title = title.Length > 30
+                ? title[..30] + "..."
+                : title;
+        }
+
+        // Display the user's message
+        conversation.Messages.Add(new ChatEntry
+        {
+            Sender = "You",
+            Text = message
+        });
+
+        // Show the thinking indicator
+        conversation.IsThinking = true;
+        shouldScrollToBottom = true;
+
+        StateHasChanged();
+
+        // Simulated delay until the real API is available
+        await Task.Delay(1500);
+
+        // The conversation might have been deleted
+        if (!conversations.Contains(conversation))
+            return;
+
+        // Hide the indicator
+        conversation.IsThinking = false;
+
+        // Temporary AI response
+        conversation.Messages.Add(new ChatEntry
+        {
+            Sender = "CFC AI",
+            Text = "Hello! I received your message."
+        });
+
+        if (activeConversation == conversation)
+            shouldScrollToBottom = true;
+    }
+
+
+
+    private class Conversation
+    {
+        public string Title { get; set; } = "New Chat";
+        public List<ChatEntry> Messages { get; set; } = new();
+        public bool IsThinking { get; set; } = false;
+    }
+
+    private class ChatEntry
+    {
+        public string Sender { get; set; } = "";
+        public string Text { get; set; } = "";
+        
+    }
+
+    private ElementReference chatThreadElement;
+    private bool shouldScrollToBottom = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (shouldScrollToBottom)
+        {
+            shouldScrollToBottom = false;
+
+            await JS.InvokeVoidAsync(
+                "cfcChat.scrollToBottom",
+                chatThreadElement
+            );
+        }
+    }
+
+}

@@ -1,0 +1,530 @@
+﻿
+/* CFC Chat AI - Modern Gray Theme */
+
+.chat-layout {
+    display: flex;
+    height: 75vh;
+    min-height: 450px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+/* Left Sidebar */
+.chat-sidebar {
+    width: 250px;
+    flex-shrink: 0;
+    background: #e9eaed;
+    padding: 20px;
+    border-right: 1px solid #d1d5db;
+}
+
+    .chat-sidebar h4 {
+        color: #252b36;
+        font-size: 17px;
+        font-weight: 600;
+    }
+
+    .chat-sidebar p {
+        color: #6b7280;
+        font-size: 14px;
+    }
+
+/* Main Chat Area */
+.chat-main {
+    min-height: 0;
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+    background: #ffffff;
+}
+
+    .chat-main h4 {
+        color: #252b36;
+        font-weight: 600;
+    }
+
+    .chat-main > p {
+        color: #6b7280;
+    }
+
+/* Messages */
+
+/* Chat Messages */
+
+.chat-message {
+    display: flex;
+    margin-bottom: 12px;
+}
+
+    /* User messages on the right */
+    .chat-message.user {
+        justify-content: flex-end;
+    }
+
+    /* AI messages on the left */
+    .chat-message.bot {
+        justify-content: flex-start;
+    }
+
+
+/* Scrollable Chat Conversation */
+.chat-thread {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 16px 0;
+}
+
+
+/* Message bubble */
+.chat-bubble {
+    max-width: 75%;
+    padding: 12px 16px;
+    border-radius: 14px;
+    color: #252b36;
+    overflow-wrap: anywhere;
+}
+
+/* User bubble - Gray */
+.chat-message.user .chat-bubble {
+    background: #dfe2e7;
+    border-bottom-right-radius: 4px;
+}
+
+/* AI bubble - Light Gray */
+.chat-message.bot .chat-bubble {
+    background: #f3f4f6;
+    border: 1px solid #e5e7eb;
+    border-bottom-left-radius: 4px;
+}
+
+
+/* Message Input Area */
+.chat-composer {
+    display: flex;
+    gap: 10px;
+    margin-top: auto;
+    padding-top: 20px;
+}
+
+    .chat-composer input {
+        flex: 1;
+        min-width: 0;
+        padding: 12px 16px;
+        border: 1px solid #d1d5db;
+        border-radius: 12px;
+        background: #ffffff;
+        color: #252b36;
+    }
+
+    /* Send Button */
+    .chat-composer button {
+        background: #252b36;
+        color: #ffffff;
+        border: none;
+        border-radius: 12px;
+        padding: 12px 22px;
+        cursor: pointer;
+    }
+
+        .chat-composer button:hover {
+            background: #414b5c;
+        }
+
+
+/* Modern Gray Chat History Sidebar */
+
+.chat-layout {
+    font-family: "Segoe UI", Arial, sans-serif;
+}
+
+.chat-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* New Chat Button */
+.sidebar-new-chat {
+    width: 100%;
+    background: #252b36;
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 12px;
+    cursor: pointer;
+    flex-shrink: 0;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+    .sidebar-new-chat:hover {
+        background: #414b5c;
+    }
+
+/* Conversation History */
+.sidebar-history {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* Individual Conversation */
+.sidebar-chat-item {
+    display: block;
+    width: 100%;
+    flex-shrink: 0;
+    text-align: left;
+    padding: 12px 14px;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: #252b36;
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 14px;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+    /* Hover Effect */
+    .sidebar-chat-item:hover {
+        background: #d1d5db;
+    }
+
+    /* Selected Conversation */
+    .sidebar-chat-item.active {
+        background: #cbd0d8;
+        border-color: #b9bec8;
+        font-weight: 600;
+    }
+
+    /* Keyboard Focus */
+    .sidebar-chat-item:focus-visible,
+    .sidebar-new-chat:focus-visible {
+        outline: 2px solid #64748b;
+        outline-offset: 2px;
+    }
+
+
+
+/* Small Screens */
+@media (max-width: 640px) {
+    .chat-layout {
+        flex-direction: column;
+    }
+
+    .chat-sidebar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid #d1d5db;
+        max-height: 220px;
+    }
+}
+
+/* CFC Header */
+.cfc-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 14px 24px;
+    background: #252b36;
+    border-radius: 12px;
+    margin-bottom: 16px;
+    font-family: "Segoe UI", Arial, sans-serif;
+}
+
+/* Original CFC Company Logo */
+.cfc-logo {
+    width: 160px;
+    height: auto;
+    max-width: 100%;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+/* Header Text */
+.cfc-header-title h3 {
+    margin: 0;
+    color: white;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+.cfc-header-title p {
+    margin: 4px 0 0;
+    color: #cbd5e1;
+    font-size: 13px;
+}
+
+/* Chat History Row */
+.sidebar-chat-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+}
+
+    /* Allow conversation title to shrink */
+ .sidebar-chat-row .sidebar-chat-item {
+        flex: 1;
+        min-width: 0;
+        width: auto;
+        flex-shrink: 1;
+}
+
+/* Delete Chat Button */
+.sidebar-delete-chat {
+    flex-shrink: 0;
+    border: none;
+    background: transparent;
+    color: #6b7280;
+    border-radius: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+    .sidebar-delete-chat:hover {
+        background: #d1d5db;
+        color: #b91c1c;
+    }
+
+    .sidebar-delete-chat:focus-visible {
+        outline: 2px solid #64748b;
+        outline-offset: 2px;
+    }
+
+/* Hide Delete button until hovered */
+.sidebar-delete-chat {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+    /* Show Delete button on hover */
+    .sidebar-chat-row:hover .sidebar-delete-chat,
+    .sidebar-delete-chat:focus-visible,
+    .sidebar-chat-row:focus-within .sidebar-delete-chat {
+        opacity: 1;
+    }
+
+
+
+/* AI Thinking Indicator */
+.cfc-thinking {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #6b7280;
+    font-size: 14px;
+}
+
+.thinking-dots {
+    display: flex;
+    gap: 4px;
+}
+
+    .thinking-dots span {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #9ca3af;
+        animation: cfc-pulse 1.2s infinite ease-in-out;
+    }
+
+        .thinking-dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .thinking-dots span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+@keyframes cfc-pulse {
+    0%, 80%, 100% {
+        opacity: 0.3;
+        transform: scale(0.8);
+    }
+
+    40% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* =========================
+   CFC Login Page
+   ========================= */
+
+.login-page {
+    min-height: 100vh;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    font-family: "Segoe UI", Arial, sans-serif;
+    color: #252b36;
+}
+
+/* Welcome Section */
+.login-hero {
+    text-align: center;
+    max-width: 650px;
+}
+
+    .login-hero h1 {
+        font-size: 32px;
+        font-weight: 700;
+        margin: 0 0 14px;
+        color: #252b36;
+    }
+
+    .login-hero p {
+        color: #6b7280;
+        font-size: 15px;
+        line-height: 1.6;
+        margin: 0 0 18px;
+    }
+
+/* Welcome Badges */
+.login-badges {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+    .login-badges span {
+        background: #e9eaed;
+        color: #414b5c;
+        border: 1px solid #d1d5db;
+        border-radius: 20px;
+        padding: 6px 12px;
+        font-size: 12px;
+    }
+
+/* Login Card */
+.login-card {
+    width: 100%;
+    max-width: 440px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+    .login-card h2 {
+        margin: 0 0 10px;
+        color: #252b36;
+        font-size: 24px;
+    }
+
+    .login-card > p {
+        color: #6b7280;
+        font-size: 14px;
+        margin-bottom: 24px;
+    }
+
+/* Login Form */
+.login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+    .login-form label {
+        font-size: 14px;
+        font-weight: 600;
+        color: #252b36;
+    }
+
+    .login-form input {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1px solid #d1d5db;
+        border-radius: 10px;
+        background: #ffffff;
+        color: #252b36;
+        font-size: 14px;
+    }
+
+        .login-form input:focus {
+            outline: 2px solid #94a3b8;
+            outline-offset: 1px;
+        }
+
+    /* Forgot Password */
+    .login-form a {
+        color: #4065ae;
+        font-size: 13px;
+        text-align: right;
+        text-decoration: none;
+    }
+
+        .login-form a:hover {
+            text-decoration: underline;
+        }
+
+    /* Sign In Button */
+    .login-form button {
+        width: 100%;
+        padding: 12px;
+        background: #252b36;
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+        .login-form button:hover:not(:disabled) {
+            background: #414b5c;
+        }
+
+        .login-form button:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
+    /* Supporting Text */
+    .login-form p {
+        font-size: 13px;
+        color: #6b7280;
+        text-align: center;
+        margin: 6px 0;
+    }
+
+/* Small Screens */
+@media (max-width: 640px) {
+    .login-page {
+        padding: 24px 16px;
+    }
+
+    .login-hero h1 {
+        font-size: 26px;
+    }
+
+    .login-card {
+        padding: 24px 20px;
+    }
+
+}
+
+/* CFC Login Page Background */
+body:has(.login-page) {
+    background: linear-gradient( 135deg, #d9dee6 0%, #f3f4f6 55%, #e3e7ed 100% );
+}

@@ -1,0 +1,56 @@
+﻿
+<div class="chat-composer">
+    <input type="text"
+           @ref="messageInput"
+           placeholder="Ask a question about CFC software..."
+           @bind="message"
+           @bind:event="oninput"
+           @onkeydown="HandleKeyDown"/>
+
+    <button @onclick="SendMessageAsync">
+        Send
+    </button>
+</div>
+
+@code {
+    private string message = "";
+
+    [Parameter]
+    public EventCallback<string> OnSend { get; set; }
+
+    private async Task SendMessageAsync()
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            return;
+
+        string text = message;
+        message = "";
+
+        await OnSend.InvokeAsync(text);
+    }
+ 
+  private async Task HandleKeyDown(KeyboardEventArgs e)
+ {
+    if (e.Key == "Enter")
+    {
+        await SendMessageAsync();
+    }
+ }
+
+ private ElementReference messageInput;
+
+ public async Task FocusInputAsync()
+ {
+    await messageInput.FocusAsync();
+ }
+
+ protected override async Task OnAfterRenderAsync(bool firstRender)
+ {
+    if (firstRender)
+    {
+        await FocusInputAsync();
+    }
+}
+
+
+}

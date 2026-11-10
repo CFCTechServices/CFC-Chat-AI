@@ -1,0 +1,16 @@
+﻿
+<div class="chat-message @(Sender == "You" ? "user" : "bot")">
+    <div class="chat-bubble">
+        <strong>@Sender:</strong> @Text
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string Sender { get; set; } = "You";
+
+    [Parameter]
+    public string Text { get; set; } = "";
+}
+
+

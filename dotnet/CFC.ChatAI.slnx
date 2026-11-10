@@ -9,4 +9,5 @@
     <Project Path="tools/CFC.ChatAI.Rag.Harness/CFC.ChatAI.Rag.Harness.csproj" />
     <Project Path="tools/CFC.ChatAI.Rag.VectorStoreCheck/CFC.ChatAI.Rag.VectorStoreCheck.csproj" />
   </Folder>
+  <Project Path="src/CFC.ChatAI.Web/CFC.ChatAI.Web.csproj" Id="93f4a4ca-9354-4be7-9733-e4e97bbbc6f7" />
 </Solution>
