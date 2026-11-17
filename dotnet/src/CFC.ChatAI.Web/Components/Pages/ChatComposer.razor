@@ -1,15 +1,29 @@
 ﻿
 <div class="chat-composer">
-    <input type="text"
+    
+  @if (ShowLongConvoWarning)
+   {
+     <button type="button"
+            class="composer-info-icon"
+            title="Conversation length info"
+            aria-label="Conversation length information"
+            @onclick="() => OnLongConvoInfo.InvokeAsync()">
+        ⓘ
+      </button>
+     }
+  
+        <input type="text"
            @ref="messageInput"
            placeholder="Ask a question about CFC software..."
            @bind="message"
            @bind:event="oninput"
-           @onkeydown="HandleKeyDown"/>
+           @onkeydown="HandleKeyDown" />
 
-    <button @onclick="SendMessageAsync">
-        Send
-    </button>
+      @AttachmentButton
+
+      <button type="button" @onclick="SendMessageAsync">
+         Send
+     </button>
 </div>
 
 @code {
@@ -18,39 +32,54 @@
     [Parameter]
     public EventCallback<string> OnSend { get; set; }
 
+    [Parameter]
+    public RenderFragment? AttachmentButton { get; set; }
+
+    [Parameter]
+    public bool HasAttachments { get; set; }
+
+    
+    [Parameter]
+    public bool ShowLongConvoWarning { get; set; }
+
+    [Parameter]
+    public EventCallback OnLongConvoInfo { get; set; }
+
+
+   
     private async Task SendMessageAsync()
+     {
+    // Allow sending if there is text OR an attachment
+       if (string.IsNullOrWhiteSpace(message) && !HasAttachments)
+         return;
+
+       string text = message;
+       message = "";
+
+       await OnSend.InvokeAsync(text);
+     }
+
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
     {
-        if (string.IsNullOrWhiteSpace(message))
-            return;
-
-        string text = message;
-        message = "";
-
-        await OnSend.InvokeAsync(text);
+        if (e.Key == "Enter")
+        {
+            await SendMessageAsync();
+        }
     }
- 
-  private async Task HandleKeyDown(KeyboardEventArgs e)
- {
-    if (e.Key == "Enter")
+
+    private ElementReference messageInput;
+
+    public async Task FocusInputAsync()
     {
-        await SendMessageAsync();
+        await messageInput.FocusAsync();
     }
- }
 
- private ElementReference messageInput;
-
- public async Task FocusInputAsync()
- {
-    await messageInput.FocusAsync();
- }
-
- protected override async Task OnAfterRenderAsync(bool firstRender)
- {
-    if (firstRender)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        await FocusInputAsync();
+        if (firstRender)
+        {
+            await FocusInputAsync();
+        }
     }
-}
-
-
 }

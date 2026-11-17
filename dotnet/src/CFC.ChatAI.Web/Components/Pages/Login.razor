@@ -1,5 +1,6 @@
 ﻿@page "/login"
 @rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
 
 <div class="login-page">
 
@@ -36,7 +37,15 @@
                        type="email"
                        placeholder="Enter your invited email"
                        autocomplete="email"
-                       @bind="email" />
+                       @bind="email"
+                       @bind:event="oninput" />
+
+                @if (!string.IsNullOrWhiteSpace(email) && !IsEmailValid)
+                {
+                    <small style="color: #b91c1c;" role="alert">
+                        Please enter a valid email address.
+                    </small>
+                }
 
                 <button type="button" disabled>
                     Next
@@ -44,11 +53,11 @@
 
                 <p>
                     Already have an account?
-                    <a href="#"
-                       @onclick="ShowSignIn"
-                       @onclick:preventDefault="true">
+                    <button type="button"
+                            class="login-switch"
+                            @onclick="ShowSignIn">
                         Sign In
-                    </a>
+                    </button>
                 </p>
 
             </div>
@@ -67,7 +76,15 @@
                        type="email"
                        placeholder="Enter your email"
                        autocomplete="email"
-                       @bind="email" />
+                       @bind="email"
+                       @bind:event="oninput" />
+
+                @if (!string.IsNullOrWhiteSpace(email) && !IsEmailValid)
+                {
+                    <small style="color: #b91c1c;" role="alert">
+                        Please enter a valid email address.
+                    </small>
+                }
 
                 <label for="login-password">Password</label>
 
@@ -83,21 +100,19 @@
                     Sign In
                 </button>
 
-                  
-                    <p>
-                        Need an account?
-                        <button type="button"
-                                class="login-switch"
-                                @onclick="ShowSignUp">
-                            Sign Up
-                        </button>
-                    </p>
+                <p>
+                    Need an account?
+                    <button type="button"
+                            class="login-switch"
+                            @onclick="ShowSignUp">
+                        Sign Up
+                    </button>
+                </p>
 
-                    <p>
-                        Don't have access? Contact your
-                        administrator to request access.
-                    </p>
-
+                <p>
+                    Don't have access? Contact your
+                    administrator to request access.
+                </p>
 
             </div>
         }
@@ -126,5 +141,9 @@
         email = string.Empty;
         password = string.Empty;
     }
+
+    private bool IsEmailValid =>
+        !string.IsNullOrWhiteSpace(email) &&
+        new EmailAddressAttribute().IsValid(email.Trim());
 
 }

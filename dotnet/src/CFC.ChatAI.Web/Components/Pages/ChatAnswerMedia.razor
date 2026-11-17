@@ -1,0 +1,136 @@
+﻿
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+
+@if (Images.Count > 0 || !string.IsNullOrWhiteSpace(VideoUrl))
+{
+    <div class="chat-answer-media">
+
+        @foreach (var url in Images)
+        {
+            <button type="button"
+                    class="chat-answer-image-button"
+                    title="Enlarge image"
+                    @onclick="() => imagePreview = url">
+                <img src="@url"
+                     alt="Image referenced by CFC AI"
+                     loading="lazy" />
+            </button>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(VideoUrl))
+        {
+            <div class="chat-answer-video">
+
+                <video @ref="videoElement"
+                       src="@VideoUrl"
+                       class="chat-response-video"
+                       controls
+                       preload="metadata">
+                </video>
+
+                @if (VideoTimestamps.Count > 0)
+                {
+                    <div class="chat-video-timestamps">
+                        @foreach (var moment in VideoTimestamps)
+                        {
+                            <button type="button"
+                                    @onclick="() => SeekTo(moment.Seconds)">
+                                @moment.Label
+                            </button>
+                        }
+                    </div>
+                }
+
+                <button type="button"
+                        class="chat-expand-video"
+                        @onclick="() => videoExpanded = true">
+                    Expand video
+                </button>
+            </div>
+        }
+    </div>
+}
+
+@if (imagePreview is not null)
+{
+    <div class="cfc-media-backdrop"
+         @onclick="CloseImage">
+        <div class="cfc-media-modal"
+             role="dialog"
+             aria-modal="true"
+             aria-label="Image preview"
+             @onclick:stopPropagation="true">
+
+            <button type="button"
+                    class="cfc-media-close"
+                    @onclick="CloseImage">
+                ✕
+            </button>
+
+            <img src="@imagePreview"
+                 alt="Enlarged document image" />
+        </div>
+    </div>
+}
+
+@if (videoExpanded && !string.IsNullOrWhiteSpace(VideoUrl))
+{
+    <div class="cfc-media-backdrop"
+         @onclick="CloseVideo">
+        <div class="cfc-media-modal"
+             role="dialog"
+             aria-modal="true"
+             aria-label="Video preview"
+             @onclick:stopPropagation="true">
+
+            <button type="button"
+                    class="cfc-media-close"
+                    @onclick="CloseVideo">
+                ✕
+            </button>
+
+            <video src="@VideoUrl"
+                   controls
+                   autoplay>
+            </video>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public IReadOnlyList<string> Images { get; set; }
+        = Array.Empty<string>();
+
+    [Parameter]
+    public string? VideoUrl { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<(double Seconds, string Label)> VideoTimestamps
+        { get; set; } =
+        Array.Empty<(double Seconds, string Label)>();
+
+    private string? imagePreview;
+    private bool videoExpanded;
+    private ElementReference videoElement;
+
+    private void CloseImage()
+    {
+        imagePreview = null;
+    }
+
+    private void CloseVideo()
+    {
+        videoExpanded = false;
+    }
+
+    private async Task SeekTo(double seconds)
+    {
+        await JS.InvokeVoidAsync(
+            "cfcChat.seekVideo",
+            videoElement,
+            seconds);
+    }
+}
+

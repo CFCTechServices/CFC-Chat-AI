@@ -1,7 +1,10 @@
-﻿@page "/"
+﻿
+@page "/"
+@inject NavigationManager Navigation
 
-<PageTitle>Home</PageTitle>
-
-<h1>CFC-Chat-AI</h1>
-
-Welcome to your new app.
+@code {
+    protected override void OnInitialized()
+    {
+        Navigation.NavigateTo("/login", replace: true);
+    }
+}

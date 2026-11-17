@@ -1,8 +1,97 @@
 ﻿
-<div class="chat-message @(Sender == "You" ? "user" : "bot")">
-    <div class="chat-bubble">
-        <strong>@Sender:</strong> @Text
-    </div>
+@using Microsoft.JSInterop
+@using System.Net
+@using System.Text
+@using System.Text.RegularExpressions
+@inject IJSRuntime JS
+
+<div class="chat-message @(IsUserMessage ? "user" : "bot")">
+
+    @if (IsUserMessage)
+    {
+        <!-- USER MESSAGE: No feedback buttons -->
+        <div class="chat-bubble">
+            <strong>@Sender:</strong> @Text
+
+            @if (Images.Count > 0)
+            {
+                <div class="chat-sent-images">
+                    @foreach (var image in Images)
+                    {
+                        <img src="@image"
+                             alt="Attached image"
+                             class="chat-sent-image" />
+                    }
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <!-- AI MESSAGE: Copy and feedback buttons -->
+        <div class="chat-bubble-group">
+
+            <div class="chat-bubble">
+                <strong>@Sender:</strong>
+                <div class="chat-text markdown">
+                    
+                <ChatAnswerMedia Images="@AnswerImages"
+                 VideoUrl="@AnswerVideoUrl"
+                 VideoTimestamps="@AnswerVideoTimestamps" />
+
+
+                    @RenderMessage(Text)
+                </div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(Text))
+            {
+                <div class="message-actions">
+
+                    <button type="button"
+                            class="msg-action-btn"
+                            title="@(copied ? "Copied!" : "Copy message")"
+                            aria-label="Copy message"
+                            @onclick="CopyMessageAsync">
+                        @if (copied)
+                        {
+                            <span>✓</span>
+                        }
+                        else
+                        {
+                            <span>⧉</span>
+                        }
+                    </button>
+
+                    <button type="button"
+                            class="msg-action-btn @(Feedback == "up" ? "active" : "")"
+                            title="Helpful"
+                            aria-label="Mark as helpful"
+                            aria-pressed="@(Feedback == "up")"
+                            @onclick="VoteUp">
+                        👍
+                    </button>
+
+                    <button type="button"
+                            class="msg-action-btn @(Feedback == "down" ? "active" : "")"
+                            title="Not helpful"
+                            aria-label="Mark as not helpful"
+                            aria-pressed="@(Feedback == "down")"
+                            @onclick="VoteDown">
+                        👎
+                    </button>
+
+                </div>
+
+                @if (!string.IsNullOrEmpty(copyError))
+                {
+                    <small role="alert" style="color: #b91c1c;">
+                        @copyError
+                    </small>
+                }
+            }
+        </div>
+    }
 </div>
 
 @code {
@@ -11,6 +100,136 @@
 
     [Parameter]
     public string Text { get; set; } = "";
+
+    [Parameter]
+    public IReadOnlyList<string> Images { get; set; } =
+        Array.Empty<string>();
+
+    [Parameter]
+    public string? Feedback { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> FeedbackChanged { get; set; }
+
+    
+    [Parameter]
+    public IReadOnlyList<string> AnswerImages { get; set; }
+      = Array.Empty<string>();
+
+    [Parameter]
+    public string? AnswerVideoUrl { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<(double Seconds, string Label)> AnswerVideoTimestamps
+      { get; set; } =
+      Array.Empty<(double Seconds, string Label)>();
+
+
+    private bool IsUserMessage =>
+        string.Equals(Sender?.Trim(), "You",
+            StringComparison.OrdinalIgnoreCase);
+
+    private bool copied = false;
+    private string? copyError;
+
+    private async Task CopyMessageAsync()
+    {
+        copyError = null;
+
+        try
+        {
+            await JS.InvokeVoidAsync(
+                "navigator.clipboard.writeText", Text);
+
+            copied = true;
+            StateHasChanged();
+
+            await Task.Delay(2000);
+            copied = false;
+        }
+        catch (JSException)
+        {
+            copied = false;
+            copyError = "Unable to copy message.";
+        }
+    }
+
+    private Task VoteUp()
+    {
+        string? next = Feedback == "up" ? null : "up";
+        return FeedbackChanged.InvokeAsync(next);
+    }
+
+    private Task VoteDown()
+    {
+        string? next = Feedback == "down" ? null : "down";
+        return FeedbackChanged.InvokeAsync(next);
+    }
+
+    private static MarkupString RenderMessage(string? text)
+    {
+        var html = new StringBuilder();
+        bool inList = false;
+
+        foreach (var rawLine in (text ?? "").Split('\n'))
+        {
+            string line = rawLine.Trim();
+
+            if (string.IsNullOrEmpty(line))
+            {
+                if (inList)
+                {
+                    html.Append("</ul>");
+                    inList = false;
+                }
+                continue;
+            }
+
+            bool isBullet = line.StartsWith("- ")
+                         || line.StartsWith("* ");
+
+            if (isBullet)
+            {
+                if (!inList)
+                {
+                    html.Append("<ul>");
+                    inList = true;
+                }
+
+                html.Append("<li>")
+                    .Append(FormatInline(line[2..]))
+                    .Append("</li>");
+            }
+            else
+            {
+                if (inList)
+                {
+                    html.Append("</ul>");
+                    inList = false;
+                }
+
+                html.Append("<p>")
+                    .Append(FormatInline(line))
+                    .Append("</p>");
+            }
+        }
+
+        if (inList)
+            html.Append("</ul>");
+
+        return new MarkupString(html.ToString());
+    }
+
+    private static string FormatInline(string text)
+    {
+        string safe = WebUtility.HtmlEncode(text);
+
+        safe = Regex.Replace(
+            safe, @"\*\*(.+?)\*\*", "<strong>$1</strong>");
+
+        safe = Regex.Replace(
+            safe, @"\*(.+?)\*", "<em>$1</em>");
+
+        return safe;
+    }
 }
-
-
