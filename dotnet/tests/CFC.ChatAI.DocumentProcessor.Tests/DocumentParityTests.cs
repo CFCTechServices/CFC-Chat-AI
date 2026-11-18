@@ -12,6 +12,20 @@ public sealed record RefDocument(
     List<RefSection>? Sections, List<RefChunk>? Chunks, string? FullText, int ImageCount);
 public sealed record RefFile(string PythonPdfPath, bool OcrAvailable, List<RefDocument> Documents);
 
+//TestData/ is gitignored, so only someone who generated the reference locally can run them, so skip these tests on machines that don't have the client documents
+public sealed class RequiresDocumentReferenceTheoryAttribute : TheoryAttribute
+{
+    public static readonly string ReferencePath =
+        Path.Combine(AppContext.BaseDirectory, "TestData", "document_reference.json");
+
+    public RequiresDocumentReferenceTheoryAttribute()
+    {
+        if (!File.Exists(ReferencePath))
+            Skip = "Client documents aren't committed. Put them in TestData/documents and run "
+                 + "tools/make_document_reference.py to enable the DocumentProcessor parity tests.";
+    }
+}
+
 /// <summary>
 /// Compares the C# DocumentProcessor with Python's app/services/document_processor.py.
 /// Reference data: TestData/document_reference.json, made by tools/make_document_reference.py
@@ -21,7 +35,7 @@ public class DocumentParityTests(ITestOutputHelper output)
     private static readonly string TestData = Path.Combine(AppContext.BaseDirectory, "TestData");
 
     private static readonly RefFile Reference = JsonSerializer.Deserialize<RefFile>(
-        File.ReadAllText(Path.Combine(TestData, "document_reference.json")),
+        File.ReadAllText(RequiresDocumentReferenceTheoryAttribute.ReferencePath),
         new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower })!;
 
     // Gives xUnit the list of file names, so each test runs once per document.
@@ -53,7 +67,7 @@ public class DocumentParityTests(ITestOutputHelper output)
         return await processor.ProcessAsync(new DocumentInput(file, stream));
     }
 
-    [Theory, MemberData(nameof(Files))]
+    [RequiresDocumentReferenceTheory, MemberData(nameof(Files))]
     public async Task FullTextMatchesPython(string file)
     {
         var expected = Expected(file);
@@ -71,7 +85,7 @@ public class DocumentParityTests(ITestOutputHelper output)
         AssertTextEqual(expected.FullText!, actual);
     }
 
-    [Theory, MemberData(nameof(Files))]
+    [RequiresDocumentReferenceTheory, MemberData(nameof(Files))]
     public async Task SectionsMatchPython(string file)
     {
         var expected = Expected(file);
@@ -85,7 +99,7 @@ public class DocumentParityTests(ITestOutputHelper output)
         Assert.Equal(expected.Sections!, actual);
     }
 
-    [Theory, MemberData(nameof(Files))]
+    [RequiresDocumentReferenceTheory, MemberData(nameof(Files))]
     public async Task ReportChunkDifferences(string file)
     {
         var expected = Expected(file);
