@@ -102,7 +102,7 @@ public sealed class DocumentProcessor : IDocumentProcessor
         }
 
         return new DocumentProcessingResult(
-            CreateDocumentId(Path.GetFileNameWithoutExtension(sourceName)),
+            CreateDocumentId(sourceName),
             sourceName,
             "document",
             outputSections,
@@ -751,8 +751,11 @@ public sealed class DocumentProcessor : IDocumentProcessor
         return index + 1 >= text.Length || char.IsWhiteSpace(text[index + 1]);
     }
 
-    private static string CreateDocumentId(string fileStem)
+    /// <summary>Returns the same normalized ID used when processing a filename.</summary>
+    public static string CreateDocumentId(string fileName)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
+        var fileStem = Path.GetFileNameWithoutExtension(Path.GetFileName(fileName.Replace('\\', '/')));
         var slug = Regex.Replace(fileStem.Trim().ToLowerInvariant(), @"[^\w-]+", "-");
         slug = Regex.Replace(slug, @"-{2,}", "-").Trim('-');
         return slug.Length == 0 ? "document" : slug;

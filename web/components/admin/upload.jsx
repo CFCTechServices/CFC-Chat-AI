@@ -2,7 +2,7 @@
   const { Card, PrimaryButton } = window.CFC.Primitives;
 
   const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.m4v', '.mkv', '.webm'];
-  const NON_PDF_UPLOAD_ACCEPT = '.doc,.docx,.txt,.md,.mp4,.mov,.m4v,.mkv,.webm';
+  const NON_PDF_UPLOAD_ACCEPT = '.doc,.docx,.txt,.md';
   const EMAIL_PDF_ACCEPT = '.pdf,application/pdf';
   const EML_ACCEPT = '.eml,message/rfc822';
 
@@ -20,34 +20,22 @@
     return file.type === 'application/pdf';
   }
 
-  function fileSlug(file) {
-    const name = (file?.name || '').toLowerCase();
-    return name.replace(/\.[^.]+$/, '').replace(/\s+/g, '-');
-  }
-
   async function uploadSingleFile(file, onProgress) {
-    if (!file) return { error: 'No file selected' };
-
-    if (isVideoFile(file)) {
-      const form = new FormData();
-      form.append('slug', fileSlug(file));
-      form.append('file', file);
-      form.append('model', 'small');
-
-      const res = await fetch('/api/videos/upload', { method: 'POST', body: form });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.detail || 'Video upload failed');
-      }
-      if (onProgress) onProgress(100);
-      return res.json();
-    }
+    if (!file) throw new Error('No file selected');
+    if (isVideoFile(file)) throw new Error('Video uploads are unavailable on the .NET backend.');
+    const client = window.supabaseClient;
+    if (!client) throw new Error('Session unavailable. Please sign in again.');
+    const { data, error } = await client.auth.getSession();
+    const session = data?.session;
+    if (error || !session?.access_token || (session.expires_at && session.expires_at * 1000 <= Date.now()))
+      throw new Error('Session expired. Please sign in again.');
 
     return new Promise((resolve, reject) => {
       const form = new FormData();
       form.append('file', file);
       const xhr = new XMLHttpRequest();
       xhr.open('POST', '/api/files/upload');
+      xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
       xhr.upload.addEventListener('progress', (e) => {
         if (onProgress && e.lengthComputable) {
           const pct = Math.round((e.loaded / e.total) * 100);
@@ -57,12 +45,16 @@
       xhr.onreadystatechange = () => {
         if (xhr.readyState === 4) {
           try {
-            const data = JSON.parse(xhr.responseText || '{}');
-            if (xhr.status >= 200 && xhr.status < 300) {
+            let data = {};
+            try { data = JSON.parse(xhr.responseText || '{}'); } catch (_) { /* proxies may return non-JSON errors */ }
+            if (xhr.status === 200 && data.document_id && Number.isInteger(data.chunk_count) && Number.isInteger(data.vector_count)) {
               if (onProgress) onProgress(100);
               resolve(data);
             } else {
-              reject(new Error(data.error || data.detail || 'Upload failed'));
+              const fallback = xhr.status === 401 ? 'Session expired. Please sign in again.'
+                : xhr.status === 403 ? 'Admin access required.'
+                : xhr.status === 409 ? 'A document with this ID already exists.' : 'Upload failed';
+              reject(new Error(data.detail || fallback));
             }
           } catch (err) {
             reject(err);
@@ -115,16 +107,7 @@
       setSingleStatus({ state: 'uploading', message: 'Uploading…' });
       try {
         const data = await uploadSingleFile(singleFile, setSingleProgress);
-        const isVideo = isVideoFile(singleFile);
-        const storageWarning = data?.supabase?.warning || null;
-        if (storageWarning) window.CFC.toast(storageWarning, 'warning', 10000);
-        setSingleStatus({
-          state: storageWarning ? 'warning' : 'done',
-          message: storageWarning
-            ? storageWarning
-            : isVideo ? 'Video uploaded and transcribed.' : 'Document uploaded and ingested.',
-          data,
-        });
+        setSingleStatus({ state: 'done', message: `Ingested ${data.document_id} (${data.chunk_count} chunks, ${data.vector_count} vectors).`, data });
       } catch (err) {
         setSingleStatus({ state: 'error', message: err.message || String(err) });
       }
@@ -174,17 +157,8 @@
         updateItem(i, { status: 'uploading', detail: '' });
         try {
           const data = await uploadSingleFile(file, (pct) => updateItem(i, { progress: pct }));
-          const isVideo = isVideoFile(file);
-          const storageWarning = data?.supabase?.warning || null;
-          if (storageWarning) window.CFC.toast(storageWarning, 'warning', 10000);
-          updateItem(i, {
-            status: storageWarning ? 'warning' : 'done',
-            progress: 100,
-            detail: storageWarning
-              ? storageWarning
-              : isVideo ? 'Video uploaded and transcribed.' : 'Document uploaded and ingested.',
-            data,
-          });
+          updateItem(i, { status: 'done', progress: 100,
+            detail: `Ingested ${data.document_id} (${data.chunk_count} chunks, ${data.vector_count} vectors).`, data });
         } catch (err) {
           updateItem(i, { status: 'error', detail: err.message || String(err) });
         }
@@ -212,7 +186,7 @@
       setEmlStatus({ state: 'uploading', message: 'Uploading .eml file…' });
       try {
         const data = await uploadSingleFile(emlFile, setEmlProgress);
-        setEmlStatus({ state: 'done', message: 'Email uploaded and ingested.', data });
+        setEmlStatus({ state: 'done', message: `Ingested ${data.document_id} (${data.chunk_count} chunks, ${data.vector_count} vectors).`, data });
       } catch (err) {
         setEmlStatus({ state: 'error', message: err.message || String(err) });
       }
@@ -242,7 +216,7 @@
         const data = await uploadSingleFile(emailFile, setEmailProgress);
         setEmailStatus({
           state: 'done',
-          message: 'Email PDF uploaded and ingested.',
+          message: `Ingested ${data.document_id} (${data.chunk_count} chunks, ${data.vector_count} vectors).`,
           data,
         });
       } catch (err) {
@@ -254,13 +228,13 @@
       <div className="admin-grid">
         <Card className="admin-card">
           <h2>Upload</h2>
-          <p className="muted">Upload a single document or video (PDF excluded). We&apos;ll detect the file type and ingest it appropriately.</p>
+          <p className="muted">Upload a document (PDF excluded). Video upload is unavailable on the .NET backend.</p>
           <div className="file-picker">
             <input type="file" accept={NON_PDF_UPLOAD_ACCEPT} onChange={handleSingleChange} className="file-input" />
             {singleFile && (
               <div className="file-chip">
                 <span>{singleFile.name}</span>
-                <span className="file-chip-kind">{isVideoFile(singleFile) ? 'Video' : 'Document'}</span>
+                <span className="file-chip-kind">Document</span>
               </div>
             )}
           </div>
@@ -281,7 +255,7 @@
 
         <Card className="admin-card">
           <h2>Bulk Upload</h2>
-          <p className="muted">Select a collection of documents and videos (PDF excluded). Each file is queued, uploaded, and ingested with progress tracking.</p>
+          <p className="muted">Select documents (PDF excluded). Each file is uploaded and ingested sequentially. Video upload is unavailable.</p>
           <div className="file-picker">
             <input type="file" accept={NON_PDF_UPLOAD_ACCEPT} multiple onChange={handleBulkChange} className="file-input" />
           </div>
@@ -305,7 +279,6 @@
                     {item.status === 'ready' && 'Ready'}
                     {item.status === 'uploading' && 'Uploading…'}
                     {item.status === 'done' && 'Ingested'}
-                    {item.status === 'warning' && 'Ingested (no download)'}
                     {item.status === 'error' && 'Error'}
                   </span>
                 </div>

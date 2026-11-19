@@ -20,7 +20,7 @@ internal sealed class DocumentHandler : IDocumentHandler
 
     private readonly DocumentHandlerOptions _options;
     private readonly IDocumentProcessor _documentProcessor;
-    private readonly IVideoProcessor _videoProcessor;
+    private readonly IServiceProvider _services;
     private readonly IChunkRepository _chunks;
     private readonly IObjectStorage _storage;
     private readonly IPineconeService _pinecone;
@@ -28,7 +28,7 @@ internal sealed class DocumentHandler : IDocumentHandler
     public DocumentHandler(
         DocumentHandlerOptions options,
         IDocumentProcessor documentProcessor,
-        IVideoProcessor videoProcessor,
+        IServiceProvider services,
         IChunkRepository chunks,
         IObjectStorage storage,
         IPineconeService pinecone)
@@ -37,7 +37,7 @@ internal sealed class DocumentHandler : IDocumentHandler
         options.Validate();
         _options = options;
         _documentProcessor = documentProcessor ?? throw new ArgumentNullException(nameof(documentProcessor));
-        _videoProcessor = videoProcessor ?? throw new ArgumentNullException(nameof(videoProcessor));
+        _services = services ?? throw new ArgumentNullException(nameof(services));
         _chunks = chunks ?? throw new ArgumentNullException(nameof(chunks));
         _storage = storage ?? throw new ArgumentNullException(nameof(storage));
         _pinecone = pinecone ?? throw new ArgumentNullException(nameof(pinecone));
@@ -225,7 +225,9 @@ internal sealed class DocumentHandler : IDocumentHandler
             await using var videoStream = new FileStream(
                 temporaryPath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920,
                 FileOptions.Asynchronous | FileOptions.SequentialScan);
-            var result = await _videoProcessor.ProcessAsync(
+            var videoProcessor = _services.GetService(typeof(IVideoProcessor)) as IVideoProcessor
+                ?? throw new InvalidOperationException("Video processing not configured.");
+            var result = await videoProcessor.ProcessAsync(
                 new VideoInput(fileName, videoStream), cancellationToken).ConfigureAwait(false);
             return new ProcessedDocument(
                 result.DocumentId,

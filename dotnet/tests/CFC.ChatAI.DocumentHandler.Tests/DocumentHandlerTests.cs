@@ -79,20 +79,59 @@ public sealed class DocumentHandlerTests
         Assert.Empty(storage.Objects);
     }
 
+    [Fact]
+    public async Task Storage_failure_compensates_and_failed_compensation_is_reported()
+    {
+        var chunks = new FakeChunkRepository();
+        var pinecone = new FakePinecone();
+        var handler = CreateHandler(new FakeDocumentProcessor(), null, chunks, new FakeObjectStorage { ThrowOnUpload = true }, pinecone);
+        await using var input = new MemoryStream("hello"u8.ToArray());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => handler.IngestAsync(new DocumentHandlerInput("sample.txt", input)));
+        Assert.Empty(chunks.Rows);
+        Assert.Empty(pinecone.Records);
+        chunks.ThrowOnDelete = true;
+        input.Position = 0;
+        await Assert.ThrowsAsync<AggregateException>(() => handler.IngestAsync(new DocumentHandlerInput("sample.txt", input)));
+    }
+
+    [Fact]
+    public async Task Documents_resolve_without_video_and_video_fails_explicitly()
+    {
+        var handler = CreateHandler(new FakeDocumentProcessor(), null, new FakeChunkRepository(), new FakeObjectStorage(), new FakePinecone());
+        await using var input = new MemoryStream("hello"u8.ToArray());
+        Assert.Equal("sample", (await handler.IngestAsync(new DocumentHandlerInput("sample.txt", input))).DocumentId);
+        input.Position = 0;
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => handler.IngestAsync(new DocumentHandlerInput("clip.mp4", input)));
+        Assert.Contains("Video processing not configured", error.Message);
+    }
+
+    [Fact]
+    public async Task Stage_enforces_actual_size_and_cleans_up_on_failure_and_cancellation()
+    {
+        var before = Directory.GetFiles(Path.GetTempPath(), "cfc-upload-*.tmp").ToHashSet();
+        var handler = CreateHandler(new FakeDocumentProcessor(), null, new FakeChunkRepository(), new FakeObjectStorage(), new FakePinecone(), 3);
+        await using var input = new MemoryStream("hello"u8.ToArray());
+        await Assert.ThrowsAsync<InvalidDataException>(() => handler.IngestAsync(new DocumentHandlerInput("sample.txt", input)));
+        using var canceled = new CancellationTokenSource(); canceled.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => handler.IngestAsync(new DocumentHandlerInput("sample.txt", input), canceled.Token));
+        Assert.Empty(Directory.GetFiles(Path.GetTempPath(), "cfc-upload-*.tmp").Except(before));
+    }
+
     private static IDocumentHandler CreateHandler(
         FakeDocumentProcessor documentProcessor,
-        FakeVideoProcessor videoProcessor,
+        FakeVideoProcessor? videoProcessor,
         FakeChunkRepository chunks,
         FakeObjectStorage storage,
-        FakePinecone pinecone)
+        FakePinecone pinecone,
+        long maxUploadBytes = 500L * 1024 * 1024)
     {
         var services = new ServiceCollection();
         services.AddSingleton<IDocumentProcessor>(documentProcessor);
-        services.AddSingleton<IVideoProcessor>(videoProcessor);
+        if (videoProcessor is not null) services.AddSingleton<IVideoProcessor>(videoProcessor);
         services.AddSingleton<IChunkRepository>(chunks);
         services.AddSingleton<IObjectStorage>(storage);
         services.AddSingleton<IPineconeService>(pinecone);
-        services.AddDocumentHandling();
+        services.AddDocumentHandling(o => o.MaxUploadBytes = maxUploadBytes);
         return services.BuildServiceProvider().GetRequiredService<IDocumentHandler>();
     }
 
@@ -131,6 +170,7 @@ public sealed class DocumentHandlerTests
     private sealed class FakeChunkRepository : IChunkRepository
     {
         public List<Chunk> Rows { get; } = [];
+        public bool ThrowOnDelete { get; set; }
 
         public Task UpsertAsync(IReadOnlyList<Chunk> chunks, CancellationToken cancellationToken = default)
         {
@@ -169,6 +209,7 @@ public sealed class DocumentHandlerTests
 
         public Task DeleteByIdsAsync(IReadOnlyList<string> chunkIds, CancellationToken cancellationToken = default)
         {
+            if (ThrowOnDelete) throw new InvalidOperationException("delete failed");
             Rows.RemoveAll(row => chunkIds.Contains(row.Id));
             return Task.CompletedTask;
         }
@@ -177,6 +218,7 @@ public sealed class DocumentHandlerTests
     private sealed class FakeObjectStorage : IObjectStorage
     {
         public Dictionary<ObjectKey, byte[]> Objects { get; } = [];
+        public bool ThrowOnUpload { get; init; }
 
         public async Task<StoredObject> UploadAsync(
             ObjectKey key,
@@ -184,6 +226,7 @@ public sealed class DocumentHandlerTests
             UploadOptions options,
             CancellationToken cancellationToken = default)
         {
+            if (ThrowOnUpload) throw new InvalidOperationException("storage failed");
             using var memory = new MemoryStream();
             await content.CopyToAsync(memory, cancellationToken);
             Objects[key] = memory.ToArray();
