@@ -21,4 +21,8 @@
     <ProjectReference Include="..\..\src\CFC.ChatAI.DocumentProcessor\CFC.ChatAI.DocumentProcessor.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="TestData\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  
 </Project>

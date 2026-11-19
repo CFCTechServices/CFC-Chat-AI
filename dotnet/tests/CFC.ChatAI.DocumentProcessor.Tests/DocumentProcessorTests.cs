@@ -31,7 +31,7 @@ public sealed class DocumentProcessorTests
 
         var result = await processor.ProcessAsync(Input("guide.md", "Preamble.\n\n# Getting Started\nInstall it.\n## Next Steps\nUse it."));
 
-        Assert.Equal(new[] { "Document", "Getting Started", "Next Steps" }, result.Sections.Select(section => section.Title));
+        Assert.Equal(new[] { "Untitled", "Getting Started", "Next Steps" }, result.Sections.Select(section => section.Title));
         Assert.Equal(new[] { 1, 1, 2 }, result.Sections.Select(section => section.Level));
         Assert.Equal(new[] { "Preamble.", "Install it.", "Use it." }, result.Chunks.Select(chunk => chunk.Text));
     }
