@@ -57,7 +57,7 @@ public sealed class DocumentProcessor : IDocumentProcessor
                 ".pdf" => ExtractPdf(data, cancellationToken),
                 ".docx" => ExtractDocx(data),
                 ".doc" => await ExtractLegacyWordAsync(data, sourceName, cancellationToken).ConfigureAwait(false),
-                ".txt" => [new SectionContent("Document", 1, DecodeText(data))],
+                ".txt" => [new SectionContent("Untitled", 1, DecodeText(data))],
                 ".md" => ExtractMarkdown(DecodeText(data)),
                 ".eml" => [ExtractEmail(data)],
                 _ => throw new UnsupportedDocumentTypeException(extension)
@@ -149,7 +149,7 @@ public sealed class DocumentProcessor : IDocumentProcessor
             }
         }
 
-        return [new SectionContent("Document", 1, string.Join(Environment.NewLine, pageTexts))];
+        return [new SectionContent("Untitled", 1, string.Join(Environment.NewLine, pageTexts))];
     }
 
     private static List<SectionContent> ExtractDocx(byte[] data)
@@ -209,6 +209,7 @@ public sealed class DocumentProcessor : IDocumentProcessor
 
     private static string ReadWordCell(XElement cell) => string.Join(" ",
         cell.Descendants(WordNamespace + "p")
+            .Where(p => !IsInsideTextBox(p, cell))
             .Select(ReadWordParagraph)
             .Where(text => text.Length > 0));
 
@@ -217,6 +218,11 @@ public sealed class DocumentProcessor : IDocumentProcessor
         var text = new StringBuilder();
         foreach (var element in paragraph.Descendants())
         {
+            // Python (python-docx) only reads the paragraph's own runs, so text boxes are skipped
+            if (IsInsideTextBox(element, paragraph))
+            {
+                continue;
+            }
             if (element.Name == WordNamespace + "t")
             {
                 text.Append(element.Value);
@@ -232,6 +238,19 @@ public sealed class DocumentProcessor : IDocumentProcessor
         }
 
         return Normalize(text.ToString());
+    }
+
+    // Walks up from the element to the paragraph; true if it passes through a text box.
+    private static bool IsInsideTextBox(XElement element, XElement stopAt)
+    {
+        for (var parent = element.Parent; parent is not null && parent != stopAt; parent = parent.Parent)
+        {
+            if (parent.Name == WordNamespace + "txbxContent")
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     private async Task<List<SectionContent>> ExtractLegacyWordAsync(
@@ -330,7 +349,7 @@ public sealed class DocumentProcessor : IDocumentProcessor
                 {
                     if (current is null)
                     {
-                        current = new SectionContent("Document", 1, string.Empty);
+                        current = new SectionContent("Untitled", 1, string.Empty);
                         sections.Add(current);
                     }
 
@@ -351,7 +370,7 @@ public sealed class DocumentProcessor : IDocumentProcessor
         {
             if (current is null)
             {
-                current = new SectionContent("Document", 1, string.Empty);
+                current = new SectionContent("Untitled", 1, string.Empty);
                 sections.Add(current);
             }
 
@@ -657,7 +676,7 @@ public sealed class DocumentProcessor : IDocumentProcessor
 
     private static SectionContent AddDefaultSection(List<SectionContent> sections)
     {
-        var section = new SectionContent("Document", 1, string.Empty);
+        var section = new SectionContent("Untitled", 1, string.Empty);
         sections.Add(section);
         return section;
     }
@@ -684,7 +703,7 @@ public sealed class DocumentProcessor : IDocumentProcessor
             var breakAt = -1;
             for (var index = limit - 1; index >= searchStart; index--)
             {
-                if (text[index] is '.' or '!' or '?' or ';' or '\n')
+                if (IsSentenceEnd(text, index))
                 {
                     breakAt = index + 1;
                     break;
@@ -712,6 +731,24 @@ public sealed class DocumentProcessor : IDocumentProcessor
                 start++;
             }
         }
+    }
+
+    // A sentence ends at . ! ? ; only when followed by whitespace (or the end of the text),
+// so "p.11" and "CFC5CUST.EXE" are never split. A newline always counts.
+    private static bool IsSentenceEnd(string text, int index)
+    {
+        var c = text[index];
+        if (c == '\n')
+        {
+            return true;
+        }
+
+        if (c is not ('.' or '!' or '?' or ';'))
+        {
+            return false;
+        }
+
+        return index + 1 >= text.Length || char.IsWhiteSpace(text[index + 1]);
     }
 
     private static string CreateDocumentId(string fileStem)
