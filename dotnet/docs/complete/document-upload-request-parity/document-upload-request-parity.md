@@ -1,5 +1,7 @@
 # Plan: document upload request parity
 
+**Status: completed for the synthetic offline suite.** The real-model case is skipped and C# Pinecone capture remains application-level; see the [report](../../tests/document-upload-parity-report.md) and [PR changes](document-upload-request-parity-changes.md).
+
 ## Goal
 
 Run the same document through the unauthenticated Python and C# upload endpoints, intercept what each would send to Supabase and Pinecone, and put **all comparisons in one concise report**. This is an investigation, not an assertion that the implementations should currently match. Do not modify production behavior to make tests pass.
@@ -8,7 +10,7 @@ Compare Python `POST /api/files/upload` with C# `POST /api/ingest/dev`. Both acc
 
 ## Deliverable: one report
 
-Generate `dotnet/docs/plan/document-upload-parity-report.md` with every executed case, in a fixed order. It is the only human-facing output; keep intermediate captures in memory or a cleaned temporary directory. Use synthetic fixtures only, no secrets or real customer documents. Regenerate the entire file on each run; do not append stale results.
+Generate `dotnet/docs/tests/document-upload-parity-report.md` with every executed case, in a fixed order. It is the only human-facing output; keep intermediate captures in memory or a cleaned temporary directory. Use synthetic fixtures only, no secrets or real customer documents. Regenerate the entire file on each run; do not append stale results.
 
 Start with a short summary table: case, outcome (`MATCH`, `DIFFERENT`, `ERROR` or `SKIPPED`), and counts of operations/differences. Then give each case:
 
