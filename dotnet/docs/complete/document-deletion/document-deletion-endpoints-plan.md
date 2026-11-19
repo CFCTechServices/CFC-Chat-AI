@@ -1,6 +1,6 @@
 # Plan: .NET document deletion endpoints
 
-**Status: planned, not implemented.** This adds an authenticated frontend endpoint and a separately gated local development endpoint for uningesting a document. It does not implement replacement or video ingestion. See the existing [remaining API plan](internal-api/internal-api-remaining-endpoints-plan.md) and [document upload plan](../complete/document-upload/document-upload-endpoints-plan.md).
+**Status: implemented with revised development-only scope; original plan below is historical.** The user explicitly waived durable recovery and cross-instance coordination. The current routes therefore do **not** satisfy the original recovery, concurrency, missing-metadata, or live acceptance criteria below. See [changes, limitations and verification](document-deletion-changes.md). Browser and live-provider acceptance remain outstanding. This is not approval for production cutover. See the [remaining API plan](../../plan/internal-api/internal-api-remaining-endpoints-plan.md) and [document upload plan](../document-upload/document-upload-endpoints-plan.md).
 
 ## Current state and scope
 
@@ -50,7 +50,7 @@
 
 ## Cleanup target from the current smoke test
 
-**Pending; not deleted by this plan.** Once the endpoint and recovery protections above are implemented and the provider target is confirmed, uningest:
+**Pending; not deleted.** Verify the provider target and permissions before considering cleanup; the recovery protections described above were waived and are not implemented:
 
 - Filename: `test-ea88dc393cb5.txt`
 - Document ID: `test-ea88dc393cb5`

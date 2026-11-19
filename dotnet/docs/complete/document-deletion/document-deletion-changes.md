@@ -1,0 +1,22 @@
+# Document deletion endpoints: PR notes
+
+## Changes
+
+- Added `DELETE /api/admin/documents/{docId}` for active admins/superusers and `DELETE /api/ingest/dev/{docId}` for direct loopback operators. The latter is unauthenticated and requires Development plus the independent `Api:EnableDevDelete=true` flag. Neither is mapped without the existing Supabase and Pinecone configuration; configuration alone does not prove connectivity.
+- Both routes use `IDocumentHandler.DeleteAsync`, shared ASCII document-ID validation, sanitized failures, and request cancellation. They return `{success:true,message:"Document deleted."}` only after provider requests complete, 404 if metadata is absent, 409 for unsupported source types, 503 for known dependency errors and 500 for other errors. Failure responses include a trace reference. A 404 is **not proof** that stores are clean after an earlier failure.
+- The handler rejects video and unknown source types. It enumerates chunk IDs, deletes vectors, recursively deletes the exact document Storage tree, then deletes chunk rows. Keeping rows until last preserves IDs for many failures; it does not resolve uncertainty after the final request. Validation now applies to ingest and download as well; legacy IDs outside the accepted set need manual handling.
+- The active Content UI retains confirmation, checks session and response, suppresses duplicate in-flight actions, and keeps the row on failure or an ambiguous response. It no longer offers unsupported replacement. `web/index.html` loads this component; same-origin proxy/CORS routing to .NET has not been verified. Do not use this UI against Python's error-swallowing delete route.
+
+## Development limitations and recovery
+
+Per the revised scope, there is **no durable operation record, lock, or fencing**. Do not run concurrent uploads or deletes for the same ID, run multiple instances against the same data, or re-ingest an ID until cleanup is independently verified. Deletion is not atomic. Cancellation, process failure or a lost provider/HTTP response can leave partial state. A retry is not a substitute for verification: if chunk rows are already gone, their vector IDs may no longer be discoverable. Missing metadata returns 404 without touching storage or vectors; old orphaned data and unknown/video metadata need manual investigation. Provider success responses are not independent verification of physical cleanup.
+
+For a failure, stop other writes to the ID, confirm the exact Supabase project and document/video buckets and Pinecone index/namespace, then inspect chunk rows, exact Storage tree, and vectors by previously recorded IDs using provider tools. Reconcile remaining objects/rows/vectors manually; if IDs are unavailable, use provider/operator investigation rather than assuming absence. Preserve local source files for recovery. No credentials or document contents should be placed in logs or PR notes.
+
+For local operator use only, bind to loopback, set `ASPNETCORE_ENVIRONMENT=Development` and `Api__EnableDevDelete=true`, then use `curl -X DELETE http://127.0.0.1:5000/api/ingest/dev/<document-id>` (`curl.exe` in PowerShell). Check status and body. Never expose or proxy the dev route: a proxy may itself appear as loopback. Keep the flag off on shared, remote, containerized and production deployments. **The handler operates on configured Supabase and Pinecone services**, even when original files also exist locally. Verify the intended disposable target before any deletion.
+
+## Verification and outstanding acceptance
+
+- `dotnet test dotnet/CFC.ChatAI.slnx --no-restore` passed; 10 model/document parity tests skipped. Fake tests exercise pagination, nested artifacts, neighboring IDs, video rejection, provider errors before/after side effects, auth, dev gates, cancellation and sanitized API errors. Existing nullable warnings remain in Pinecone tests.
+- Browser smoke tests, actual frontend routing, live provider behavior, and independent provider cleanup checks were not performed. No destructive live call was made. The smoke-test document `test-ea88dc393cb5` remains pending: confirm the exact Supabase project, buckets, Pinecone index and namespace before considering deletion and independently verify all stores afterward.
+- The original plan's durable recovery and multi-instance guarantees were explicitly dropped for development. This implementation is not production-ready and does not fulfill those historical acceptance criteria.

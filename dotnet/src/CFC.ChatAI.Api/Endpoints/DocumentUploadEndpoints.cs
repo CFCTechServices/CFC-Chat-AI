@@ -58,7 +58,7 @@ public static class DocumentUploadEndpoints
             if (file.Length == 0) return Error(400, "File is empty");
             if (file.Length > maxBytes) return Error(413, "Upload exceeds the size limit");
             var documentId = DocumentProcessor.DocumentProcessor.CreateDocumentId(name);
-            if (documentId.Length > 128 || !documentId.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.'))
+            if (!DocumentId.IsValid(documentId))
                 return Error(400, "Invalid document ID derived from filename");
             if (checkDuplicate && await chunks.GetDocumentMetadataAsync(documentId, context.RequestAborted) is not null)
                 return Error(409, "A document with this ID already exists");

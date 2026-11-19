@@ -132,7 +132,10 @@ if (hasSupabase)
     app.MapInternalApi(hasPinecone);
     app.MapAdminReads();
     if (hasPinecone)
+    {
         app.MapDocumentUploads(maxDocumentBytes, app.Environment.IsDevelopment() && config.GetValue<bool>("Api:EnableDevIngest"));
+        app.MapDocumentDeletions(app.Environment.IsDevelopment() && config.GetValue<bool>("Api:EnableDevDelete"));
+    }
 }
 app.Run();
 

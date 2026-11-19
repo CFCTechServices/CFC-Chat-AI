@@ -21,7 +21,7 @@ namespace CFC.ChatAI.Api.Tests;
 
 public sealed class DocumentUploadTests
 {
-    private static WebApplicationFactory<Program> Factory(string role = "admin", bool dev = false, string environment = "Development", string ip = "127.0.0.1") =>
+    private static WebApplicationFactory<Program> Factory(string role = "admin", bool dev = false, string environment = "Development", string ip = "127.0.0.1", bool devDelete = false, string status = "active", bool deleted = false) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment(environment);
@@ -33,11 +33,12 @@ public sealed class DocumentUploadTests
             builder.UseSetting("Embedding:ModelPath", "test.onnx");
             builder.UseSetting("Embedding:VocabularyPath", "vocab.txt");
             builder.UseSetting("Api:EnableDevIngest", dev.ToString());
+            builder.UseSetting("Api:EnableDevDelete", devDelete.ToString());
             builder.UseSetting("Document:MaxUploadBytes", "8");
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<IIdentityGateway>(); services.AddSingleton<IIdentityGateway>(new Identity());
-                services.RemoveAll<IUserProfileRepository>(); services.AddSingleton<IUserProfileRepository>(new Profiles(role));
+                services.RemoveAll<IUserProfileRepository>(); services.AddSingleton<IUserProfileRepository>(new Profiles(role, status, deleted));
                 services.RemoveAll<IChunkRepository>(); services.AddSingleton<IChunkRepository, Chunks>();
                 services.RemoveAll<IDocumentHandler>(); services.AddSingleton<IDocumentHandler, Handler>();
                 services.AddSingleton<IStartupFilter>(new RemoteIpFilter(IPAddress.Parse(ip)));
@@ -161,6 +162,91 @@ public sealed class DocumentUploadTests
         Assert.DoesNotContain("secret", await failed.Content.ReadAsStringAsync());
     }
 
+    [Theory]
+    [InlineData("admin")]
+    [InlineData("superuser")]
+    public async Task Delete_admin_and_dev_share_handler(string role)
+    {
+        using var factory = Factory(role, devDelete: true); using var client = Client(factory);
+        var handler = (Handler)factory.Services.GetRequiredService<IDocumentHandler>();
+        var response = await client.DeleteAsync("/api/admin/documents/sample");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(json.GetProperty("success").GetBoolean());
+        Assert.Equal("Document deleted.", json.GetProperty("message").GetString());
+        Assert.Equal("sample", handler.DeletedId);
+        Assert.True(handler.ReceivedCancellationToken);
+        using var anonymous = Client(factory, null);
+        Assert.Equal(HttpStatusCode.OK, (await anonymous.DeleteAsync("/api/ingest/dev/other")).StatusCode);
+        Assert.Equal("other", handler.DeletedId);
+    }
+
+    [Fact]
+    public async Task Delete_auth_validation_and_errors()
+    {
+        using var factory = Factory(); using var client = Client(factory);
+        using var anonymous = Client(factory, null);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.DeleteAsync("/api/admin/documents/sample")).StatusCode);
+        using var userFactory = Factory(role: "user"); using var user = Client(userFactory);
+        Assert.Equal(HttpStatusCode.Forbidden, (await user.DeleteAsync("/api/admin/documents/sample")).StatusCode);
+        using var inactiveFactory = Factory(status: "inactive"); using var inactive = Client(inactiveFactory);
+        Assert.Equal(HttpStatusCode.Forbidden, (await inactive.DeleteAsync("/api/admin/documents/sample")).StatusCode);
+        using var deletedFactory = Factory(deleted: true); using var deleted = Client(deletedFactory);
+        Assert.Equal(HttpStatusCode.Forbidden, (await deleted.DeleteAsync("/api/admin/documents/sample")).StatusCode);
+        var handler = (Handler)factory.Services.GetRequiredService<IDocumentHandler>();
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.DeleteAsync("/api/admin/documents/a%252fb")).StatusCode);
+        Assert.Null(handler.DeletedId);
+        handler.Found = false;
+        Assert.Equal(HttpStatusCode.NotFound, (await client.DeleteAsync("/api/admin/documents/sample")).StatusCode);
+        handler.Error = new UnsupportedDeletionException();
+        Assert.Equal(HttpStatusCode.Conflict, (await client.DeleteAsync("/api/admin/documents/sample")).StatusCode);
+        handler.Error = new DependencyFailureException("secret", "operation");
+        var unavailable = await client.DeleteAsync("/api/admin/documents/sample");
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, unavailable.StatusCode);
+        Assert.DoesNotContain("secret", await unavailable.Content.ReadAsStringAsync());
+        handler.Error = new Exception("secret");
+        var failure = await client.DeleteAsync("/api/admin/documents/sample");
+        Assert.Equal(HttpStatusCode.InternalServerError, failure.StatusCode);
+        Assert.DoesNotContain("secret", await failure.Content.ReadAsStringAsync());
+        Assert.Contains("Reference:", await failure.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Delete_dev_requires_independent_flag_development_and_direct_loopback()
+    {
+        using var offFactory = Factory(dev: true); using var off = Client(offFactory, null);
+        Assert.Equal(HttpStatusCode.NotFound, (await off.DeleteAsync("/api/ingest/dev/sample")).StatusCode);
+        using var prodFactory = Factory(devDelete: true, environment: "Production"); using var prod = Client(prodFactory, null);
+        Assert.Equal(HttpStatusCode.NotFound, (await prod.DeleteAsync("/api/ingest/dev/sample")).StatusCode);
+        using var ipv6Factory = Factory(devDelete: true, ip: "::1"); using var ipv6 = Client(ipv6Factory, null);
+        Assert.Equal(HttpStatusCode.OK, (await ipv6.DeleteAsync("/api/ingest/dev/sample")).StatusCode);
+        using var remoteFactory = Factory(devDelete: true, ip: "192.0.2.1"); using var remote = Client(remoteFactory, null);
+        remote.DefaultRequestHeaders.Add("X-Forwarded-For", "127.0.0.1");
+        Assert.Equal(HttpStatusCode.Forbidden, (await remote.DeleteAsync("/api/ingest/dev/sample")).StatusCode);
+        using var missingFactory = Factory(devDelete: true).WithWebHostBuilder(b => b.UseSetting("PINECONE_API_KEY", ""));
+        using var missing = Client(missingFactory);
+        Assert.Equal(HttpStatusCode.NotFound, (await missing.DeleteAsync("/api/admin/documents/sample")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await missing.DeleteAsync("/api/ingest/dev/sample")).StatusCode);
+        using var noSupabaseFactory = Factory(devDelete: true).WithWebHostBuilder(b => b.UseSetting("SUPABASE_SERVICE_ROLE_KEY", ""));
+        using var noSupabase = Client(noSupabaseFactory);
+        Assert.Equal(HttpStatusCode.NotFound, (await noSupabase.DeleteAsync("/api/admin/documents/sample")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await noSupabase.DeleteAsync("/api/ingest/dev/sample")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Delete_cancellation_reaches_handler()
+    {
+        using var factory = Factory(); using var client = Client(factory);
+        var handler = (Handler)factory.Services.GetRequiredService<IDocumentHandler>();
+        handler.WaitForCancellation = true;
+        using var cancel = new CancellationTokenSource();
+        var request = client.DeleteAsync("/api/admin/documents/sample", cancel.Token);
+        await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        cancel.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => request);
+        await handler.Canceled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
     private sealed class UnknownLengthContent : HttpContent
     {
         protected override bool TryComputeLength(out long length) { length = 0; return false; }
@@ -180,9 +266,9 @@ public sealed class DocumentUploadTests
         public Task<IdentityUser?> GetUserAsync(string token, CancellationToken ct = default) => Task.FromResult(token == "valid" ? new IdentityUser("cf52745a-430b-4fef-91d1-9287cbbf2c33", "test@example.com") : null);
         public Task RequestPasswordRecoveryAsync(string email, Uri? redirectTo = null, CancellationToken ct = default) => Task.CompletedTask;
     }
-    private sealed class Profiles(string role) : IUserProfileRepository
+    private sealed class Profiles(string role, string status, bool deleted) : IUserProfileRepository
     {
-        public Task<Profile?> GetCurrentAsync(string id, string token, CancellationToken ct = default) => Task.FromResult<Profile?>(new Profile(id, "test@example.com", "Test", null, role, "active", DateTimeOffset.UtcNow, null, null));
+        public Task<Profile?> GetCurrentAsync(string id, string token, CancellationToken ct = default) => Task.FromResult<Profile?>(new Profile(id, "test@example.com", "Test", null, role, status, DateTimeOffset.UtcNow, deleted ? DateTimeOffset.UtcNow : null, null));
         public Task<Profile?> UpdateCurrentAsync(string id, string token, UpdateOwnProfile update, CancellationToken ct = default) => throw new NotSupportedException();
     }
     private sealed class Handler : IDocumentHandler
@@ -205,7 +291,21 @@ public sealed class DocumentUploadTests
             await input.Content.CopyToAsync(Stream.Null, ct);
             return new(DocumentProcessor.DocumentProcessor.CreateDocumentId(input.FileName), input.FileName, "document", 1, 1, new ObjectKey(StorageArea.Documents, "test"));
         }
-        public Task<DocumentDeletionResult> DeleteAsync(string id, CancellationToken ct = default) => throw new NotSupportedException();
+        public bool Found { get; set; } = true;
+        public string? DeletedId { get; private set; }
+        public async Task<DocumentDeletionResult> DeleteAsync(string id, CancellationToken ct = default)
+        {
+            DeletedId = id;
+            ReceivedCancellationToken = ct.CanBeCanceled;
+            if (Error != null) throw Error;
+            if (WaitForCancellation)
+            {
+                Started.TrySetResult();
+                try { await Task.Delay(Timeout.InfiniteTimeSpan, ct); }
+                catch (OperationCanceledException) { Canceled.TrySetResult(); throw; }
+            }
+            return new(id, Found, 1, 1);
+        }
     }
     private sealed class Chunks : IChunkRepository
     {

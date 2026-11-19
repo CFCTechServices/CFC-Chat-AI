@@ -92,6 +92,17 @@ public sealed class InternalApiContractTests
         Assert.Equal("active", profile.GetProperty("status").GetString());
     }
 
+    [Theory]
+    [InlineData("a%252fb")]
+    [InlineData("%C3%A9")]
+    public async Task AdminDownload_RejectsInvalidDocumentIds(string id)
+    {
+        using var factory = Factory("admin");
+        using var client = Client(factory);
+        var response = await client.GetAsync($"/api/admin/documents/{id}/download");
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
     [Fact]
     public async Task DetailedSessions_MapPreviewAndUseBoundedRepositoryPage()
     {

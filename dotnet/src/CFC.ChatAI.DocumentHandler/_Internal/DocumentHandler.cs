@@ -176,6 +176,11 @@ internal sealed class DocumentHandler : IDocumentHandler
         ValidateDocumentId(documentId);
         cancellationToken.ThrowIfCancellationRequested();
         var metadata = await _chunks.GetDocumentMetadataAsync(documentId, cancellationToken).ConfigureAwait(false);
+        // Without metadata we cannot determine the source type or discover previously deleted vector IDs.
+        // Do not perform a blind cleanup; operators must reconcile any orphaned data separately.
+        if (metadata is null) return new DocumentDeletionResult(documentId, false, 0, 0);
+        if (!string.Equals(metadata.SourceType, "document", StringComparison.OrdinalIgnoreCase))
+            throw new UnsupportedDeletionException();
         var chunkIds = new List<string>();
         var offset = 0;
         while (true)
@@ -184,35 +189,24 @@ internal sealed class DocumentHandler : IDocumentHandler
                 documentId, new PageRequest(offset, StoragePageSize), cancellationToken).ConfigureAwait(false);
             chunkIds.AddRange(page.ChunkIds);
             if (!page.HasMore) break;
+            if (page.ChunkIds.Count == 0)
+                throw new InvalidDataException("Chunk listing did not advance.");
             offset = checked(offset + page.ChunkIds.Count);
-            if (page.ChunkIds.Count == 0) break;
         }
 
         var uniqueIds = chunkIds.Distinct(StringComparer.Ordinal).ToArray();
+        if (uniqueIds.Length == 0)
+            throw new InvalidDataException("Document metadata exists but no chunk IDs were found.");
         foreach (var batch in uniqueIds.Chunk(PineconeDeleteBatchSize))
             await _pinecone.DeleteAsync(batch, cancellationToken).ConfigureAwait(false);
 
+        // Keep chunk IDs until vector and storage requests complete, so most failures can be retried.
+        // A lost response to the final chunk delete still requires manual reconciliation.
+        var removedObjects = await DeleteStorageTreeAsync(
+            StorageArea.Documents, $"docs/{documentId}", cancellationToken).ConfigureAwait(false);
         await _chunks.DeleteByIdsAsync(uniqueIds, cancellationToken).ConfigureAwait(false);
 
-        StorageArea[] areas = metadata is null
-            ? [StorageArea.Documents, StorageArea.Videos]
-            : [string.Equals(metadata.SourceType, "video", StringComparison.OrdinalIgnoreCase)
-                ? StorageArea.Videos
-                : StorageArea.Documents];
-        var removedObjects = 0;
-        foreach (var area in areas)
-        {
-            removedObjects += await DeleteStorageTreeAsync(
-                area,
-                $"{(area == StorageArea.Videos ? "videos" : "docs")}/{documentId}",
-                cancellationToken).ConfigureAwait(false);
-        }
-
-        return new DocumentDeletionResult(
-            documentId,
-            metadata is not null || uniqueIds.Length > 0 || removedObjects > 0,
-            uniqueIds.Length,
-            removedObjects);
+        return new DocumentDeletionResult(documentId, true, uniqueIds.Length, removedObjects);
     }
 
     private async Task<ProcessedDocument> ProcessAsync(
@@ -310,8 +304,17 @@ internal sealed class DocumentHandler : IDocumentHandler
                     new ObjectPrefix(area, prefix),
                     new PageRequest(offset, StoragePageSize),
                     cancellationToken).ConfigureAwait(false);
-                entries.AddRange(page.Items);
-                if (!page.HasMore || page.Items.Count == 0) break;
+                foreach (var entry in page.Items)
+                {
+                    var parent = prefix + "/";
+                    if (entry.Key.Area != area || !entry.Key.Path.StartsWith(parent, StringComparison.Ordinal) ||
+                        entry.Key.Path.Length == parent.Length || entry.Key.Path[parent.Length..].Contains('/') ||
+                        entry.Key.Path[parent.Length..] is "." or "..")
+                        throw new InvalidDataException("Storage listing returned an invalid child.");
+                    entries.Add(entry);
+                }
+                if (!page.HasMore) break;
+                if (page.Items.Count == 0) throw new InvalidDataException("Storage listing did not advance.");
                 offset = checked(offset + page.Items.Count);
             }
 
@@ -350,10 +353,8 @@ internal sealed class DocumentHandler : IDocumentHandler
 
     private static void ValidateDocumentId(string documentId)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(documentId);
-        if (documentId is "." or ".." || documentId.Contains('/') || documentId.Contains('\\') ||
-            documentId.Any(char.IsControl))
-            throw new ArgumentException("Document ID must be one non-empty storage path segment.", nameof(documentId));
+        if (!DocumentId.IsValid(documentId))
+            throw new ArgumentException("Invalid document ID.", nameof(documentId));
     }
 
     private static void TryDeleteFile(string path)

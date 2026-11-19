@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using CFC.ChatAI.Api.Security;
+using CFC.ChatAI.DocumentHandler;
 using CFC.ChatAI.Supabase.Chunks;
 using CFC.ChatAI.Supabase.Common;
 using CFC.ChatAI.Supabase.Profiles;
@@ -64,7 +65,7 @@ public static class AdminReadEndpoints
         admin.MapGet("/documents/{docId}/download", async (string docId, IChunkRepository chunks,
             IObjectStorage storage, CancellationToken ct) =>
         {
-            if (!ValidDocumentId(docId)) return Results.BadRequest(new { detail = "Invalid document ID" });
+            if (!DocumentId.IsValid(docId)) return Results.BadRequest(new { detail = "Invalid document ID" });
             var metadata = await chunks.GetDocumentMetadataAsync(docId, ct);
             if (metadata is null) return Results.NotFound(new { detail = "Document not found" });
             var video = string.Equals(metadata.SourceType, "video", StringComparison.OrdinalIgnoreCase);
@@ -95,9 +96,6 @@ public static class AdminReadEndpoints
             return Results.Json(new { detail = "Too many documents; pagination is required" }, statusCode: 413);
         });
     }
-
-    private static bool ValidDocumentId(string? id) => id is { Length: > 0 and <= 128 } &&
-        id.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.');
 
     public sealed record RoleRequest(string UserId, string NewRole);
 }
