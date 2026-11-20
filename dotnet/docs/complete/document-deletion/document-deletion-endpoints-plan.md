@@ -1,6 +1,6 @@
 # Plan: .NET document deletion endpoints
 
-**Status: implemented with revised development-only scope; original plan below is historical.** The user explicitly waived durable recovery and cross-instance coordination. The current routes therefore do **not** satisfy the original recovery, concurrency, missing-metadata, or live acceptance criteria below. See [changes, limitations and verification](document-deletion-changes.md). Browser and live-provider acceptance remain outstanding. This is not approval for production cutover. See the [remaining API plan](../../plan/internal-api/internal-api-remaining-endpoints-plan.md) and [document upload plan](../document-upload/document-upload-endpoints-plan.md).
+**Status: implemented with revised development-only scope; original plan below is historical.** The user explicitly waived durable recovery and cross-instance coordination. The current routes therefore do **not** satisfy the original recovery, concurrency, missing-metadata, or live acceptance criteria below. See [changes, limitations and verification](document-deletion-changes.md). Browser and live-provider acceptance remain outstanding. This is not approval for production cutover. See the [remaining API plan](../internal-api/internal-api-remaining-endpoints-plan.md) and [document upload plan](../document-upload/document-upload-endpoints-plan.md).
 
 ## Current state and scope
 

@@ -1,6 +1,6 @@
 # Frontend changes for the .NET migration
 
-Track UI work required by `dotnet/docs/plan/internal-api/internal-api-remaining-endpoints-plan.md`. **Checklist only: none of these UI changes are implemented by this document.** Ship the matching backend and UI changes together; Python and .NET will not have identical contracts everywhere. Primary app paths are under `web/components/` and `web/js/`; legacy `web/app_legacy.jsx` / `web/app_legacy.js` should be updated only if still served, otherwise explicitly retire them. Confirm which upload utilities are actually loaded before changing them.
+Track UI work required by `dotnet/docs/complete/internal-api/internal-api-remaining-endpoints-plan.md`. **Checklist only: none of these UI changes are implemented by this document.** Ship the matching backend and UI changes together; Python and .NET will not have identical contracts everywhere. Primary app paths are under `web/components/` and `web/js/`; legacy `web/app_legacy.jsx` / `web/app_legacy.js` should be updated only if still served, otherwise explicitly retire them. Confirm which upload utilities are actually loaded before changing them.
 
 ## Required for the agreed API decisions
 
@@ -16,5 +16,5 @@ Track UI work required by `dotnet/docs/plan/internal-api/internal-api-remaining-
 
 ## Other cutover checks (existing routes, not newly planned UI features)
 
-- [ ] Verify active client handling of the existing .NET divergences in `dotnet/docs/plan/internal-api/internal-api-endpoints-implementation.md`: validation is 400 instead of Python 422; list ceilings can return 413; vector stats require a current user; provider-backed routes may be absent (404) when configuration is incomplete. Do not treat an error as an empty successful list.
+- [ ] Verify active client handling of the existing .NET divergences in `dotnet/docs/complete/internal-api/internal-api-endpoints-implementation.md`: validation is 400 instead of Python 422; list ceilings can return 413; vector stats require a current user; provider-backed routes may be absent (404) when configuration is incomplete. Do not treat an error as an empty successful list.
 - [ ] Run browser smoke tests for admin uploads (including XHR progress), video links, chat images/history/modals, admin document/user operations, local stats and profile settings against disposable non-production providers. Confirm authenticated CORS/proxy behavior and Storage signed-link access in the target deployment; do not put signed URLs or access tokens in client analytics/error logs.
