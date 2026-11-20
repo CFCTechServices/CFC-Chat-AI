@@ -15,6 +15,7 @@ import platform
 import subprocess
 import sys
 import tempfile
+from urllib.parse import unquote
 
 from comparison import CaptureError, MISSING, compare, display, storage_object, validate
 
@@ -93,9 +94,9 @@ def run_case(case, tmp):
 
 
 def missing_expected(case, py, cs):
-    # These are fixture/harness sanity checks, not assertions of parity or of
-    # provider side effects. Failure cases are validated by their actual hook.
-    if case.key not in {"baseline", "multi", "image"}:
+    # These assertions are about the endpoint and captured attempts, not remote side effects.
+    # Failure cases are validated by their actual hook.
+    if case.key not in {"baseline", "multi", "image", "filename"}:
         return []
     expected = {
         "Python": {"storage-original", "storage-section", "chunks-upsert", "index-list", "index-describe", "vectors-upsert"},
@@ -115,6 +116,16 @@ def missing_expected(case, py, cs):
     ingestion = response.get("ingestion") if isinstance(response, dict) else None
     if not isinstance(ingestion, dict) or ingestion.get("success") is not True:
         errors.append("Python ingestion did not report success")
+    if case.key == "filename":
+        if not isinstance(ingestion, dict) or ingestion.get("doc_id") != "café-guide-v2":
+            errors.append("Python did not report the expected Unicode ID")
+        response = cs.get("response")
+        if not isinstance(response, dict) or response.get("document_id") != "café-guide-v2":
+            errors.append("C# did not report the expected Unicode ID")
+        obj = original(cs)
+        path = obj.get("path", "") if isinstance(obj, dict) else ""
+        if unquote(path) != "/storage/v1/object/parity-bucket/docs/!u-Y2Fmw6ktZ3VpZGUtdjI/original/document.eml":
+            errors.append("C# did not attempt the expected ASCII-safe original object key")
     return errors
 
 
@@ -241,8 +252,11 @@ def render(results, stability):
                   "The C# runner runs in a Docker container with `--network none`, only loopback, no repository mount, and a read-only root. "
                   "Both deliberately test an unhandled request and outbound denial. Unknown traffic fails the harness.", ""])
     for case, py, cs, result in results:
+        note = (" Both endpoints must accept the file and report `café-guide-v2`. "
+                "C# intentionally encodes the new original's storage key to meet Supabase's ASCII key restriction."
+                if case.key == "filename" else "")
         lines.extend([f"## {case.title}", "", case.description + f" Fixture: `{case.fixture}` as `{case.filename}`. "
-                      "Capture: Supabase transport; Pinecone Python transport / C# application boundary.", "",
+                      "Capture: Supabase transport; Pinecone Python transport / C# application boundary." + note, "",
                       f"**Outcome:** {result['outcome']}. " + (" ".join(result["errors"]) if result["errors"] else short_summary(py, cs, result["comparison"])), "",
                       "| Observation | Python | C# |", "| --- | --- | --- |",
                       f"| Endpoint status | {code(py.get('status', MISSING))} | {code(cs.get('status', MISSING))} |",

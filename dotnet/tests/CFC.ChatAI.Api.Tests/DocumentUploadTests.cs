@@ -98,7 +98,73 @@ public sealed class DocumentUploadTests
         unknownLength.Add(new UnknownLengthContent(), "file", "large.txt");
         Assert.Null(unknownLength.Headers.ContentLength);
         Assert.Equal(HttpStatusCode.RequestEntityTooLarge, (await client.PostAsync("/api/files/upload", unknownLength)).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync("/api/files/upload", Form("é.txt"))).StatusCode);
+    }
+
+    [Theory]
+    [InlineData("Café Guide V2.EML", "café-guide-v2")]
+    [InlineData("Cafe\u0301 Guide V2.EML", "café-guide-v2")]
+    [InlineData("日本語ガイド.EML", "日本語ガイド")]
+    [InlineData("!!!.EML", "document")]
+    public async Task Unicode_filename_preflight_uses_same_id_as_ingest_and_duplicate_lookup(string name, string id)
+    {
+        using var factory = Factory(); using var client = Client(factory);
+        var chunks = (Chunks)factory.Services.GetRequiredService<IChunkRepository>();
+        using var response = await client.PostAsync("/api/files/upload", Form(name));
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(id, body.GetProperty("document_id").GetString());
+        Assert.Equal(name, body.GetProperty("source_name").GetString());
+        Assert.Equal(id, chunks.LastLookup);
+        chunks.Existing = id;
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsync("/api/files/upload", Form(name.ToUpperInvariant().Normalize(NormalizationForm.FormD)))).StatusCode);
+        Assert.Equal(1, ((Handler)factory.Services.GetRequiredService<IDocumentHandler>()).IngestCalls);
+    }
+
+    [Fact]
+    public async Task Browser_style_utf8_filename_without_filename_star_is_accepted()
+    {
+        using var factory = Factory(); using var client = Client(factory);
+        using var form = new ByteArrayContent(Encoding.UTF8.GetBytes(
+            "--test\r\nContent-Disposition: form-data; name=\"file\"; filename=\"Café Guide V2.EML\"\r\n\r\nhello\r\n--test--\r\n"));
+        form.Headers.ContentType = MediaTypeHeaderValue.Parse("multipart/form-data; boundary=test");
+        using var response = await client.PostAsync("/api/files/upload", form);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("café-guide-v2", body.GetProperty("document_id").GetString());
+    }
+
+    [Fact]
+    public async Task Unsafe_or_overlong_filenames_do_not_reach_providers()
+    {
+        using var factory = Factory(); using var client = Client(factory);
+        foreach (var name in new[] { "../café.eml", "a\\b.eml", "a%2fb.eml", "a%255Cb.eml", "a\u0001b.eml", "CON.EML", new string('é', 129) + ".eml" })
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsync("/api/files/upload", Form(name))).StatusCode);
+        Assert.Null(((Chunks)factory.Services.GetRequiredService<IChunkRepository>()).LastLookup);
+        Assert.Equal(0, ((Handler)factory.Services.GetRequiredService<IDocumentHandler>()).IngestCalls);
+    }
+
+    [Theory]
+    [InlineData("café-guide-v2", "docs/!u-Y2Fmw6ktZ3VpZGUtdjI/original/document.eml")]
+    [InlineData("cafe\u0301-guide-v2", "docs/cafe\u0301-guide-v2/original/cafe\u0301-guide-v2.eml")]
+    public async Task Download_and_delete_use_the_exact_decoded_id(string id, string path)
+    {
+        var key = new ObjectKey(StorageArea.Documents, path);
+        var storage = new DownloadStorage(key);
+        using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IObjectStorage>(); services.AddSingleton<IObjectStorage>(storage);
+        }));
+        using var client = Client(factory);
+        var chunks = (Chunks)factory.Services.GetRequiredService<IChunkRepository>();
+        chunks.Existing = id;
+        var route = "/api/admin/documents/" + Uri.EscapeDataString(id);
+
+        using var response = await client.GetAsync(route + "/download");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(id, chunks.LastLookup);
+        Assert.Equal(key, storage.SignedKey);
+        Assert.Equal(HttpStatusCode.OK, (await client.DeleteAsync(route)).StatusCode);
+        Assert.Equal(id, ((Handler)factory.Services.GetRequiredService<IDocumentHandler>()).DeletedId);
     }
 
     [Fact]
@@ -194,7 +260,8 @@ public sealed class DocumentUploadTests
         using var deletedFactory = Factory(deleted: true); using var deleted = Client(deletedFactory);
         Assert.Equal(HttpStatusCode.Forbidden, (await deleted.DeleteAsync("/api/admin/documents/sample")).StatusCode);
         var handler = (Handler)factory.Services.GetRequiredService<IDocumentHandler>();
-        Assert.Equal(HttpStatusCode.BadRequest, (await client.DeleteAsync("/api/admin/documents/a%252fb")).StatusCode);
+        foreach (var id in new[] { "a%2Fb", "a%252fb", "a%5Cb", "caf%25C3%25A9", "a%01b" })
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.DeleteAsync("/api/admin/documents/" + id)).StatusCode);
         Assert.Null(handler.DeletedId);
         handler.Found = false;
         Assert.Equal(HttpStatusCode.NotFound, (await client.DeleteAsync("/api/admin/documents/sample")).StatusCode);
@@ -278,8 +345,10 @@ public sealed class DocumentUploadTests
         public bool WaitForCancellation { get; set; }
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public TaskCompletionSource Canceled { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public int IngestCalls { get; private set; }
         public async Task<DocumentHandlerResult> IngestAsync(DocumentHandlerInput input, CancellationToken ct = default)
         {
+            IngestCalls++;
             ReceivedCancellationToken = ct.CanBeCanceled;
             if (Error != null) throw Error;
             if (WaitForCancellation)
@@ -307,10 +376,31 @@ public sealed class DocumentUploadTests
             return new(id, Found, 1, 1);
         }
     }
+    private sealed class DownloadStorage(ObjectKey key) : IObjectStorage
+    {
+        public ObjectKey? SignedKey { get; private set; }
+        public Task<Page<StorageEntry>> ListAsync(ObjectPrefix prefix, PageRequest page, CancellationToken ct = default) =>
+            Task.FromResult(new Page<StorageEntry>(key.Area == prefix.Area &&
+                Path.GetDirectoryName(key.Path)!.Replace('\\', '/') == prefix.Path ? [new StorageEntry(key, false)] : [], false));
+        public Task<Uri> CreateSignedUrlAsync(ObjectKey objectKey, TimeSpan lifetime, CancellationToken ct = default)
+        {
+            SignedKey = objectKey;
+            return Task.FromResult(new Uri("https://example.invalid/signed"));
+        }
+        public Task<StoredObject> UploadAsync(ObjectKey key, Stream content, UploadOptions options, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task<DownloadedObject> DownloadAsync(ObjectKey key, CancellationToken ct = default) => throw new NotSupportedException();
+        public Task DeleteAsync(IReadOnlyList<ObjectKey> keys, CancellationToken ct = default) => throw new NotSupportedException();
+        public Uri GetPublicUrl(ObjectKey key) => throw new NotSupportedException();
+    }
     private sealed class Chunks : IChunkRepository
     {
         public string? Existing { get; set; }
-        public Task<DocumentMetadata?> GetDocumentMetadataAsync(string id, CancellationToken ct = default) => Task.FromResult(id == Existing ? new DocumentMetadata(id, "test", "document") : null);
+        public string? LastLookup { get; private set; }
+        public Task<DocumentMetadata?> GetDocumentMetadataAsync(string id, CancellationToken ct = default)
+        {
+            LastLookup = id;
+            return Task.FromResult(id == Existing ? new DocumentMetadata(id, "test", "document") : null);
+        }
         public Task UpsertAsync(IReadOnlyList<Chunk> chunks, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<IReadOnlyDictionary<string, Chunk>> GetByIdsAsync(IReadOnlyList<string> ids, CancellationToken ct = default) => throw new NotSupportedException();
         public Task<ChunkIdPage> ListIdsForDocumentAsync(string id, PageRequest page, CancellationToken ct = default) => throw new NotSupportedException();

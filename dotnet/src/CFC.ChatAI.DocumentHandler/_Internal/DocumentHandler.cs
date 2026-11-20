@@ -202,8 +202,10 @@ internal sealed class DocumentHandler : IDocumentHandler
 
         // Keep chunk IDs until vector and storage requests complete, so most failures can be retried.
         // A lost response to the final chunk delete still requires manual reconciliation.
-        var removedObjects = await DeleteStorageTreeAsync(
-            StorageArea.Documents, $"docs/{documentId}", cancellationToken).ConfigureAwait(false);
+        var removedObjects = 0;
+        foreach (var root in DocumentStoragePaths.GetLookupRoots(documentId))
+            removedObjects += await DeleteStorageTreeAsync(StorageArea.Documents, root, cancellationToken)
+                .ConfigureAwait(false);
         await _chunks.DeleteByIdsAsync(uniqueIds, cancellationToken).ConfigureAwait(false);
 
         return new DocumentDeletionResult(documentId, true, uniqueIds.Length, removedObjects);
@@ -277,11 +279,12 @@ internal sealed class DocumentHandler : IDocumentHandler
 
     private static ObjectKey CreateSourceObject(string documentId, string extension, string sourceType)
     {
-        var area = string.Equals(sourceType, "video", StringComparison.OrdinalIgnoreCase)
-            ? StorageArea.Videos
-            : StorageArea.Documents;
-        var root = area == StorageArea.Videos ? "videos" : "docs";
-        return new ObjectKey(area, $"{root}/{documentId}/original/{documentId}{extension}");
+        if (string.Equals(sourceType, "video", StringComparison.OrdinalIgnoreCase))
+            return new ObjectKey(StorageArea.Videos, $"videos/{documentId}/original/{documentId}{extension}");
+
+        var root = DocumentStoragePaths.GetRoot(documentId);
+        var name = DocumentStoragePaths.UsesEncodedKey(documentId) ? "document" : documentId;
+        return new ObjectKey(StorageArea.Documents, $"{root}/original/{name}{extension}");
     }
 
     private async Task<int> DeleteStorageTreeAsync(

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.RegularExpressions;
 using CFC.ChatAI.DocumentHandler;
 using CFC.ChatAI.DocumentProcessor;
 using CFC.ChatAI.Supabase.Chunks;
@@ -51,7 +52,7 @@ public static class DocumentUploadEndpoints
             var name = file.FileName;
             if (string.IsNullOrWhiteSpace(name) || name.Length > 255 || name is "." or ".." ||
                 name.EndsWith(' ') || name.EndsWith('.') || name.IndexOfAny(['/', '\\', ':', '*', '?', '"', '<', '>', '|']) >= 0 ||
-                name.Any(char.IsControl) || IsReservedWindowsName(name))
+                name.Any(char.IsControl) || Regex.IsMatch(name, "%[0-9A-Fa-f]{2}") || IsReservedWindowsName(name))
                 return Error(400, "Invalid filename");
             if (!Extensions.Contains(Path.GetExtension(name)))
                 return Error(415, "Unsupported document type");

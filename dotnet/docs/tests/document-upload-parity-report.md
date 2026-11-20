@@ -8,7 +8,7 @@ Synthetic, in-process upload investigation. `DIFFERENT` is an observation, not a
 | Multi-section DOCX | DIFFERENT | 7 / 3 | 34 |
 | Embedded image DOCX | DIFFERENT | 7 / 3 | 37 |
 | TXT upload | DIFFERENT | 1 / 3 | 23 |
-| Filename normalization | DIFFERENT | 6 / 0 | 24 |
+| Filename normalization | DIFFERENT | 6 / 3 | 35 |
 | Injected original storage failure | DIFFERENT | 6 / 5 | 34 |
 | Injected chunk upsert failure | DIFFERENT | 3 / 2 | 22 |
 | Injected vector upsert failure | DIFFERENT | 6 / 4 | 30 |
@@ -126,7 +126,7 @@ One small email exercises the original, section, chunk and vector paths. Fixture
       "headers": {
         "accept": "*/*",
         "content-length": "497",
-        "content-type": "multipart/form-data; boundary=86b6623ba43cb24443494149dce3943c",
+        "content-type": "multipart/form-data; boundary=57b3645676ed568d3be1907143ef1c59",
         "user-agent": "python-httpx/0.28.1",
         "x-client-info": "supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7",
         "x-upsert": "true"
@@ -152,7 +152,7 @@ One small email exercises the original, section, chunk and vector paths. Fixture
           },
           {
             "headers": {
-              "content-disposition": "form-data; name=\"file\"; filename=\"2ace8fba-6fbb-417a-958c-65ca2684568d.json\"",
+              "content-disposition": "form-data; name=\"file\"; filename=\"27ea3f9d-1e69-47d5-b92e-137bc9b9f779.json\"",
               "content-type": "text/plain; charset=\"UTF-8\""
             },
             "json": {
@@ -165,12 +165,12 @@ One small email exercises the original, section, chunk and vector paths. Fixture
               "doc_slug": "baseline",
               "index": 1,
               "level": 1,
-              "section_id": "2ace8fba-6fbb-417a-958c-65ca2684568d",
-              "storage_path": "docs/baseline/sections/2ace8fba-6fbb-417a-958c-65ca2684568d.json",
+              "section_id": "27ea3f9d-1e69-47d5-b92e-137bc9b9f779",
+              "storage_path": "docs/baseline/sections/27ea3f9d-1e69-47d5-b92e-137bc9b9f779.json",
               "suggested_name": "baseline__sec001_email.json",
               "title": "Synthetic upload baseline"
             },
-            "sha256": "c3fb3a3477de25c05c2f997ee037057043a43d31d26758baf88d6186d81e6865",
+            "sha256": "30dfbb30ef3a53b98cd99cd65027f550d0f1c2156828285ebbca901a571f3755",
             "size": 521
           }
         ]
@@ -179,7 +179,7 @@ One small email exercises the original, section, chunk and vector paths. Fixture
       "headers": {
         "accept": "*/*",
         "content-length": "835",
-        "content-type": "multipart/form-data; boundary=2a2d06301d4b58bd65ea3792151ec64c",
+        "content-type": "multipart/form-data; boundary=ba88436222fbbabf65146a641de2d723",
         "user-agent": "python-httpx/0.28.1",
         "x-client-info": "supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7",
         "x-upsert": "true"
@@ -187,7 +187,7 @@ One small email exercises the original, section, chunk and vector paths. Fixture
       "kind": "storage-section",
       "method": "POST",
       "origin": "https://provider.invalid",
-      "path": "/storage/v1/object/parity-bucket/docs/baseline/sections/2ace8fba-6fbb-417a-958c-65ca2684568d.json",
+      "path": "/storage/v1/object/parity-bucket/docs/baseline/sections/27ea3f9d-1e69-47d5-b92e-137bc9b9f779.json",
       "provider": "supabase",
       "provider_response_status": 200,
       "query": "",
@@ -196,12 +196,12 @@ One small email exercises the original, section, chunk and vector paths. Fixture
     {
       "body": [
         {
-          "chunk_id": "a7b568a8-791b-45ed-a2c5-7961e2aa4872",
+          "chunk_id": "2d4b55d1-fd8f-42df-9c46-51168d03a369",
           "content": "Subject: Synthetic upload baseline From: sender@example.invalid To: reader@example.invalid This is synthetic content for the document upload parity investigation.",
           "doc_id": "baseline",
           "end_seconds": null,
           "image_paths": [],
-          "section_id": "2ace8fba-6fbb-417a-958c-65ca2684568d",
+          "section_id": "27ea3f9d-1e69-47d5-b92e-137bc9b9f779",
           "section_title": "Synthetic upload baseline",
           "source": "baseline.eml",
           "source_type": "document",
@@ -269,10 +269,10 @@ One small email exercises the original, section, chunk and vector paths. Fixture
         "namespace": "parity-namespace",
         "vectors": [
           {
-            "id": "a7b568a8-791b-45ed-a2c5-7961e2aa4872",
+            "id": "2d4b55d1-fd8f-42df-9c46-51168d03a369",
             "metadata": {
               "doc_id": "baseline",
-              "section_id": "2ace8fba-6fbb-417a-958c-65ca2684568d",
+              "section_id": "27ea3f9d-1e69-47d5-b92e-137bc9b9f779",
               "source": "baseline.eml",
               "source_type": "document"
             },
@@ -360,12 +360,12 @@ One small email exercises the original, section, chunk and vector paths. Fixture
     {
       "body": [
         {
-          "chunk_id": "9bacd602-038a-4633-8572-1ba2c0509165",
+          "chunk_id": "3410fb30-ec9b-4e28-957a-7bb1a4c31e6a",
           "content": "Subject: Synthetic upload baseline From: sender@example.invalid To: reader@example.invalid This is synthetic content for the document upload parity investigation.",
           "doc_id": "baseline",
           "end_seconds": null,
           "image_paths": [],
-          "section_id": "a7641903-5db4-4f9a-91cf-84f309be6db2",
+          "section_id": "842eb113-6188-487d-9dc3-7b4c15cf06b6",
           "section_title": "Synthetic upload baseline",
           "source": "baseline.eml",
           "source_type": "document",
@@ -397,10 +397,10 @@ One small email exercises the original, section, chunk and vector paths. Fixture
       "result": "canned-success",
       "vectors": [
         {
-          "id": "9bacd602-038a-4633-8572-1ba2c0509165",
+          "id": "3410fb30-ec9b-4e28-957a-7bb1a4c31e6a",
           "metadata": {
             "doc_id": "baseline",
-            "section_id": "a7641903-5db4-4f9a-91cf-84f309be6db2",
+            "section_id": "842eb113-6188-487d-9dc3-7b4c15cf06b6",
             "source": "baseline.eml",
             "source_type": "document"
           },
@@ -563,7 +563,7 @@ Two headings exercise section boundaries, chunk order and references. Fixture: `
       "headers": {
         "accept": "*/*",
         "content-length": "35677",
-        "content-type": "multipart/form-data; boundary=9c25e96a346b7f185523ac8cc79fc02e",
+        "content-type": "multipart/form-data; boundary=37c822bb8cdd76bb598bf4636b14664b",
         "user-agent": "python-httpx/0.28.1",
         "x-client-info": "supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7",
         "x-upsert": "true"
@@ -589,7 +589,7 @@ Two headings exercise section boundaries, chunk order and references. Fixture: `
           },
           {
             "headers": {
-              "content-disposition": "form-data; name=\"file\"; filename=\"d5b293ab-695d-4a89-8ab7-53e78af1925b.json\"",
+              "content-disposition": "form-data; name=\"file\"; filename=\"e25c1c61-8b2f-4306-8bb2-f304ad4af004.json\"",
               "content-type": "text/plain; charset=\"UTF-8\""
             },
             "json": {
@@ -602,12 +602,12 @@ Two headings exercise section boundaries, chunk order and references. Fixture: `
               "doc_slug": "multi-section",
               "index": 1,
               "level": 1,
-              "section_id": "d5b293ab-695d-4a89-8ab7-53e78af1925b",
-              "storage_path": "docs/multi-section/sections/d5b293ab-695d-4a89-8ab7-53e78af1925b.json",
+              "section_id": "e25c1c61-8b2f-4306-8bb2-f304ad4af004",
+              "storage_path": "docs/multi-section/sections/e25c1c61-8b2f-4306-8bb2-f304ad4af004.json",
               "suggested_name": "multi-section__sec001_overview.json",
               "title": "Overview"
             },
-            "sha256": "387383c375d53819b3f5412ecee3a3a5f7b34e73db46e4bf5279caf791a464ad",
+            "sha256": "ef0527e4cd647f9c7536922b566fc3fd2d3a2b853da3be848da6e44a0202bbb8",
             "size": 384
           }
         ]
@@ -616,7 +616,7 @@ Two headings exercise section boundaries, chunk order and references. Fixture: `
       "headers": {
         "accept": "*/*",
         "content-length": "698",
-        "content-type": "multipart/form-data; boundary=34b2843893860631f34a62850541c86e",
+        "content-type": "multipart/form-data; boundary=6601a9114cd91c2ab4411df11b96b2c6",
         "user-agent": "python-httpx/0.28.1",
         "x-client-info": "supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7",
         "x-upsert": "true"
@@ -624,7 +624,7 @@ Two headings exercise section boundaries, chunk order and references. Fixture: `
       "kind": "storage-section",
       "method": "POST",
       "origin": "https://provider.invalid",
-      "path": "/storage/v1/object/parity-bucket/docs/multi-section/sections/d5b293ab-695d-4a89-8ab7-53e78af1925b.json",
+      "path": "/storage/v1/object/parity-bucket/docs/multi-section/sections/e25c1c61-8b2f-4306-8bb2-f304ad4af004.json",
       "provider": "supabase",
       "provider_response_status": 200,
       "query": "",
@@ -642,7 +642,7 @@ Two headings exercise section boundaries, chunk order and references. Fixture: `
           },
           {
             "headers": {
-              "content-disposition": "form-data; name=\"file\"; filename=\"012d881a-be04-46e3-8ecc-86abc3a4ee1b.json\"",
+              "content-disposition": "form-data; name=\"file\"; filename=\"ca77419b-3137-43c5-8926-843e8cc0972b.json\"",
               "content-type": "text/plain; charset=\"UTF-8\""
             },
             "json": {
@@ -655,12 +655,12 @@ Two headings exercise section boundaries, chunk order and references. Fixture: `
               "doc_slug": "multi-section",
               "index": 2,
               "level": 2,
-              "section_id": "012d881a-be04-46e3-8ecc-86abc3a4ee1b",
-              "storage_path": "docs/multi-section/sections/012d881a-be04-46e3-8ecc-86abc3a4ee1b.json",
+              "section_id": "ca77419b-3137-43c5-8926-843e8cc0972b",
+              "storage_path": "docs/multi-section/sections/ca77419b-3137-43c5-8926-843e8cc0972b.json",
               "suggested_name": "multi-section__sec002_details.json",
               "title": "Details"
             },
-            "sha256": "255a607f98c8e5593d6a8a27b78f8c3c22864fb91644c0a90ade1038e05cd011",
+            "sha256": "426515f9087833be84df40d16abae418d1135277d5fab712ec8a755c0c125cc9",
             "size": 383
           }
         ]
@@ -669,7 +669,7 @@ Two headings exercise section boundaries, chunk order and references. Fixture: `
       "headers": {
         "accept": "*/*",
         "content-length": "697",
-        "content-type": "multipart/form-data; boundary=9c77e40f040687c551c826f5300d6bfa",
+        "content-type": "multipart/form-data; boundary=9b456cc9779821caa7ae9cadb22d393a",
         "user-agent": "python-httpx/0.28.1",
         "x-client-info": "supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7",
         "x-upsert": "true"
@@ -677,7 +677,7 @@ Two headings exercise section boundaries, chunk order and references. Fixture: `
       "kind": "storage-section",
       "method": "POST",
       "origin": "https://provider.invalid",
-      "path": "/storage/v1/object/parity-bucket/docs/multi-section/sections/012d881a-be04-46e3-8ecc-86abc3a4ee1b.json",
+      "path": "/storage/v1/object/parity-bucket/docs/multi-section/sections/ca77419b-3137-43c5-8926-843e8cc0972b.json",
       "provider": "supabase",
       "provider_response_status": 200,
       "query": "",
@@ -686,12 +686,12 @@ Two headings exercise section boundaries, chunk order and references. Fixture: `
     {
       "body": [
         {
-          "chunk_id": "46136e39-e2c4-45bf-97ff-416c4fbada95",
+          "chunk_id": "cf7b2000-7044-4716-b1e2-9dc41b8f9da1",
           "content": "Synthetic first section.",
           "doc_id": "multi-section",
           "end_seconds": null,
           "image_paths": [],
-          "section_id": "d5b293ab-695d-4a89-8ab7-53e78af1925b",
+          "section_id": "e25c1c61-8b2f-4306-8bb2-f304ad4af004",
           "section_title": "Overview",
           "source": "multi-section.docx",
           "source_type": "document",
@@ -702,12 +702,12 @@ Two headings exercise section boundaries, chunk order and references. Fixture: `
           "vtt_url": null
         },
         {
-          "chunk_id": "89633320-7283-4825-936d-570860896212",
+          "chunk_id": "a72ff4ef-d2ae-4d3f-ab7a-be28a7e817c2",
           "content": "Synthetic second section.",
           "doc_id": "multi-section",
           "end_seconds": null,
           "image_paths": [],
-          "section_id": "012d881a-be04-46e3-8ecc-86abc3a4ee1b",
+          "section_id": "ca77419b-3137-43c5-8926-843e8cc0972b",
           "section_title": "Details",
           "source": "multi-section.docx",
           "source_type": "document",
@@ -775,10 +775,10 @@ Two headings exercise section boundaries, chunk order and references. Fixture: `
         "namespace": "parity-namespace",
         "vectors": [
           {
-            "id": "46136e39-e2c4-45bf-97ff-416c4fbada95",
+            "id": "cf7b2000-7044-4716-b1e2-9dc41b8f9da1",
             "metadata": {
               "doc_id": "multi-section",
-              "section_id": "d5b293ab-695d-4a89-8ab7-53e78af1925b",
+              "section_id": "e25c1c61-8b2f-4306-8bb2-f304ad4af004",
               "source": "multi-section.docx",
               "source_type": "document"
             },
@@ -790,10 +790,10 @@ Two headings exercise section boundaries, chunk order and references. Fixture: `
             ]
           },
           {
-            "id": "89633320-7283-4825-936d-570860896212",
+            "id": "a72ff4ef-d2ae-4d3f-ab7a-be28a7e817c2",
             "metadata": {
               "doc_id": "multi-section",
-              "section_id": "012d881a-be04-46e3-8ecc-86abc3a4ee1b",
+              "section_id": "ca77419b-3137-43c5-8926-843e8cc0972b",
               "source": "multi-section.docx",
               "source_type": "document"
             },
@@ -890,12 +890,12 @@ Two headings exercise section boundaries, chunk order and references. Fixture: `
     {
       "body": [
         {
-          "chunk_id": "1220e8ca-249f-4373-bea9-88413d7355a6",
+          "chunk_id": "a8ebd05a-93ea-4798-9d25-1c271f337419",
           "content": "Synthetic first section.",
           "doc_id": "multi-section",
           "end_seconds": null,
           "image_paths": [],
-          "section_id": "12f9d7e7-a068-4741-86a3-9321a6d097cd",
+          "section_id": "17e7f7b8-9a9e-45e4-ae23-6a134943c5d6",
           "section_title": "Overview",
           "source": "multi-section.docx",
           "source_type": "document",
@@ -906,12 +906,12 @@ Two headings exercise section boundaries, chunk order and references. Fixture: `
           "vtt_url": null
         },
         {
-          "chunk_id": "6a6b8b68-c968-428c-b8fc-fd3fc0df1b5f",
+          "chunk_id": "522890c1-f170-4407-b83b-94ec81571777",
           "content": "Synthetic second section.",
           "doc_id": "multi-section",
           "end_seconds": null,
           "image_paths": [],
-          "section_id": "2059245e-d55a-4a53-853c-cb8128c5bd35",
+          "section_id": "0b7ce039-f8e3-4106-8cdf-d7cee9a15940",
           "section_title": "Details",
           "source": "multi-section.docx",
           "source_type": "document",
@@ -943,10 +943,10 @@ Two headings exercise section boundaries, chunk order and references. Fixture: `
       "result": "canned-success",
       "vectors": [
         {
-          "id": "1220e8ca-249f-4373-bea9-88413d7355a6",
+          "id": "a8ebd05a-93ea-4798-9d25-1c271f337419",
           "metadata": {
             "doc_id": "multi-section",
-            "section_id": "12f9d7e7-a068-4741-86a3-9321a6d097cd",
+            "section_id": "17e7f7b8-9a9e-45e4-ae23-6a134943c5d6",
             "source": "multi-section.docx",
             "source_type": "document"
           },
@@ -958,10 +958,10 @@ Two headings exercise section boundaries, chunk order and references. Fixture: `
           ]
         },
         {
-          "id": "6a6b8b68-c968-428c-b8fc-fd3fc0df1b5f",
+          "id": "522890c1-f170-4407-b83b-94ec81571777",
           "metadata": {
             "doc_id": "multi-section",
-            "section_id": "2059245e-d55a-4a53-853c-cb8128c5bd35",
+            "section_id": "0b7ce039-f8e3-4106-8cdf-d7cee9a15940",
             "source": "multi-section.docx",
             "source_type": "document"
           },
@@ -1118,7 +1118,7 @@ A one-pixel image exercises image artifacts and chunk image references. Fixture:
       "headers": {
         "accept": "*/*",
         "content-length": "36139",
-        "content-type": "multipart/form-data; boundary=7cdfbf87c3326bd0e27d6d7879f72486",
+        "content-type": "multipart/form-data; boundary=5c4117f3396fe4062faa471663e2232f",
         "user-agent": "python-httpx/0.28.1",
         "x-client-info": "supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7",
         "x-upsert": "true"
@@ -1158,7 +1158,7 @@ A one-pixel image exercises image artifacts and chunk image references. Fixture:
       "headers": {
         "accept": "*/*",
         "content-length": "367",
-        "content-type": "multipart/form-data; boundary=26f9930ba928485907bd55b9676234fb",
+        "content-type": "multipart/form-data; boundary=206ca50d074b7daf35dd4440b7446cb5",
         "contenttype": "image/png",
         "user-agent": "python-httpx/0.28.1",
         "x-client-info": "supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7",
@@ -1185,7 +1185,7 @@ A one-pixel image exercises image artifacts and chunk image references. Fixture:
           },
           {
             "headers": {
-              "content-disposition": "form-data; name=\"file\"; filename=\"9c1755c1-6a0c-4842-96e0-016176a0d807.json\"",
+              "content-disposition": "form-data; name=\"file\"; filename=\"c2483e50-e2c7-4fd7-912a-6144e7ad20ba.json\"",
               "content-type": "text/plain; charset=\"UTF-8\""
             },
             "json": {
@@ -1207,12 +1207,12 @@ A one-pixel image exercises image artifacts and chunk image references. Fixture:
               "doc_slug": "embedded-image",
               "index": 1,
               "level": 1,
-              "section_id": "9c1755c1-6a0c-4842-96e0-016176a0d807",
-              "storage_path": "docs/embedded-image/sections/9c1755c1-6a0c-4842-96e0-016176a0d807.json",
+              "section_id": "c2483e50-e2c7-4fd7-912a-6144e7ad20ba",
+              "storage_path": "docs/embedded-image/sections/c2483e50-e2c7-4fd7-912a-6144e7ad20ba.json",
               "suggested_name": "embedded-image__sec001_illustration.json",
               "title": "Illustration"
             },
-            "sha256": "7b2112e894caba180a383740f002512d0fdcd79e1f8f04647c360c3d90fc944d",
+            "sha256": "6ffdb56824b7f2149d229a3b74012957448135f5a65274d498b975fd55535588",
             "size": 671
           }
         ]
@@ -1221,7 +1221,7 @@ A one-pixel image exercises image artifacts and chunk image references. Fixture:
       "headers": {
         "accept": "*/*",
         "content-length": "985",
-        "content-type": "multipart/form-data; boundary=7ece6f90d5011853f25ab983c332ac62",
+        "content-type": "multipart/form-data; boundary=11d1ec2fe6276f3a999ed7d2e6e429b3",
         "user-agent": "python-httpx/0.28.1",
         "x-client-info": "supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7",
         "x-upsert": "true"
@@ -1229,7 +1229,7 @@ A one-pixel image exercises image artifacts and chunk image references. Fixture:
       "kind": "storage-section",
       "method": "POST",
       "origin": "https://provider.invalid",
-      "path": "/storage/v1/object/parity-bucket/docs/embedded-image/sections/9c1755c1-6a0c-4842-96e0-016176a0d807.json",
+      "path": "/storage/v1/object/parity-bucket/docs/embedded-image/sections/c2483e50-e2c7-4fd7-912a-6144e7ad20ba.json",
       "provider": "supabase",
       "provider_response_status": 200,
       "query": "",
@@ -1238,14 +1238,14 @@ A one-pixel image exercises image artifacts and chunk image references. Fixture:
     {
       "body": [
         {
-          "chunk_id": "dc58feab-b1be-4947-8584-91753d8f9d16",
+          "chunk_id": "6bf0c1ca-3471-4478-8b34-ebc8bc86639e",
           "content": "Synthetic text before the image. Synthetic text after the image.",
           "doc_id": "embedded-image",
           "end_seconds": null,
           "image_paths": [
             "docs/embedded-image/images/embedded-image__img001.png"
           ],
-          "section_id": "9c1755c1-6a0c-4842-96e0-016176a0d807",
+          "section_id": "c2483e50-e2c7-4fd7-912a-6144e7ad20ba",
           "section_title": "Illustration",
           "source": "embedded-image.docx",
           "source_type": "document",
@@ -1313,10 +1313,10 @@ A one-pixel image exercises image artifacts and chunk image references. Fixture:
         "namespace": "parity-namespace",
         "vectors": [
           {
-            "id": "dc58feab-b1be-4947-8584-91753d8f9d16",
+            "id": "6bf0c1ca-3471-4478-8b34-ebc8bc86639e",
             "metadata": {
               "doc_id": "embedded-image",
-              "section_id": "9c1755c1-6a0c-4842-96e0-016176a0d807",
+              "section_id": "c2483e50-e2c7-4fd7-912a-6144e7ad20ba",
               "source": "embedded-image.docx",
               "source_type": "document"
             },
@@ -1404,12 +1404,12 @@ A one-pixel image exercises image artifacts and chunk image references. Fixture:
     {
       "body": [
         {
-          "chunk_id": "ae7bcb56-7033-4cc5-8f0b-23ca7a4f8de6",
+          "chunk_id": "5777ac05-9958-4d7b-b709-7181ab4aa069",
           "content": "Synthetic text before the image. Synthetic text after the image.",
           "doc_id": "embedded-image",
           "end_seconds": null,
           "image_paths": [],
-          "section_id": "7d88f093-f911-4521-be81-4b79ea952716",
+          "section_id": "6f268634-a44a-40e9-8040-d9e73abedaa7",
           "section_title": "Illustration",
           "source": "embedded-image.docx",
           "source_type": "document",
@@ -1441,10 +1441,10 @@ A one-pixel image exercises image artifacts and chunk image references. Fixture:
       "result": "canned-success",
       "vectors": [
         {
-          "id": "ae7bcb56-7033-4cc5-8f0b-23ca7a4f8de6",
+          "id": "5777ac05-9958-4d7b-b709-7181ab4aa069",
           "metadata": {
             "doc_id": "embedded-image",
-            "section_id": "7d88f093-f911-4521-be81-4b79ea952716",
+            "section_id": "6f268634-a44a-40e9-8040-d9e73abedaa7",
             "source": "embedded-image.docx",
             "source_type": "document"
           },
@@ -1577,7 +1577,7 @@ The same plain text reaches C# processing but Python's processor does not suppor
       "headers": {
         "accept": "*/*",
         "content-length": "374",
-        "content-type": "multipart/form-data; boundary=e30b5387ded2c7299ea7a9d64c30532b",
+        "content-type": "multipart/form-data; boundary=9c2e344897f4676e3d0b2112e556bab6",
         "user-agent": "python-httpx/0.28.1",
         "x-client-info": "supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7",
         "x-upsert": "true"
@@ -1644,12 +1644,12 @@ The same plain text reaches C# processing but Python's processor does not suppor
     {
       "body": [
         {
-          "chunk_id": "803ff097-e7a9-4c15-a1df-d13f2aa8dd8b",
+          "chunk_id": "0cec7f1a-3664-4db0-a303-6c114df28686",
           "content": "This synthetic text fixture is supported by the C# processor but not the Python document processor.",
           "doc_id": "unsupported",
           "end_seconds": null,
           "image_paths": [],
-          "section_id": "a1e2f892-7234-471f-a123-a8854420dcb1",
+          "section_id": "1f9977e0-c350-46ef-a42a-0fefb0f5ffbf",
           "section_title": "Untitled",
           "source": "unsupported.txt",
           "source_type": "document",
@@ -1681,10 +1681,10 @@ The same plain text reaches C# processing but Python's processor does not suppor
       "result": "canned-success",
       "vectors": [
         {
-          "id": "803ff097-e7a9-4c15-a1df-d13f2aa8dd8b",
+          "id": "0cec7f1a-3664-4db0-a303-6c114df28686",
           "metadata": {
             "doc_id": "unsupported",
-            "section_id": "a1e2f892-7234-471f-a123-a8854420dcb1",
+            "section_id": "1f9977e0-c350-46ef-a42a-0fefb0f5ffbf",
             "source": "unsupported.txt",
             "source_type": "document"
           },
@@ -1738,45 +1738,56 @@ The same plain text reaches C# processing but Python's processor does not suppor
 
 ## Filename normalization
 
-A valid email is submitted with spaces, mixed case and a non-ASCII filename. Fixture: `baseline.eml` as `Café Guide V2.EML`. Capture: Supabase transport; Pinecone Python transport / C# application boundary.
+A valid email is submitted with spaces, mixed case and a non-ASCII filename. Fixture: `baseline.eml` as `Café Guide V2.EML`. Capture: Supabase transport; Pinecone Python transport / C# application boundary. Both endpoints must accept the file and report `café-guide-v2`. C# intentionally encodes the new original's storage key to meet Supabase's ASCII key restriction.
 
-**Outcome:** DIFFERENT. Python HTTP 200 / ingestion success true; C# HTTP 400. Section/image storage attempts: Python 1/0, C# 0/0.
+**Outcome:** DIFFERENT. Python HTTP 200 / ingestion success true; C# HTTP 200. Section/image storage attempts: Python 1/0, C# 0/0. Chunk rows and test vectors match after ID validation and aliasing.
 
 | Observation | Python | C# |
 | --- | --- | --- |
-| Endpoint status | `200` | `400` |
-| Ordered attempted operations | storage-original → storage-section → chunks-upsert → index-list → index-describe → vectors-upsert | No provider operation captured. |
-| Original object and options | `{"kind":"storage-original","multipart_fields":[{"headers":{"content-disposition":"form-data; name=\"cacheControl\""},"text":"3600"}],"object":{"sha256":"24672c47143e5c8e8584a3f269403a066543ee6a6313d6d869d320a6d16fc092","size":222},"object_content_type":"message/rfc822","path":"/storage/v1/object/parity-bucket/docs/caf%C3%A9-guide-v2/original/caf%C3%A9-guide-v2.eml","x-upsert":"true"}` | `<MISSING>` |
+| Endpoint status | `200` | `200` |
+| Ordered attempted operations | storage-original → storage-section → chunks-upsert → index-list → index-describe → vectors-upsert | chunks-upsert → vectors-upsert → storage-original |
+| Original object and options | `{"kind":"storage-original","multipart_fields":[{"headers":{"content-disposition":"form-data; name=\"cacheControl\""},"text":"3600"}],"object":{"sha256":"24672c47143e5c8e8584a3f269403a066543ee6a6313d6d869d320a6d16fc092","size":222},"object_content_type":"message/rfc822","path":"/storage/v1/object/parity-bucket/docs/caf%C3%A9-guide-v2/original/caf%C3%A9-guide-v2.eml","x-upsert":"true"}` | `{"kind":"storage-original","multipart_fields":[],"object":{"sha256":"24672c47143e5c8e8584a3f269403a066543ee6a6313d6d869d320a6d16fc092","size":222},"object_content_type":"message/rfc822","path":"/storage/v1/object/parity-bucket/docs/%21u-Y2Fmw6ktZ3VpZGUtdjI/original/document.eml","x-upsert":"true"}` |
 | Failure hook intercepted | `false` | `false` |
 
-**Checks:** endpoint.status: DIFFERENT; endpoint.response: DIFFERENT; ordered_operations: DIFFERENT; supabase_http: DIFFERENT; pinecone_http: NOT COMPARABLE (one side bypasses the SDK); storage_objects: DIFFERENT; chunk_batch_sizes: DIFFERENT; vector_batch_sizes_at_capture_boundary: DIFFERENT; chunk boundaries/text differ; rows and vectors shown as unmatched ordered lists; namespace: Python captured "parity-namespace"; C# is unobservable at its fake vector store.
+**Checks:** endpoint.status: MATCH; endpoint.response: DIFFERENT; ordered_operations: DIFFERENT; supabase_http: DIFFERENT; pinecone_http: NOT COMPARABLE (one side bypasses the SDK); storage_objects: DIFFERENT; chunk_batch_sizes: MATCH; vector_batch_sizes_at_capture_boundary: MATCH; chunk_rows: MATCH; vectors: MATCH; embedding_inputs_outputs: MATCH; namespace: Python captured "parity-namespace"; C# is unobservable at its fake vector store.
 
 | Difference (normalized only as described above) | Python | C# |
 | --- | --- | --- |
-| endpoint.status | `200` | `400` |
-| endpoint.response.detail | `<MISSING>` | `"Invalid document ID derived from filename"` |
+| endpoint.response.chunk_count | `<MISSING>` | `1` |
+| endpoint.response.document_id | `<MISSING>` | `"café-guide-v2"` |
 | endpoint.response.ingestion | `{"chunks_processed":1,"doc_id":"café-guide-v2","error":null,"images_processed":0,"message":"Successfully ingested Café Guide V2.EML","sections_processed":1,"source":"<documents>\\Café Guide V2.EML","success":true}` | `<MISSING>` |
 | endpoint.response.message | `"File uploaded and ingestion triggered"` | `<MISSING>` |
+| endpoint.response.source_name | `<MISSING>` | `"Café Guide V2.EML"` |
+| endpoint.response.source_type | `<MISSING>` | `"document"` |
 | endpoint.response.supabase | `{"path":"docs/café-guide-v2/original/café-guide-v2.eml","stored":true}` | `<MISSING>` |
-| ordered_operations[0] | `{"kind":"storage-original","provider":"supabase","result":"canned-success"}` | `<MISSING>` |
-| ordered_operations[1] | `{"kind":"storage-section","provider":"supabase","result":"canned-success"}` | `<MISSING>` |
-| ordered_operations[2] | `{"kind":"chunks-upsert","provider":"supabase","result":"canned-success"}` | `<MISSING>` |
+| endpoint.response.vector_count | `<MISSING>` | `1` |
+| ordered_operations[0].kind | `"storage-original"` | `"chunks-upsert"` |
+| ordered_operations[1].kind | `"storage-section"` | `"vectors-upsert"` |
+| ordered_operations[1].provider | `"supabase"` | `"pinecone"` |
+| ordered_operations[2].kind | `"chunks-upsert"` | `"storage-original"` |
 | ordered_operations[3] | `{"kind":"index-list","provider":"pinecone","result":"canned-success"}` | `<MISSING>` |
 | ordered_operations[4] | `{"kind":"index-describe","provider":"pinecone","result":"canned-success"}` | `<MISSING>` |
 | ordered_operations[5] | `{"kind":"vectors-upsert","provider":"pinecone","result":"canned-success"}` | `<MISSING>` |
-| supabase_http.chunks-upsert | `[{"headers":{"accept":"*/*","content-length":"524","content-type":"application/json","prefer":"return=representation,resolution=merge-duplicates","user-agent":"python-httpx/0.28.1","x-client-info":"supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7"},"method":"POST","origin":"https://provider.invalid","path":"/rest/v1/document_chunks","provider_response_status":200,"query":"?columns=%22chunk_id%22%2C%22section_id%22%2C%22source_type%22%2C%22source%22%2C%22video_url%22%2C%22vtt_url%22%2C%22start_seconds%22%2C%22image_paths%22%2C%22end_seconds%22%2C%22srt_url%22%2C%22txt_url%22%2C%22doc_id%22%2C%22content%22%2C%22section_title%22","result":"canned-success"}]` | `<MISSING>` |
-| supabase_http.storage-original | `[{"headers":{"accept":"*/*","content-length":"503","content-type":"multipart/form-data; boundary=<boundary>","user-agent":"python-httpx/0.28.1","x-client-info":"supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7","x-upsert":"true"},"method":"POST","origin":"https://provider.invalid","path":"/storage/v1/object/parity-bucket/docs/caf%C3%A9-guide-v2/original/caf%C3%A9-guide-v2.eml","provider_response_status":200,"query":"","result":"canned-success"}]` | `<MISSING>` |
+| supabase_http.chunks-upsert[0].headers.accept | `"*/*"` | `<MISSING>` |
+| supabase_http.chunks-upsert[0].headers.content-length | `"524"` | `<MISSING>` |
+| supabase_http.chunks-upsert[0].headers.content-type | `"application/json"` | `"application/json; charset=utf-8"` |
+| supabase_http.chunks-upsert[0].headers.prefer | `"return=representation,resolution=merge-duplicates"` | `"resolution=merge-duplicates,return=minimal"` |
+| supabase_http.chunks-upsert[0].headers.user-agent | `"python-httpx/0.28.1"` | `<MISSING>` |
+| supabase_http.chunks-upsert[0].headers.x-client-info | `"supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7"` | `<MISSING>` |
+| supabase_http.chunks-upsert[0].query | `"?columns=%22chunk_id%22%2C%22section_id%22%2C%22source_type%22%2C%22source%22%2C%22video_url%22%2C%22vtt_url%22%2C%22start_seconds%22%2C%22image_paths%22%2C%22end_seconds%22%2C%22srt_url%22%2C%22txt_url%22%2C%22doc_id%22%2C%22content%22%2C%22section_title%22"` | `"?on_conflict=chunk_id"` |
+| supabase_http.storage-original[0].headers.accept | `"*/*"` | `<MISSING>` |
+| supabase_http.storage-original[0].headers.content-length | `"503"` | `"222"` |
+| supabase_http.storage-original[0].headers.content-type | `"multipart/form-data; boundary=<boundary>"` | `"message/rfc822"` |
+| supabase_http.storage-original[0].headers.user-agent | `"python-httpx/0.28.1"` | `<MISSING>` |
+| supabase_http.storage-original[0].headers.x-client-info | `"supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7"` | `<MISSING>` |
+| supabase_http.storage-original[0].path | `"/storage/v1/object/parity-bucket/docs/caf%C3%A9-guide-v2/original/caf%C3%A9-guide-v2.eml"` | `"/storage/v1/object/parity-bucket/docs/%21u-Y2Fmw6ktZ3VpZGUtdjI/original/document.eml"` |
 | supabase_http.storage-section | `[{"headers":{"accept":"*/*","content-length":"853","content-type":"multipart/form-data; boundary=<boundary>","user-agent":"python-httpx/0.28.1","x-client-info":"supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7","x-upsert":"true"},"method":"POST","origin":"https://provider.invalid","path":"/storage/v1/object/parity-bucket/docs/caf%C3%A9-guide-v2/sections/<section-1>.json","provider_response_status":200,"query":"","result":"canned-success"}]` | `<MISSING>` |
 | pinecone_http.index-describe | `[{"headers":{"accept":"*/*","user-agent":"python-client-10.0.0","x-pinecone-api-version":"2026-07"},"method":"GET","origin":"https://api.pinecone.io","path":"/indexes/parity-index","provider_response_status":200,"query":"","result":"canned-success"}]` | `<NOT OBSERVABLE>` |
 | pinecone_http.index-list | `[{"headers":{"accept":"*/*","user-agent":"python-client-10.0.0","x-pinecone-api-version":"2026-07"},"method":"GET","origin":"https://api.pinecone.io","path":"/indexes","provider_response_status":200,"query":"","result":"canned-success"}]` | `<NOT OBSERVABLE>` |
 | pinecone_http.vectors-upsert | `[{"headers":{"content-length":"270","content-type":"application/json","user-agent":"python-client-10.0.0","x-pinecone-api-version":"2026-07"},"method":"POST","origin":"https://parity-index.invalid","path":"/vectors/upsert","provider_response_status":200,"query":"","result":"canned-success"}]` | `<NOT OBSERVABLE>` |
-| storage_objects.storage-original | `[{"kind":"storage-original","multipart_fields":[{"headers":{"content-disposition":"form-data; name=\"cacheControl\""},"text":"3600"}],"object":{"sha256":"24672c47143e5c8e8584a3f269403a066543ee6a6313d6d869d320a6d16fc092","size":222},"object_content_type":"message/rfc822","path":"/storage/v1/object/parity-bucket/docs/caf%C3%A9-guide-v2/original/caf%C3%A9-guide-v2.eml","x-upsert":"true"}]` | `<MISSING>` |
+| storage_objects.storage-original[0].multipart_fields[0] | `{"headers":{"content-disposition":"form-data; name=\"cacheControl\""},"text":"3600"}` | `<MISSING>` |
+| storage_objects.storage-original[0].path | `"/storage/v1/object/parity-bucket/docs/caf%C3%A9-guide-v2/original/caf%C3%A9-guide-v2.eml"` | `"/storage/v1/object/parity-bucket/docs/%21u-Y2Fmw6ktZ3VpZGUtdjI/original/document.eml"` |
 | storage_objects.storage-section | `[{"kind":"storage-section","multipart_fields":[{"headers":{"content-disposition":"form-data; name=\"cacheControl\""},"text":"3600"}],"object":{"blocks":[{"text":"Subject: Synthetic upload baseline From: sender@example.invalid To: reader@example.invalid This is synthetic content for the document upload parity investigation.","type":"text"}],"doc_slug":"café-guide-v2","index":1,"level":1,"section_id":"<section-1>","storage_path":"docs/café-guide-v2/sections/<section-1>.json","suggested_name":"café-guide-v2__sec001_email.json","title":"Synthetic upload baseline"},"object_content_type":"text/plain; charset=\"UTF-8\"","path":"/storage/v1/object/parity-bucket/docs/caf%C3%A9-guide-v2/sections/<section-1>.json","x-upsert":"true"}]` | `<MISSING>` |
-| chunk_batch_sizes[0] | `1` | `<MISSING>` |
-| vector_batch_sizes_at_capture_boundary[0] | `1` | `<MISSING>` |
-| chunk_rows.unmatched_boundaries | `[{"chunk_id":"<chunk-1>","content":"Subject: Synthetic upload baseline From: sender@example.invalid To: reader@example.invalid This is synthetic content for the document upload parity investigation.","doc_id":"café-guide-v2","end_seconds":null,"image_paths":[],"section_id":"<section-1>","section_title":"Synthetic upload baseline","source":"Café Guide V2.EML","source_type":"document","srt_url":null,"start_seconds":null,"txt_url":null,"video_url":null,"vtt_url":null}]` | `[]` |
-| vectors.unmatched_chunks | `[{"id":"<chunk-1>","metadata":{"doc_id":"café-guide-v2","section_id":"<section-1>","source":"Café Guide V2.EML","source_type":"document"},"values":[162.0,644.0,407.0,17.0]}]` | `[]` |
-| embedding_inputs_outputs.unmatched_chunks | `[{"input":"Subject: Synthetic upload baseline From: sender@example.invalid To: reader@example.invalid This is synthetic content for the document upload parity investigation.","values":[162.0,644.0,407.0,17.0]}]` | `[]` |
 
 <details><summary>Python: complete sanitized capture</summary>
 
@@ -1828,7 +1839,7 @@ A valid email is submitted with spaces, mixed case and a non-ASCII filename. Fix
       "headers": {
         "accept": "*/*",
         "content-length": "503",
-        "content-type": "multipart/form-data; boundary=9b3a29a04bf543c72e16389ab42fa655",
+        "content-type": "multipart/form-data; boundary=26b23e6c1b6fadd2c5f6812772b141eb",
         "user-agent": "python-httpx/0.28.1",
         "x-client-info": "supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7",
         "x-upsert": "true"
@@ -1854,7 +1865,7 @@ A valid email is submitted with spaces, mixed case and a non-ASCII filename. Fix
           },
           {
             "headers": {
-              "content-disposition": "form-data; name=\"file\"; filename=\"4deef583-29a1-460a-888c-0452c35d28b4.json\"",
+              "content-disposition": "form-data; name=\"file\"; filename=\"77b65b68-220e-4033-a798-46e482dfe654.json\"",
               "content-type": "text/plain; charset=\"UTF-8\""
             },
             "json": {
@@ -1867,12 +1878,12 @@ A valid email is submitted with spaces, mixed case and a non-ASCII filename. Fix
               "doc_slug": "café-guide-v2",
               "index": 1,
               "level": 1,
-              "section_id": "4deef583-29a1-460a-888c-0452c35d28b4",
-              "storage_path": "docs/café-guide-v2/sections/4deef583-29a1-460a-888c-0452c35d28b4.json",
+              "section_id": "77b65b68-220e-4033-a798-46e482dfe654",
+              "storage_path": "docs/café-guide-v2/sections/77b65b68-220e-4033-a798-46e482dfe654.json",
               "suggested_name": "café-guide-v2__sec001_email.json",
               "title": "Synthetic upload baseline"
             },
-            "sha256": "1f50503c3a747c630e981c1ec4eeea0bf82a4148a67791ea690bc71b30e95243",
+            "sha256": "e3a6cbb85b8cffe4287f789c9a6e118f903f837fa22c71ac9f62613214cb5261",
             "size": 539
           }
         ]
@@ -1881,7 +1892,7 @@ A valid email is submitted with spaces, mixed case and a non-ASCII filename. Fix
       "headers": {
         "accept": "*/*",
         "content-length": "853",
-        "content-type": "multipart/form-data; boundary=12aff868e432e49ebbc37b79f9c3d71d",
+        "content-type": "multipart/form-data; boundary=efb7c5c4b665bc5711bc9f2c2c4a6c06",
         "user-agent": "python-httpx/0.28.1",
         "x-client-info": "supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7",
         "x-upsert": "true"
@@ -1889,7 +1900,7 @@ A valid email is submitted with spaces, mixed case and a non-ASCII filename. Fix
       "kind": "storage-section",
       "method": "POST",
       "origin": "https://provider.invalid",
-      "path": "/storage/v1/object/parity-bucket/docs/caf%C3%A9-guide-v2/sections/4deef583-29a1-460a-888c-0452c35d28b4.json",
+      "path": "/storage/v1/object/parity-bucket/docs/caf%C3%A9-guide-v2/sections/77b65b68-220e-4033-a798-46e482dfe654.json",
       "provider": "supabase",
       "provider_response_status": 200,
       "query": "",
@@ -1898,12 +1909,12 @@ A valid email is submitted with spaces, mixed case and a non-ASCII filename. Fix
     {
       "body": [
         {
-          "chunk_id": "9842e79c-6095-457b-b226-52e1ff8f10c0",
+          "chunk_id": "184c730b-a01f-48ef-b6fd-43cb143f9847",
           "content": "Subject: Synthetic upload baseline From: sender@example.invalid To: reader@example.invalid This is synthetic content for the document upload parity investigation.",
           "doc_id": "café-guide-v2",
           "end_seconds": null,
           "image_paths": [],
-          "section_id": "4deef583-29a1-460a-888c-0452c35d28b4",
+          "section_id": "77b65b68-220e-4033-a798-46e482dfe654",
           "section_title": "Synthetic upload baseline",
           "source": "Café Guide V2.EML",
           "source_type": "document",
@@ -1971,10 +1982,10 @@ A valid email is submitted with spaces, mixed case and a non-ASCII filename. Fix
         "namespace": "parity-namespace",
         "vectors": [
           {
-            "id": "9842e79c-6095-457b-b226-52e1ff8f10c0",
+            "id": "184c730b-a01f-48ef-b6fd-43cb143f9847",
             "metadata": {
               "doc_id": "café-guide-v2",
-              "section_id": "4deef583-29a1-460a-888c-0452c35d28b4",
+              "section_id": "77b65b68-220e-4033-a798-46e482dfe654",
               "source": "Café Guide V2.EML",
               "source_type": "document"
             },
@@ -2043,21 +2054,112 @@ A valid email is submitted with spaces, mixed case and a non-ASCII filename. Fix
     "pinecone": "application",
     "supabase": "wire"
   },
-  "embeddings": [],
+  "embeddings": [
+    {
+      "input": "Subject: Synthetic upload baseline From: sender@example.invalid To: reader@example.invalid This is synthetic content for the document upload parity investigation.",
+      "values": [
+        162,
+        644,
+        407,
+        17
+      ]
+    }
+  ],
   "failure_intercepted": false,
   "failure_requested": "none",
   "namespace_configured": "parity-namespace",
   "namespace_observed": "unobservable at the substituted IVectorStore boundary",
-  "operations": [],
+  "operations": [
+    {
+      "body": [
+        {
+          "chunk_id": "3f9879ed-f8de-48f9-bb96-c9926dbd6014",
+          "content": "Subject: Synthetic upload baseline From: sender@example.invalid To: reader@example.invalid This is synthetic content for the document upload parity investigation.",
+          "doc_id": "café-guide-v2",
+          "end_seconds": null,
+          "image_paths": [],
+          "section_id": "dc3fe585-4da1-4d97-8c1c-511d62646815",
+          "section_title": "Synthetic upload baseline",
+          "source": "Café Guide V2.EML",
+          "source_type": "document",
+          "srt_url": null,
+          "start_seconds": null,
+          "txt_url": null,
+          "video_url": null,
+          "vtt_url": null
+        }
+      ],
+      "capture": "wire",
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "prefer": "resolution=merge-duplicates,return=minimal"
+      },
+      "kind": "chunks-upsert",
+      "method": "POST",
+      "origin": "https://provider.invalid",
+      "path": "/rest/v1/document_chunks",
+      "provider": "supabase",
+      "provider_response_status": 200,
+      "query": "?on_conflict=chunk_id",
+      "result": "canned-success"
+    },
+    {
+      "capture": "application",
+      "kind": "vectors-upsert",
+      "provider": "pinecone",
+      "result": "canned-success",
+      "vectors": [
+        {
+          "id": "3f9879ed-f8de-48f9-bb96-c9926dbd6014",
+          "metadata": {
+            "doc_id": "café-guide-v2",
+            "section_id": "dc3fe585-4da1-4d97-8c1c-511d62646815",
+            "source": "Café Guide V2.EML",
+            "source_type": "document"
+          },
+          "values": [
+            162,
+            644,
+            407,
+            17
+          ]
+        }
+      ]
+    },
+    {
+      "body": {
+        "sha256": "24672c47143e5c8e8584a3f269403a066543ee6a6313d6d869d320a6d16fc092",
+        "size": 222
+      },
+      "capture": "wire",
+      "headers": {
+        "content-length": "222",
+        "content-type": "message/rfc822",
+        "x-upsert": "true"
+      },
+      "kind": "storage-original",
+      "method": "POST",
+      "origin": "https://provider.invalid",
+      "path": "/storage/v1/object/parity-bucket/docs/%21u-Y2Fmw6ktZ3VpZGUtdjI/original/document.eml",
+      "provider": "supabase",
+      "provider_response_status": 200,
+      "query": "",
+      "result": "canned-success"
+    }
+  ],
   "response": {
-    "detail": "Invalid document ID derived from filename"
+    "chunk_count": 1,
+    "document_id": "café-guide-v2",
+    "source_name": "Café Guide V2.EML",
+    "source_type": "document",
+    "vector_count": 1
   },
   "self_test": {
     "in_process_server": true,
     "socket_denied": true,
     "unhandled_http_denied": true
   },
-  "status": 400,
+  "status": 200,
   "unexpected_requests": 0
 }
 ```
@@ -2165,7 +2267,7 @@ The original upload attempt fails; continuation and compensating attempts remain
       "headers": {
         "accept": "*/*",
         "content-length": "497",
-        "content-type": "multipart/form-data; boundary=c79e028bedcef8f7ff7b6e87371585ba",
+        "content-type": "multipart/form-data; boundary=a4c982a39b5d87f12f1887c8c1978efe",
         "user-agent": "python-httpx/0.28.1",
         "x-client-info": "supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7",
         "x-upsert": "true"
@@ -2191,7 +2293,7 @@ The original upload attempt fails; continuation and compensating attempts remain
           },
           {
             "headers": {
-              "content-disposition": "form-data; name=\"file\"; filename=\"3629443a-295b-47b3-af57-91147e7dc0b0.json\"",
+              "content-disposition": "form-data; name=\"file\"; filename=\"a2140883-c584-4561-b802-121a83d0aace.json\"",
               "content-type": "text/plain; charset=\"UTF-8\""
             },
             "json": {
@@ -2204,12 +2306,12 @@ The original upload attempt fails; continuation and compensating attempts remain
               "doc_slug": "baseline",
               "index": 1,
               "level": 1,
-              "section_id": "3629443a-295b-47b3-af57-91147e7dc0b0",
-              "storage_path": "docs/baseline/sections/3629443a-295b-47b3-af57-91147e7dc0b0.json",
+              "section_id": "a2140883-c584-4561-b802-121a83d0aace",
+              "storage_path": "docs/baseline/sections/a2140883-c584-4561-b802-121a83d0aace.json",
               "suggested_name": "baseline__sec001_email.json",
               "title": "Synthetic upload baseline"
             },
-            "sha256": "be91f0ce6a551b7aeaff59b8e178e60abb05db44680d296f86e429c3ed574149",
+            "sha256": "304db859937cd09f33ce69c543d0a69b9250da6178d174636d722b8707808176",
             "size": 521
           }
         ]
@@ -2218,7 +2320,7 @@ The original upload attempt fails; continuation and compensating attempts remain
       "headers": {
         "accept": "*/*",
         "content-length": "835",
-        "content-type": "multipart/form-data; boundary=3a2f37619cb10f050da87a3cbd8c0c2a",
+        "content-type": "multipart/form-data; boundary=fc0d2cc175cf47e2eba56b457e7aa82f",
         "user-agent": "python-httpx/0.28.1",
         "x-client-info": "supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7",
         "x-upsert": "true"
@@ -2226,7 +2328,7 @@ The original upload attempt fails; continuation and compensating attempts remain
       "kind": "storage-section",
       "method": "POST",
       "origin": "https://provider.invalid",
-      "path": "/storage/v1/object/parity-bucket/docs/baseline/sections/3629443a-295b-47b3-af57-91147e7dc0b0.json",
+      "path": "/storage/v1/object/parity-bucket/docs/baseline/sections/a2140883-c584-4561-b802-121a83d0aace.json",
       "provider": "supabase",
       "provider_response_status": 200,
       "query": "",
@@ -2235,12 +2337,12 @@ The original upload attempt fails; continuation and compensating attempts remain
     {
       "body": [
         {
-          "chunk_id": "597c308a-cc9b-4bbb-8166-e31abbc3a770",
+          "chunk_id": "2b070555-6152-4d91-8607-712a018fdf15",
           "content": "Subject: Synthetic upload baseline From: sender@example.invalid To: reader@example.invalid This is synthetic content for the document upload parity investigation.",
           "doc_id": "baseline",
           "end_seconds": null,
           "image_paths": [],
-          "section_id": "3629443a-295b-47b3-af57-91147e7dc0b0",
+          "section_id": "a2140883-c584-4561-b802-121a83d0aace",
           "section_title": "Synthetic upload baseline",
           "source": "baseline.eml",
           "source_type": "document",
@@ -2308,10 +2410,10 @@ The original upload attempt fails; continuation and compensating attempts remain
         "namespace": "parity-namespace",
         "vectors": [
           {
-            "id": "597c308a-cc9b-4bbb-8166-e31abbc3a770",
+            "id": "2b070555-6152-4d91-8607-712a018fdf15",
             "metadata": {
               "doc_id": "baseline",
-              "section_id": "3629443a-295b-47b3-af57-91147e7dc0b0",
+              "section_id": "a2140883-c584-4561-b802-121a83d0aace",
               "source": "baseline.eml",
               "source_type": "document"
             },
@@ -2399,12 +2501,12 @@ The original upload attempt fails; continuation and compensating attempts remain
     {
       "body": [
         {
-          "chunk_id": "5266e9df-7437-4d84-b5ce-4376e53ebaf2",
+          "chunk_id": "3b4a399c-2322-40c4-b4b7-bf8c9f3a09fa",
           "content": "Subject: Synthetic upload baseline From: sender@example.invalid To: reader@example.invalid This is synthetic content for the document upload parity investigation.",
           "doc_id": "baseline",
           "end_seconds": null,
           "image_paths": [],
-          "section_id": "bc74e8c0-4956-43ca-bf0a-b7c38545ef12",
+          "section_id": "2cdb2a34-af87-439d-9798-459ea08b81df",
           "section_title": "Synthetic upload baseline",
           "source": "baseline.eml",
           "source_type": "document",
@@ -2436,10 +2538,10 @@ The original upload attempt fails; continuation and compensating attempts remain
       "result": "canned-success",
       "vectors": [
         {
-          "id": "5266e9df-7437-4d84-b5ce-4376e53ebaf2",
+          "id": "3b4a399c-2322-40c4-b4b7-bf8c9f3a09fa",
           "metadata": {
             "doc_id": "baseline",
-            "section_id": "bc74e8c0-4956-43ca-bf0a-b7c38545ef12",
+            "section_id": "2cdb2a34-af87-439d-9798-459ea08b81df",
             "source": "baseline.eml",
             "source_type": "document"
           },
@@ -2475,7 +2577,7 @@ The original upload attempt fails; continuation and compensating attempts remain
     {
       "capture": "application",
       "ids": [
-        "5266e9df-7437-4d84-b5ce-4376e53ebaf2"
+        "3b4a399c-2322-40c4-b4b7-bf8c9f3a09fa"
       ],
       "kind": "vectors-delete",
       "provider": "pinecone",
@@ -2493,7 +2595,7 @@ The original upload attempt fails; continuation and compensating attempts remain
       "path": "/rest/v1/document_chunks",
       "provider": "supabase",
       "provider_response_status": 200,
-      "query": "?chunk_id=in.%28%225266e9df-7437-4d84-b5ce-4376e53ebaf2%22%29",
+      "query": "?chunk_id=in.%28%223b4a399c-2322-40c4-b4b7-bf8c9f3a09fa%22%29",
       "result": "canned-success"
     }
   ],
@@ -2601,7 +2703,7 @@ The chunk upsert attempt fails; later operations and compensation are recorded. 
       "headers": {
         "accept": "*/*",
         "content-length": "497",
-        "content-type": "multipart/form-data; boundary=25b95b0560f65f925daf27062d830d4a",
+        "content-type": "multipart/form-data; boundary=941323f42def34b95c3eb484d43cdac6",
         "user-agent": "python-httpx/0.28.1",
         "x-client-info": "supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7",
         "x-upsert": "true"
@@ -2627,7 +2729,7 @@ The chunk upsert attempt fails; later operations and compensation are recorded. 
           },
           {
             "headers": {
-              "content-disposition": "form-data; name=\"file\"; filename=\"9ea96440-6c2b-4d08-b68a-5f2b411d9cc4.json\"",
+              "content-disposition": "form-data; name=\"file\"; filename=\"2750afcf-6418-4161-94fc-a1386670d2a1.json\"",
               "content-type": "text/plain; charset=\"UTF-8\""
             },
             "json": {
@@ -2640,12 +2742,12 @@ The chunk upsert attempt fails; later operations and compensation are recorded. 
               "doc_slug": "baseline",
               "index": 1,
               "level": 1,
-              "section_id": "9ea96440-6c2b-4d08-b68a-5f2b411d9cc4",
-              "storage_path": "docs/baseline/sections/9ea96440-6c2b-4d08-b68a-5f2b411d9cc4.json",
+              "section_id": "2750afcf-6418-4161-94fc-a1386670d2a1",
+              "storage_path": "docs/baseline/sections/2750afcf-6418-4161-94fc-a1386670d2a1.json",
               "suggested_name": "baseline__sec001_email.json",
               "title": "Synthetic upload baseline"
             },
-            "sha256": "7b7559a6854a218e931f0d0616ce82e07db5c92b715cd84157413bcf4c37ab6f",
+            "sha256": "8f4b1beebbddc67ac872e8171b9c89dddf9d3efc66281150a173a5a0df61123d",
             "size": 521
           }
         ]
@@ -2654,7 +2756,7 @@ The chunk upsert attempt fails; later operations and compensation are recorded. 
       "headers": {
         "accept": "*/*",
         "content-length": "835",
-        "content-type": "multipart/form-data; boundary=6bf11c9823c97f5219899c71c64bf214",
+        "content-type": "multipart/form-data; boundary=e1467e95ac17ccf17c785cc3b2f442c3",
         "user-agent": "python-httpx/0.28.1",
         "x-client-info": "supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7",
         "x-upsert": "true"
@@ -2662,7 +2764,7 @@ The chunk upsert attempt fails; later operations and compensation are recorded. 
       "kind": "storage-section",
       "method": "POST",
       "origin": "https://provider.invalid",
-      "path": "/storage/v1/object/parity-bucket/docs/baseline/sections/9ea96440-6c2b-4d08-b68a-5f2b411d9cc4.json",
+      "path": "/storage/v1/object/parity-bucket/docs/baseline/sections/2750afcf-6418-4161-94fc-a1386670d2a1.json",
       "provider": "supabase",
       "provider_response_status": 200,
       "query": "",
@@ -2671,12 +2773,12 @@ The chunk upsert attempt fails; later operations and compensation are recorded. 
     {
       "body": [
         {
-          "chunk_id": "46d32e9a-2f8d-421e-848a-298da4a172b4",
+          "chunk_id": "5dad8e10-2c3a-44ee-8720-7f9fbf2393cc",
           "content": "Subject: Synthetic upload baseline From: sender@example.invalid To: reader@example.invalid This is synthetic content for the document upload parity investigation.",
           "doc_id": "baseline",
           "end_seconds": null,
           "image_paths": [],
-          "section_id": "9ea96440-6c2b-4d08-b68a-5f2b411d9cc4",
+          "section_id": "2750afcf-6418-4161-94fc-a1386670d2a1",
           "section_title": "Synthetic upload baseline",
           "source": "baseline.eml",
           "source_type": "document",
@@ -2748,12 +2850,12 @@ The chunk upsert attempt fails; later operations and compensation are recorded. 
     {
       "body": [
         {
-          "chunk_id": "814529df-3683-4202-96b3-9062e6427475",
+          "chunk_id": "735d1a42-c91d-4a80-842b-1aa27fb86a98",
           "content": "Subject: Synthetic upload baseline From: sender@example.invalid To: reader@example.invalid This is synthetic content for the document upload parity investigation.",
           "doc_id": "baseline",
           "end_seconds": null,
           "image_paths": [],
-          "section_id": "ebecc28c-6aba-4a46-bf3d-1f19cf42daa6",
+          "section_id": "48fedc4d-c189-4fba-88ce-5e06426ac4cc",
           "section_title": "Synthetic upload baseline",
           "source": "baseline.eml",
           "source_type": "document",
@@ -2790,7 +2892,7 @@ The chunk upsert attempt fails; later operations and compensation are recorded. 
       "path": "/rest/v1/document_chunks",
       "provider": "supabase",
       "provider_response_status": 200,
-      "query": "?chunk_id=in.%28%22814529df-3683-4202-96b3-9062e6427475%22%29",
+      "query": "?chunk_id=in.%28%22735d1a42-c91d-4a80-842b-1aa27fb86a98%22%29",
       "result": "canned-success"
     }
   ],
@@ -2906,7 +3008,7 @@ The vector boundary fails after chunk upsert; later operations and compensation 
       "headers": {
         "accept": "*/*",
         "content-length": "497",
-        "content-type": "multipart/form-data; boundary=c0b5e7941f82a3844cd9ac6af84e6d0a",
+        "content-type": "multipart/form-data; boundary=c24be6e97cd1d3b26acea93aa777a9c7",
         "user-agent": "python-httpx/0.28.1",
         "x-client-info": "supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7",
         "x-upsert": "true"
@@ -2932,7 +3034,7 @@ The vector boundary fails after chunk upsert; later operations and compensation 
           },
           {
             "headers": {
-              "content-disposition": "form-data; name=\"file\"; filename=\"6718ec24-97d2-4d5e-8664-99738996240d.json\"",
+              "content-disposition": "form-data; name=\"file\"; filename=\"67d7fb73-dc96-4eb7-ba85-cb78476f5e78.json\"",
               "content-type": "text/plain; charset=\"UTF-8\""
             },
             "json": {
@@ -2945,12 +3047,12 @@ The vector boundary fails after chunk upsert; later operations and compensation 
               "doc_slug": "baseline",
               "index": 1,
               "level": 1,
-              "section_id": "6718ec24-97d2-4d5e-8664-99738996240d",
-              "storage_path": "docs/baseline/sections/6718ec24-97d2-4d5e-8664-99738996240d.json",
+              "section_id": "67d7fb73-dc96-4eb7-ba85-cb78476f5e78",
+              "storage_path": "docs/baseline/sections/67d7fb73-dc96-4eb7-ba85-cb78476f5e78.json",
               "suggested_name": "baseline__sec001_email.json",
               "title": "Synthetic upload baseline"
             },
-            "sha256": "27bcf361f93138050e99b28de7d58a0c42f8fd58bb6b38bd83de8217c41cebeb",
+            "sha256": "118e0b1f5cd887b59794b825581bd8b928ef711fb40dea3e77b1b12b5a7ca443",
             "size": 521
           }
         ]
@@ -2959,7 +3061,7 @@ The vector boundary fails after chunk upsert; later operations and compensation 
       "headers": {
         "accept": "*/*",
         "content-length": "835",
-        "content-type": "multipart/form-data; boundary=60bd1161c216d2d38d9edd0850927341",
+        "content-type": "multipart/form-data; boundary=e50c54025f2d30902552c21b20c5a73e",
         "user-agent": "python-httpx/0.28.1",
         "x-client-info": "supabase-py/2.32.0; platform=Windows; platform-version=11; runtime=python; runtime-version=3.14.7",
         "x-upsert": "true"
@@ -2967,7 +3069,7 @@ The vector boundary fails after chunk upsert; later operations and compensation 
       "kind": "storage-section",
       "method": "POST",
       "origin": "https://provider.invalid",
-      "path": "/storage/v1/object/parity-bucket/docs/baseline/sections/6718ec24-97d2-4d5e-8664-99738996240d.json",
+      "path": "/storage/v1/object/parity-bucket/docs/baseline/sections/67d7fb73-dc96-4eb7-ba85-cb78476f5e78.json",
       "provider": "supabase",
       "provider_response_status": 200,
       "query": "",
@@ -2976,12 +3078,12 @@ The vector boundary fails after chunk upsert; later operations and compensation 
     {
       "body": [
         {
-          "chunk_id": "a5ff798c-ade8-44ec-bbb8-8a5631ec6551",
+          "chunk_id": "00f7b0d3-7b4f-402f-b326-a5b5380fdab6",
           "content": "Subject: Synthetic upload baseline From: sender@example.invalid To: reader@example.invalid This is synthetic content for the document upload parity investigation.",
           "doc_id": "baseline",
           "end_seconds": null,
           "image_paths": [],
-          "section_id": "6718ec24-97d2-4d5e-8664-99738996240d",
+          "section_id": "67d7fb73-dc96-4eb7-ba85-cb78476f5e78",
           "section_title": "Synthetic upload baseline",
           "source": "baseline.eml",
           "source_type": "document",
@@ -3049,10 +3151,10 @@ The vector boundary fails after chunk upsert; later operations and compensation 
         "namespace": "parity-namespace",
         "vectors": [
           {
-            "id": "a5ff798c-ade8-44ec-bbb8-8a5631ec6551",
+            "id": "00f7b0d3-7b4f-402f-b326-a5b5380fdab6",
             "metadata": {
               "doc_id": "baseline",
-              "section_id": "6718ec24-97d2-4d5e-8664-99738996240d",
+              "section_id": "67d7fb73-dc96-4eb7-ba85-cb78476f5e78",
               "source": "baseline.eml",
               "source_type": "document"
             },
@@ -3134,12 +3236,12 @@ The vector boundary fails after chunk upsert; later operations and compensation 
     {
       "body": [
         {
-          "chunk_id": "54dbbbc9-bd6b-46e7-9095-21fcb12120d6",
+          "chunk_id": "7933c805-55c7-4ebb-9245-777f3cd6b836",
           "content": "Subject: Synthetic upload baseline From: sender@example.invalid To: reader@example.invalid This is synthetic content for the document upload parity investigation.",
           "doc_id": "baseline",
           "end_seconds": null,
           "image_paths": [],
-          "section_id": "13eff5e4-27c6-4c99-b000-df4b2dc98b49",
+          "section_id": "4d562eed-e1a3-453d-b1fc-42cf726f56be",
           "section_title": "Synthetic upload baseline",
           "source": "baseline.eml",
           "source_type": "document",
@@ -3171,10 +3273,10 @@ The vector boundary fails after chunk upsert; later operations and compensation 
       "result": "injected-failure",
       "vectors": [
         {
-          "id": "54dbbbc9-bd6b-46e7-9095-21fcb12120d6",
+          "id": "7933c805-55c7-4ebb-9245-777f3cd6b836",
           "metadata": {
             "doc_id": "baseline",
-            "section_id": "13eff5e4-27c6-4c99-b000-df4b2dc98b49",
+            "section_id": "4d562eed-e1a3-453d-b1fc-42cf726f56be",
             "source": "baseline.eml",
             "source_type": "document"
           },
@@ -3190,7 +3292,7 @@ The vector boundary fails after chunk upsert; later operations and compensation 
     {
       "capture": "application",
       "ids": [
-        "54dbbbc9-bd6b-46e7-9095-21fcb12120d6"
+        "7933c805-55c7-4ebb-9245-777f3cd6b836"
       ],
       "kind": "vectors-delete",
       "provider": "pinecone",
@@ -3208,7 +3310,7 @@ The vector boundary fails after chunk upsert; later operations and compensation 
       "path": "/rest/v1/document_chunks",
       "provider": "supabase",
       "provider_response_status": 200,
-      "query": "?chunk_id=in.%28%2254dbbbc9-bd6b-46e7-9095-21fcb12120d6%22%29",
+      "query": "?chunk_id=in.%28%227933c805-55c7-4ebb-9245-777f3cd6b836%22%29",
       "result": "canned-success"
     }
   ],
@@ -3232,7 +3334,7 @@ The vector boundary fails after chunk upsert; later operations and compensation 
 
 ## Reproduction and verification
 
-- Revision: `c938e952898cf17554d37581dcc68fbc3e41ed66` plus the working-tree harness/fixture changes; Python `3.14.7`, `fastapi` 0.142.2, `supabase` 2.32.0, `storage3` 2.32.0, `postgrest` 2.32.0, `httpx` 0.28.1, `pinecone` 10.0.0, `python-docx` 1.2.0; Python host `Windows`; .NET SDK 10.0.401 and Linux ASP.NET/.NET runtime 10.0.15 in `mcr.microsoft.com/dotnet/aspnet@sha256:12b1135f5f8b3c0a214f2a680ff2033dff4f684f445d6c697d9524ceeb303586`.
+- Revision: `57c966855a23623847007c5f611b4d642d48df71` plus the working-tree harness/fixture changes; Python `3.14.7`, `fastapi` 0.142.2, `supabase` 2.32.0, `storage3` 2.32.0, `postgrest` 2.32.0, `httpx` 0.28.1, `pinecone` 10.0.0, `python-docx` 1.2.0; Python host `Windows`; .NET SDK 10.0.401 and Linux ASP.NET/.NET runtime 10.0.15 in `mcr.microsoft.com/dotnet/aspnet@sha256:12b1135f5f8b3c0a214f2a680ff2033dff4f684f445d6c697d9524ceeb303586`.
 - All fixtures are synthetic. DOCX fixtures can be regenerated by `generate_docx_fixtures.py` with python-docx 1.2.0. Both hosts receive the same bytes and `file` field for each case.
 - The report was regenerated from scratch. Two offline runs had identical normalized comparisons; original random IDs and multipart boundaries remain visible below.
 - Prerequisites: Docker with the pinned image already present, .NET packages in the local NuGet cache, and the pinned Python packages in the local `uv` cache. Image/package acquisition is a separate setup step; no provider credentials are required. The commands below are the recorded Windows Git Bash/MSYS offline run. The runner fixes `PYTHONHASHSEED=0` in each Python child and performs two complete suites per invocation.

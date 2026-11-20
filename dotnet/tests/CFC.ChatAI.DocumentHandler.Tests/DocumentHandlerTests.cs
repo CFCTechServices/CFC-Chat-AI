@@ -21,7 +21,12 @@ public sealed class DocumentHandlerTests
     [InlineData("a\\b", false)]
     [InlineData("a%2fb", false)]
     [InlineData("a\nb", false)]
-    [InlineData("é", false)]
+    [InlineData("café", true)]
+    [InlineData("cafe\u0301", true)]
+    [InlineData("日本語𐐨", true)]
+    [InlineData("a\u202Eb", false)]
+    [InlineData("a／b", false)]
+    [InlineData("😀", false)]
     [InlineData("a-b_c.1", true)]
     [InlineData("...", true)]
     public void Document_id_validation_matches_route_and_storage_contract(string? value, bool valid) =>
@@ -34,7 +39,7 @@ public sealed class DocumentHandlerTests
         Assert.False(DocumentId.IsValid(new string('a', 129)));
         var chunks = new FakeChunkRepository();
         var handler = CreateHandler(new FakeDocumentProcessor(), null, chunks, new FakeObjectStorage(), new FakePinecone());
-        foreach (var id in new[] { "", ".", "..", "a/b", "a%2fb", "é", new string('a', 129) })
+        foreach (var id in new[] { "", ".", "..", "a/b", "a%2fb", "a\u202Eb", new string('a', 129) })
             await Assert.ThrowsAsync<ArgumentException>(() => handler.DeleteAsync(id));
         Assert.Equal(0, chunks.MetadataReads);
     }
@@ -67,6 +72,33 @@ public sealed class DocumentHandlerTests
         Assert.Empty(chunks.Rows);
         Assert.Empty(pinecone.Records);
         Assert.Empty(storage.Objects);
+    }
+
+    [Fact]
+    public async Task Unicode_ingest_and_delete_use_provider_safe_keys_and_preserve_exact_ids()
+    {
+        const string id = "café-guide-v2";
+        var chunks = new FakeChunkRepository(); var storage = new FakeObjectStorage(); var vectors = new FakePinecone();
+        var processor = new DocumentProcessor.DocumentProcessor(new DocumentProcessorOptions());
+        var handler = CreateHandler(processor, null, chunks, storage, vectors);
+        await using var input = new MemoryStream("Subject: Sample\r\n\r\nEmail body."u8.ToArray());
+        var result = await handler.IngestAsync(new DocumentHandlerInput("Cafe\u0301 Guide V2.EML", input));
+
+        Assert.Equal(id, result.DocumentId);
+        Assert.Equal(id, chunks.Rows.Single().DocumentId);
+        Assert.Equal(id, vectors.Records.Single().Metadata!["doc_id"].GetString());
+        Assert.Equal("docs/!u-Y2Fmw6ktZ3VpZGUtdjI/original/document.eml", result.SourceObject.Path);
+        Assert.Equal(input.ToArray(), storage.Objects[result.SourceObject]);
+        storage.Objects[new ObjectKey(StorageArea.Documents, $"docs/{id}/original/{id}.eml")] = [];
+        var neighbor = new ObjectKey(StorageArea.Documents, "docs/cafe\u0301-guide-v2/original/legacy.eml");
+        storage.Objects[neighbor] = [];
+
+        var deleted = await handler.DeleteAsync(id);
+        Assert.True(deleted.Found);
+        Assert.Equal(2, deleted.StorageObjectCount);
+        Assert.Empty(chunks.Rows);
+        Assert.Empty(vectors.Records);
+        Assert.Equal(neighbor, Assert.Single(storage.Objects).Key);
     }
 
     [Fact]
@@ -219,7 +251,7 @@ public sealed class DocumentHandlerTests
     }
 
     private static IDocumentHandler CreateHandler(
-        FakeDocumentProcessor documentProcessor,
+        IDocumentProcessor documentProcessor,
         FakeVideoProcessor? videoProcessor,
         FakeChunkRepository chunks,
         FakeObjectStorage storage,

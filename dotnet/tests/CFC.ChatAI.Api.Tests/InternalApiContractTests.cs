@@ -93,8 +93,11 @@ public sealed class InternalApiContractTests
     }
 
     [Theory]
+    [InlineData("a%2Fb")]
     [InlineData("a%252fb")]
-    [InlineData("%C3%A9")]
+    [InlineData("a%5Cb")]
+    [InlineData("caf%25C3%25A9")]
+    [InlineData("a%01b")]
     public async Task AdminDownload_RejectsInvalidDocumentIds(string id)
     {
         using var factory = Factory("admin");

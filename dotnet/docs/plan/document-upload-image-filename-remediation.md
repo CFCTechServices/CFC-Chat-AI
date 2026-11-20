@@ -1,11 +1,11 @@
 # Document upload image and filename remediation plan
 
-**Status: planned; no implementation or provider changes have been made.** Findings and scope decisions are in [document-upload-parity-decisions.md](../tests/document-upload-parity-decisions.md); the evidence is in [document-upload-parity-report.md](../tests/document-upload-parity-report.md).
+**Status: Unicode filename remediation implemented and verified offline; DOCX image remediation remains planned.** See the [Unicode filename completion note](../complete/document-upload-unicode-filename.md) for the implemented storage layout and remaining live checks. Findings and scope decisions are in [document-upload-parity-decisions.md](../tests/document-upload-parity-decisions.md); the evidence is in [document-upload-parity-report.md](../tests/document-upload-parity-report.md).
 
 ## Goals and boundaries
 
 1. For DOCX documents with supported embedded images, preserve the association between each image and its relevant chunk(s), store the image, and persist its retrievable storage path in `document_chunks.image_paths`. Verify it can reach the chat/image retrieval flow.
-2. Accept the tested `Café Guide V2.EML` filename safely and use a consistent document ID throughout upload, lookup and deletion. Target Python's `café-guide-v2` for this case so existing Python IDs and object paths remain addressable.
+2. Accept the tested `Café Guide V2.EML` filename safely and use a consistent document ID throughout upload, lookup and deletion. Preserve Python's `café-guide-v2` ID. New original objects use an ASCII-safe key for Supabase; lookups can fall back to an existing literal object path for the exact ID.
 3. Preserve existing behavior for ordinary text-only documents, authorization, duplicate checks and failure reporting. Do not add section JSON artifact storage as part of this work.
 
 The image baseline is the tested embedded DOCX case, not a claim of complete Python image parity for PDF, legacy DOC, EML or every DOCX feature. Inventory and explicitly document other formats/unsupported features; extend the scope separately rather than silently claiming support. Do not change embedding models or attempt Pinecone wire parity here.
@@ -26,6 +26,8 @@ The image baseline is the tested embedded DOCX case, not a claim of complete Pyt
 - Confirm the image content endpoint accepts the chosen paths, uses appropriate MIME and security controls, and that retrieval/chat receives the persisted paths. Keep image bytes out of logs and vector metadata.
 
 ## 3. Make document IDs consistent and safe for filenames
+
+Implemented as described in the [completion note](../complete/document-upload-unicode-filename.md); the bullets below describe the original design work.
 
 - Align `CreateDocumentId` and `DocumentId.IsValid` for the tested accented filename, with a single documented normalization/validation policy used by upload preflight, processing, duplicate lookup, storage keys, download and delete routes. `DocumentId.IsValid` currently restricts IDs to ASCII, and is shared by the handler and API endpoints. Audit `ObjectKey`/prefix validation, URL encoding, database queries and any other ID consumers before expanding it.
 - Preserve `café-guide-v2` for the tested input rather than transliterating it to a different ID. Define Unicode normalization and casing, allowed characters, maximum length, empty/fallback cases and collisions deliberately; Python and .NET regex/casing rules are not necessarily equivalent for all scripts. Do not silently rename already stored documents or claim universal Unicode parity. Determine how existing Python IDs, including normalization variants, are looked up without creating duplicate identities.

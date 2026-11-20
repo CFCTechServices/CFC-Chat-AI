@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.IO.Compression;
 using System.Net;
 using System.Text;
@@ -756,10 +757,28 @@ public sealed class DocumentProcessor : IDocumentProcessor
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fileName);
         var fileStem = Path.GetFileNameWithoutExtension(Path.GetFileName(fileName.Replace('\\', '/')));
-        var slug = Regex.Replace(fileStem.Trim().ToLowerInvariant(), @"[^\w-]+", "-");
-        slug = Regex.Replace(slug, @"-{2,}", "-").Trim('-');
-        return slug.Length == 0 ? "document" : slug;
+        var normalized = fileStem.Normalize().ToLowerInvariant().Normalize();
+        var slug = new StringBuilder(normalized.Length);
+        var pendingSeparator = false;
+        foreach (var rune in normalized.EnumerateRunes())
+        {
+            if (!IsDocumentIdWordCharacter(rune))
+            {
+                pendingSeparator = slug.Length > 0;
+                continue;
+            }
+
+            if (pendingSeparator) slug.Append('-');
+            slug.Append(rune.ToString());
+            pendingSeparator = false;
+        }
+        return slug.Length == 0 ? "document" : slug.ToString();
     }
+
+    /// <summary>Characters shared by filename slugs and exact document ID lookup.</summary>
+    public static bool IsDocumentIdWordCharacter(Rune rune) => Rune.IsLetterOrDigit(rune) ||
+        Rune.GetUnicodeCategory(rune) is UnicodeCategory.NonSpacingMark or UnicodeCategory.SpacingCombiningMark
+            or UnicodeCategory.EnclosingMark or UnicodeCategory.ConnectorPunctuation;
 
     private sealed class SectionContent(string title, int level, string text)
     {

@@ -100,6 +100,23 @@ public sealed class SupabaseAdapterTests
         Assert.DoesNotContain("two.pdf", exception.Message);
     }
 
+    [Theory]
+    [InlineData("café-guide-v2", "caf%C3%A9-guide-v2")]
+    [InlineData("cafe\u0301-guide-v2", "cafe%CC%81-guide-v2")]
+    public async Task ChunkRepository_EscapesExactUnicodeIdInLookupFilters(string id, string escaped)
+    {
+        var handler = new RecordingHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("[]"),
+        }));
+        var repository = new SupabaseChunkRepository(CreateTransport(handler));
+
+        Assert.Null(await repository.GetDocumentMetadataAsync(id));
+        Assert.Contains($"&doc_id=eq.{escaped}&", handler.PathAndQuery);
+        _ = await repository.ListIdsForDocumentAsync(id, new PageRequest(0, 10));
+        Assert.Contains($"&doc_id=eq.{escaped}&", handler.PathAndQuery);
+    }
+
     [Fact]
     public async Task IdentityGateway_MapsUnauthorizedToAbsentUserButPropagatesOutage()
     {

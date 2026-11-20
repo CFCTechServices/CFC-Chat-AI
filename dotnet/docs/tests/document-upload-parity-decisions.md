@@ -1,6 +1,6 @@
 # Document upload parity findings and decisions
 
-**Status: proposed direction; fixes not yet implemented.** This note interprets the synthetic results in [document-upload-parity-report.md](document-upload-parity-report.md). The implementation plan is [document upload image and filename remediation](../plan/document-upload-image-filename-remediation.md).
+**Status: Unicode filename fix implemented and verified offline; DOCX image support remains planned.** This note interprets the synthetic results in [document-upload-parity-report.md](document-upload-parity-report.md). The implementation plan is [document upload image and filename remediation](../plan/document-upload-image-filename-remediation.md).
 
 ## Three principal gaps
 
@@ -10,9 +10,9 @@ In the embedded-image DOCX fixture, both endpoints returned HTTP 200, and the te
 
 The fixture establishes the gap for one DOCX image; it does not establish image behavior for every document format or image layout. The plan starts with DOCX and explicitly tests the association between images and chunks rather than assuming that all images belong to all chunks. These are document images, not embedding vectors.
 
-### 2. Filename / document ID compatibility — plan to fix
+### 2. Filename / document ID compatibility — fixed offline
 
-Python accepted `Café Guide V2.EML` and derived `café-guide-v2`; the C# development endpoint returned 400 before provider operations. C#'s processor preserves `é` in the slug, but `DocumentId.IsValid` currently allows only ASCII letters and digits plus `-`, `_`, and `.`. This is a compatibility regression for the tested filename. The fix must cover the whole document lifecycle and preserve security boundaries, not just relax upload validation. Existing IDs and collision behavior require care.
+In the initial run, Python accepted `Café Guide V2.EML` and derived `café-guide-v2`; the C# development endpoint returned 400 because `DocumentId.IsValid` rejected non-ASCII IDs. The regenerated report now shows both endpoints accepting the file with the same ID. New C# uploads use an ASCII-safe original object key because upstream Supabase Storage rejects literal Unicode keys. See the [completion note](../complete/document-upload-unicode-filename.md) for the lifecycle policy, tests, and live verification still needed.
 
 ### 3. Section JSON artifacts — do not plan to reproduce
 
