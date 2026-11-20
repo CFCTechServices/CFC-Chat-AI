@@ -1,6 +1,6 @@
 # Remaining internal API endpoints — implementation plan
 
-**Development delivery:** [implementation, configuration, reconciliation, and disposable smoke tests](internal-api-remaining-endpoints-delivery.md). Six routes are implemented; both self-profile writes remain unmapped. The table below is the original baseline, not a cutover checklist.
+**Historical plan:** All eight in-scope routes have since been implemented; profile writes map only when `Api:EnableProfileWrites` is enabled, and remain gated on tests and database security. See the [delivery notes](internal-api-remaining-endpoints-delivery.md) for the first six routes and the current [cutover checklist](../../plan/internal-api-cutover.md). The baseline and proposed steps below describe the earlier plan, not current status or cutover approval.
 
 ## Baseline and boundary
 
