@@ -8,6 +8,9 @@ using CFC.ChatAI.Api.Security;
 using CFC.ChatAI.Pinecone;
 using CFC.ChatAI.Feedback;
 using CFC.ChatAI.ChatService;
+using CFC.ChatAI.DocumentHandler;
+using CFC.ChatAI.DocumentProcessor;
+using Microsoft.AspNetCore.Http.Features;
 using CFC.ChatAI.Supabase;
 using CFC.ChatAI.Supabase.Common;
 using CFC.ChatAI.Supabase.Conversations;
@@ -32,6 +35,10 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 // Keep health available without credentials. Provider-backed routes are never mapped without
 // their complete configuration: no mock successes and no half-configured adapters.
 var config = builder.Configuration;
+var maxDocumentBytes = config.GetValue<long?>("Document:MaxUploadBytes") ?? 50L * 1024 * 1024;
+if (maxDocumentBytes <= 0 || maxDocumentBytes > long.MaxValue - 1024 * 1024)
+    throw new InvalidOperationException("Document:MaxUploadBytes must be positive and leave room for multipart overhead.");
+builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = maxDocumentBytes + 1024 * 1024);
 var hasSupabase = new[] { "SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY" }
     .All(key => !string.IsNullOrWhiteSpace(config[key]));
 var hasPinecone = new[] { "PINECONE_API_KEY", "PINECONE_INDEX_NAME", "Embedding:ModelPath", "Embedding:VocabularyPath" }
@@ -66,9 +73,16 @@ if (hasSupabase)
         {
             o.ApiKey = config["PINECONE_API_KEY"]!;
             o.IndexName = config["PINECONE_INDEX_NAME"]!;
+            o.Namespace = config["PINECONE_NAMESPACE"];
             o.ModelPath = config["Embedding:ModelPath"]!;
             o.VocabularyPath = config["Embedding:VocabularyPath"]!;
         });
+        builder.Services.AddDocumentProcessing(o =>
+        {
+            o.MaxDocumentBytes = maxDocumentBytes;
+            o.LibreOfficePath = config["Document:LibreOfficePath"] ?? o.LibreOfficePath;
+        });
+        builder.Services.AddDocumentHandling(o => o.MaxUploadBytes = maxDocumentBytes);
         builder.Services.AddFeedback();
         builder.Services.AddChatService(o =>
         {
@@ -85,10 +99,11 @@ app.Use(async (context, next) =>
 {
     try { await next(context); }
     catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested) { }
-    catch (BadHttpRequestException)
+    catch (BadHttpRequestException ex)
     {
         if (!context.Response.HasStarted)
-            await Results.BadRequest(new { detail = "Invalid request body" }).ExecuteAsync(context);
+            await Results.Json(new { detail = ex.StatusCode == 413 ? "Upload exceeds the size limit" : "Invalid request body" },
+                statusCode: ex.StatusCode == 413 ? 413 : 400).ExecuteAsync(context);
     }
     catch (SessionDeletionPartialFailureException)
     {
@@ -115,7 +130,13 @@ if (hasSupabase)
     app.UseAuthentication();
     app.UseAuthorization();
     app.MapInternalApi(hasPinecone);
+    app.MapDocumentImages();
     app.MapAdminReads();
+    if (hasPinecone)
+    {
+        app.MapDocumentUploads(maxDocumentBytes, app.Environment.IsDevelopment() && config.GetValue<bool>("Api:EnableDevIngest"));
+        app.MapDocumentDeletions(app.Environment.IsDevelopment() && config.GetValue<bool>("Api:EnableDevDelete"));
+    }
 }
 app.Run();
 

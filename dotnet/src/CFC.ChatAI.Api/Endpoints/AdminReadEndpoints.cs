@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using CFC.ChatAI.Api.Security;
+using CFC.ChatAI.DocumentHandler;
 using CFC.ChatAI.Supabase.Chunks;
 using CFC.ChatAI.Supabase.Common;
 using CFC.ChatAI.Supabase.Profiles;
@@ -64,21 +65,28 @@ public static class AdminReadEndpoints
         admin.MapGet("/documents/{docId}/download", async (string docId, IChunkRepository chunks,
             IObjectStorage storage, CancellationToken ct) =>
         {
-            if (!ValidDocumentId(docId)) return Results.BadRequest(new { detail = "Invalid document ID" });
+            if (!DocumentId.IsValid(docId)) return Results.BadRequest(new { detail = "Invalid document ID" });
             var metadata = await chunks.GetDocumentMetadataAsync(docId, ct);
             if (metadata is null) return Results.NotFound(new { detail = "Document not found" });
             var video = string.Equals(metadata.SourceType, "video", StringComparison.OrdinalIgnoreCase);
             var area = video ? StorageArea.Videos : StorageArea.Documents;
-            var prefix = $"{(video ? "videos" : "docs")}/{docId}/original";
-            var objects = await storage.ListAsync(new ObjectPrefix(area, prefix), new PageRequest(0, 1000), ct);
-            var source = objects.Items.FirstOrDefault(item => !item.IsFolder &&
-                item.Key.Path.StartsWith(prefix + "/", StringComparison.Ordinal) &&
-                !item.Key.Path[(prefix.Length + 1)..].Contains('/'));
-            if (source is null && objects.HasMore)
-                return Results.Json(new { detail = "Too many original objects; manual reconciliation required" }, statusCode: 413);
-            if (source is null) return Results.NotFound(new { detail = "Original file not found in storage" });
-            var signed = await storage.CreateSignedUrlAsync(source.Key, TimeSpan.FromMinutes(5), ct);
-            return Results.Ok(new { url = signed.ToString(), filename = Path.GetFileName(source.Key.Path) });
+            var roots = video ? [$"videos/{docId}"] : DocumentStoragePaths.GetLookupRoots(docId);
+            foreach (var root in roots)
+            {
+                var prefix = root + "/original";
+                var objects = await storage.ListAsync(new ObjectPrefix(area, prefix), new PageRequest(0, 1000), ct);
+                var source = objects.Items.FirstOrDefault(item => !item.IsFolder &&
+                    item.Key.Path.StartsWith(prefix + "/", StringComparison.Ordinal) &&
+                    !item.Key.Path[(prefix.Length + 1)..].Contains('/'));
+                if (source is not null)
+                {
+                    var signed = await storage.CreateSignedUrlAsync(source.Key, TimeSpan.FromMinutes(5), ct);
+                    return Results.Ok(new { url = signed.ToString(), filename = Path.GetFileName(source.Key.Path) });
+                }
+                if (objects.HasMore)
+                    return Results.Json(new { detail = "Too many original objects; manual reconciliation required" }, statusCode: 413);
+            }
+            return Results.NotFound(new { detail = "Original file not found in storage" });
         });
         admin.MapGet("/documents", async (IChunkRepository chunks, CancellationToken ct) =>
         {
@@ -95,9 +103,6 @@ public static class AdminReadEndpoints
             return Results.Json(new { detail = "Too many documents; pagination is required" }, statusCode: 413);
         });
     }
-
-    private static bool ValidDocumentId(string? id) => id is { Length: > 0 and <= 128 } &&
-        id.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or '.');
 
     public sealed record RoleRequest(string UserId, string NewRole);
 }

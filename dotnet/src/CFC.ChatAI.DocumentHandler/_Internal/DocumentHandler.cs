@@ -20,7 +20,7 @@ internal sealed class DocumentHandler : IDocumentHandler
 
     private readonly DocumentHandlerOptions _options;
     private readonly IDocumentProcessor _documentProcessor;
-    private readonly IVideoProcessor _videoProcessor;
+    private readonly IServiceProvider _services;
     private readonly IChunkRepository _chunks;
     private readonly IObjectStorage _storage;
     private readonly IPineconeService _pinecone;
@@ -28,7 +28,7 @@ internal sealed class DocumentHandler : IDocumentHandler
     public DocumentHandler(
         DocumentHandlerOptions options,
         IDocumentProcessor documentProcessor,
-        IVideoProcessor videoProcessor,
+        IServiceProvider services,
         IChunkRepository chunks,
         IObjectStorage storage,
         IPineconeService pinecone)
@@ -37,7 +37,7 @@ internal sealed class DocumentHandler : IDocumentHandler
         options.Validate();
         _options = options;
         _documentProcessor = documentProcessor ?? throw new ArgumentNullException(nameof(documentProcessor));
-        _videoProcessor = videoProcessor ?? throw new ArgumentNullException(nameof(videoProcessor));
+        _services = services ?? throw new ArgumentNullException(nameof(services));
         _chunks = chunks ?? throw new ArgumentNullException(nameof(chunks));
         _storage = storage ?? throw new ArgumentNullException(nameof(storage));
         _pinecone = pinecone ?? throw new ArgumentNullException(nameof(pinecone));
@@ -75,13 +75,18 @@ internal sealed class DocumentHandler : IDocumentHandler
             var videoUrl = string.Equals(processed.SourceType, "video", StringComparison.OrdinalIgnoreCase)
                 ? _storage.GetPublicUrl(sourceObject).AbsoluteUri
                 : null;
+            var imageRoot = DocumentStoragePaths.GetRoot(processed.DocumentId) + "/images";
+            var ingestId = Guid.NewGuid().ToString("N");
+            var images = processed.Images.Select((image, index) => (Image: image,
+                Key: new ObjectKey(StorageArea.Documents, $"{imageRoot}/{ingestId}__img{index + 1:D3}{image.Extension}"))).ToArray();
+            var imageKeys = images.ToDictionary(item => item.Image.Id, item => item.Key.Path, StringComparer.Ordinal);
             var persistedChunks = processed.Chunks.Select(chunk => new Chunk(
                 chunk.Id,
                 processed.DocumentId,
                 chunk.Text,
                 chunk.SectionId,
                 chunk.SectionTitle,
-                [],
+                chunk.ImageIds.Select(id => imageKeys[id]).ToArray(),
                 processed.SourceName,
                 processed.SourceType,
                 VideoUrl: videoUrl)).ToArray();
@@ -96,10 +101,29 @@ internal sealed class DocumentHandler : IDocumentHandler
                     ["source_type"] = JsonSerializer.SerializeToElement(processed.SourceType),
                 })).ToArray();
 
+            var attemptedImageKeys = new List<ObjectKey>();
             var chunkWriteAttempted = false;
             var vectorWriteAttempted = false;
             try
             {
+                foreach (var (image, key) in images)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    using var content = new MemoryStream(image.Content.ToArray(), writable: false);
+                    attemptedImageKeys.Add(key);
+                    try
+                    {
+                        await _storage.UploadAsync(key, content, new UploadOptions(image.ContentType, Overwrite: false),
+                            cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (StorageObjectConflictException)
+                    {
+                        // The provider confirmed that this create did not acquire the key.
+                        attemptedImageKeys.RemoveAt(attemptedImageKeys.Count - 1);
+                        throw;
+                    }
+                }
+
                 chunkWriteAttempted = true;
                 await _chunks.UpsertAsync(persistedChunks, cancellationToken).ConfigureAwait(false);
 
@@ -156,6 +180,18 @@ internal sealed class DocumentHandler : IDocumentHandler
                     }
                 }
 
+                if (attemptedImageKeys.Count > 0)
+                {
+                    try
+                    {
+                        await _storage.DeleteAsync(attemptedImageKeys, CancellationToken.None).ConfigureAwait(false);
+                    }
+                    catch (Exception rollbackError)
+                    {
+                        rollbackErrors.Add(rollbackError);
+                    }
+                }
+
                 if (rollbackErrors.Count > 0)
                     throw new AggregateException("Ingestion failed and one or more compensating deletions also failed.",
                         [ingestionError, .. rollbackErrors]);
@@ -176,6 +212,11 @@ internal sealed class DocumentHandler : IDocumentHandler
         ValidateDocumentId(documentId);
         cancellationToken.ThrowIfCancellationRequested();
         var metadata = await _chunks.GetDocumentMetadataAsync(documentId, cancellationToken).ConfigureAwait(false);
+        // Without metadata we cannot determine the source type or discover previously deleted vector IDs.
+        // Do not perform a blind cleanup; operators must reconcile any orphaned data separately.
+        if (metadata is null) return new DocumentDeletionResult(documentId, false, 0, 0);
+        if (!string.Equals(metadata.SourceType, "document", StringComparison.OrdinalIgnoreCase))
+            throw new UnsupportedDeletionException();
         var chunkIds = new List<string>();
         var offset = 0;
         while (true)
@@ -184,35 +225,26 @@ internal sealed class DocumentHandler : IDocumentHandler
                 documentId, new PageRequest(offset, StoragePageSize), cancellationToken).ConfigureAwait(false);
             chunkIds.AddRange(page.ChunkIds);
             if (!page.HasMore) break;
+            if (page.ChunkIds.Count == 0)
+                throw new InvalidDataException("Chunk listing did not advance.");
             offset = checked(offset + page.ChunkIds.Count);
-            if (page.ChunkIds.Count == 0) break;
         }
 
         var uniqueIds = chunkIds.Distinct(StringComparer.Ordinal).ToArray();
+        if (uniqueIds.Length == 0)
+            throw new InvalidDataException("Document metadata exists but no chunk IDs were found.");
         foreach (var batch in uniqueIds.Chunk(PineconeDeleteBatchSize))
             await _pinecone.DeleteAsync(batch, cancellationToken).ConfigureAwait(false);
 
+        // Keep chunk IDs until vector and storage requests complete, so most failures can be retried.
+        // A lost response to the final chunk delete still requires manual reconciliation.
+        var removedObjects = 0;
+        foreach (var root in DocumentStoragePaths.GetLookupRoots(documentId))
+            removedObjects += await DeleteStorageTreeAsync(StorageArea.Documents, root, cancellationToken)
+                .ConfigureAwait(false);
         await _chunks.DeleteByIdsAsync(uniqueIds, cancellationToken).ConfigureAwait(false);
 
-        StorageArea[] areas = metadata is null
-            ? [StorageArea.Documents, StorageArea.Videos]
-            : [string.Equals(metadata.SourceType, "video", StringComparison.OrdinalIgnoreCase)
-                ? StorageArea.Videos
-                : StorageArea.Documents];
-        var removedObjects = 0;
-        foreach (var area in areas)
-        {
-            removedObjects += await DeleteStorageTreeAsync(
-                area,
-                $"{(area == StorageArea.Videos ? "videos" : "docs")}/{documentId}",
-                cancellationToken).ConfigureAwait(false);
-        }
-
-        return new DocumentDeletionResult(
-            documentId,
-            metadata is not null || uniqueIds.Length > 0 || removedObjects > 0,
-            uniqueIds.Length,
-            removedObjects);
+        return new DocumentDeletionResult(documentId, true, uniqueIds.Length, removedObjects);
     }
 
     private async Task<ProcessedDocument> ProcessAsync(
@@ -225,14 +257,16 @@ internal sealed class DocumentHandler : IDocumentHandler
             await using var videoStream = new FileStream(
                 temporaryPath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920,
                 FileOptions.Asynchronous | FileOptions.SequentialScan);
-            var result = await _videoProcessor.ProcessAsync(
+            var videoProcessor = _services.GetService(typeof(IVideoProcessor)) as IVideoProcessor
+                ?? throw new InvalidOperationException("Video processing not configured.");
+            var result = await videoProcessor.ProcessAsync(
                 new VideoInput(fileName, videoStream), cancellationToken).ConfigureAwait(false);
             return new ProcessedDocument(
                 result.DocumentId,
                 result.SourceName,
                 result.SourceType,
                 result.Chunks.Select(chunk => new ProcessedChunk(
-                    chunk.Id, chunk.SectionId, chunk.SectionTitle, chunk.Text)).ToArray());
+                    chunk.Id, chunk.SectionId, chunk.SectionTitle, chunk.Text, [])).ToArray(), []);
         }
 
         await using var documentStream = new FileStream(
@@ -245,7 +279,7 @@ internal sealed class DocumentHandler : IDocumentHandler
             document.SourceName,
             document.SourceType,
             document.Chunks.Select(chunk => new ProcessedChunk(
-                chunk.Id, chunk.SectionId, chunk.SectionTitle, chunk.Text)).ToArray());
+                chunk.Id, chunk.SectionId, chunk.SectionTitle, chunk.Text, chunk.ImageIds)).ToArray(), document.Images);
     }
 
     private async Task<string> StageUploadAsync(Stream content, CancellationToken cancellationToken)
@@ -281,11 +315,12 @@ internal sealed class DocumentHandler : IDocumentHandler
 
     private static ObjectKey CreateSourceObject(string documentId, string extension, string sourceType)
     {
-        var area = string.Equals(sourceType, "video", StringComparison.OrdinalIgnoreCase)
-            ? StorageArea.Videos
-            : StorageArea.Documents;
-        var root = area == StorageArea.Videos ? "videos" : "docs";
-        return new ObjectKey(area, $"{root}/{documentId}/original/{documentId}{extension}");
+        if (string.Equals(sourceType, "video", StringComparison.OrdinalIgnoreCase))
+            return new ObjectKey(StorageArea.Videos, $"videos/{documentId}/original/{documentId}{extension}");
+
+        var root = DocumentStoragePaths.GetRoot(documentId);
+        var name = DocumentStoragePaths.UsesEncodedKey(documentId) ? "document" : documentId;
+        return new ObjectKey(StorageArea.Documents, $"{root}/original/{name}{extension}");
     }
 
     private async Task<int> DeleteStorageTreeAsync(
@@ -308,8 +343,17 @@ internal sealed class DocumentHandler : IDocumentHandler
                     new ObjectPrefix(area, prefix),
                     new PageRequest(offset, StoragePageSize),
                     cancellationToken).ConfigureAwait(false);
-                entries.AddRange(page.Items);
-                if (!page.HasMore || page.Items.Count == 0) break;
+                foreach (var entry in page.Items)
+                {
+                    var parent = prefix + "/";
+                    if (entry.Key.Area != area || !entry.Key.Path.StartsWith(parent, StringComparison.Ordinal) ||
+                        entry.Key.Path.Length == parent.Length || entry.Key.Path[parent.Length..].Contains('/') ||
+                        entry.Key.Path[parent.Length..] is "." or "..")
+                        throw new InvalidDataException("Storage listing returned an invalid child.");
+                    entries.Add(entry);
+                }
+                if (!page.HasMore) break;
+                if (page.Items.Count == 0) throw new InvalidDataException("Storage listing did not advance.");
                 offset = checked(offset + page.Items.Count);
             }
 
@@ -348,10 +392,8 @@ internal sealed class DocumentHandler : IDocumentHandler
 
     private static void ValidateDocumentId(string documentId)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(documentId);
-        if (documentId is "." or ".." || documentId.Contains('/') || documentId.Contains('\\') ||
-            documentId.Any(char.IsControl))
-            throw new ArgumentException("Document ID must be one non-empty storage path segment.", nameof(documentId));
+        if (!DocumentId.IsValid(documentId))
+            throw new ArgumentException("Invalid document ID.", nameof(documentId));
     }
 
     private static void TryDeleteFile(string path)
@@ -365,7 +407,8 @@ internal sealed class DocumentHandler : IDocumentHandler
         string DocumentId,
         string SourceName,
         string SourceType,
-        IReadOnlyList<ProcessedChunk> Chunks);
+        IReadOnlyList<ProcessedChunk> Chunks,
+        IReadOnlyList<DocumentImage> Images);
 
-    private sealed record ProcessedChunk(string Id, string? SectionId, string? SectionTitle, string Text);
+    private sealed record ProcessedChunk(string Id, string? SectionId, string? SectionTitle, string Text, IReadOnlyList<string> ImageIds);
 }

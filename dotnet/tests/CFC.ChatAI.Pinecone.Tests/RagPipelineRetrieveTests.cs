@@ -52,6 +52,16 @@ public class RagPipelineRetrieveTests
     }
 
     [Fact]
+    public async Task MatchedChunkHydratesAllOfItsImagePathsWithoutVectorMetadata()
+    {
+        string[] paths = ["docs/sample/images/one.png", "docs/sample/images/two.gif"];
+        var row = new ChunkRow { ChunkId = "c1", Content = "matched text", ImagePaths = paths };
+        var neighbor = new ChunkRow { ChunkId = "c2", Content = "other text", ImagePaths = ["docs/sample/images/other.png"] };
+        var chunks = await Pipeline([new VectorMatch("c1", 0.9f, null)], row, neighbor).RetrieveContextAsync("q");
+        Assert.Equal(paths, Assert.Single(chunks).ImagePaths);
+    }
+
+    [Fact]
     public async Task EmptyImageListInRow_FallsBackToMetadataList()
     {
         var meta = new Metadata { ["image_paths"] = new MetadataValue[] { "img/a.png" } };

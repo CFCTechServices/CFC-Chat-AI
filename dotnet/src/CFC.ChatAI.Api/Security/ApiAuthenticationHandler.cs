@@ -16,6 +16,18 @@ public sealed class ApiAuthenticationHandler(
     IUserProfileRepository profiles)
     : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
+    protected override Task HandleChallengeAsync(AuthenticationProperties properties)
+    {
+        Response.StatusCode = StatusCodes.Status401Unauthorized;
+        return Response.WriteAsJsonAsync(new { detail = "Authentication required" });
+    }
+
+    protected override Task HandleForbiddenAsync(AuthenticationProperties properties)
+    {
+        Response.StatusCode = StatusCodes.Status403Forbidden;
+        return Response.WriteAsJsonAsync(new { detail = "Access denied" });
+    }
+
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {
         var header = Request.Headers.Authorization.ToString();

@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <None Include="TestData\**" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\DocumentUploadParity\fixtures\**" Link="UploadParityFixtures\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   
 </Project>

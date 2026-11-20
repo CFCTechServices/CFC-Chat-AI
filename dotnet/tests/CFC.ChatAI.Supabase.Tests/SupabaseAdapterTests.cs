@@ -100,6 +100,23 @@ public sealed class SupabaseAdapterTests
         Assert.DoesNotContain("two.pdf", exception.Message);
     }
 
+    [Theory]
+    [InlineData("café-guide-v2", "caf%C3%A9-guide-v2")]
+    [InlineData("cafe\u0301-guide-v2", "cafe%CC%81-guide-v2")]
+    public async Task ChunkRepository_EscapesExactUnicodeIdInLookupFilters(string id, string escaped)
+    {
+        var handler = new RecordingHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("[]"),
+        }));
+        var repository = new SupabaseChunkRepository(CreateTransport(handler));
+
+        Assert.Null(await repository.GetDocumentMetadataAsync(id));
+        Assert.Contains($"&doc_id=eq.{escaped}&", handler.PathAndQuery);
+        _ = await repository.ListIdsForDocumentAsync(id, new PageRequest(0, 10));
+        Assert.Contains($"&doc_id=eq.{escaped}&", handler.PathAndQuery);
+    }
+
     [Fact]
     public async Task IdentityGateway_MapsUnauthorizedToAbsentUserButPropagatesOutage()
     {
@@ -437,6 +454,22 @@ public sealed class SupabaseAdapterTests
         var exception = await Assert.ThrowsAsync<DependencyFailureException>(() =>
             timeoutTransport.SendAnonAsync(timedRequest, CancellationToken.None));
         Assert.DoesNotContain("token", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Conflict, "{}")]
+    [InlineData(HttpStatusCode.BadRequest, "{\"statusCode\":\"409\",\"error\":\"Duplicate\"}")]
+    [InlineData(HttpStatusCode.BadRequest, "{\"code\":\"ResourceAlreadyExists\"}")]
+    public async Task StorageUpload_ClassifiesConfirmedConflictsOnCreateWithoutOverwrite(HttpStatusCode status, string body)
+    {
+        var handler = new RecordingHandler((_, _) => Task.FromResult(new HttpResponseMessage(status)
+        {
+            Content = new StringContent(body),
+        }));
+        var storage = new SupabaseObjectStorage(CreateTransport(handler), CreateOptions());
+        using var bytes = new MemoryStream([1, 2]);
+        await Assert.ThrowsAsync<StorageObjectConflictException>(() => storage.UploadAsync(
+            new ObjectKey(StorageArea.Documents, "docs/sample/images/object.png"), bytes, new("image/png", Overwrite: false)));
     }
 
     [Fact]
