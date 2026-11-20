@@ -1,5 +1,7 @@
 # CFC Chat-AI — Deployment Guide
 
+> **For the Python-free development deployment:** use the [.NET and IIS checklist](deployment/DOTNET-IIS.md). The rest of this document is the legacy Python deployment and rollback reference. Do not run the Python deployment script for the .NET target.
+
 This document covers the production deployment of CFC Chat-AI on the Windows Azure VM.
 The application runs natively as a **Python Windows Service** (via NSSM) with **IIS** as the reverse proxy.
 

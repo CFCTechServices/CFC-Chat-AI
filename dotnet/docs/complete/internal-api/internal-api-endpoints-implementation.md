@@ -1,6 +1,6 @@
 # Internal API migration: implementation status and cutover gates
 
-This records the work applied against `docs/plan/internal-api-endpoints.md`. **This is not a completed migration or approval to switch traffic from Python.** Unlisted routes have not been mapped; there are no success stubs.
+**Historical implementation record:** This predates the remaining-endpoints delivery. Its statements below that account lifecycle, replacement, images, staged ingest, stats and profile writes are unimplemented or unmapped are no longer current. Profile writes are now behind a default-off flag; other routes remain subject to configuration and release gates. See the [later delivery notes](internal-api-remaining-endpoints-delivery.md) and current [cutover checklist](../../plan/internal-api-cutover.md). This record is not approval to switch traffic from Python.
 
 ## Implemented
 

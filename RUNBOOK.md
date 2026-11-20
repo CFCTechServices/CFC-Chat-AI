@@ -1,6 +1,8 @@
 # CFC Chat AI — Operations Runbook
 
 Quick reference for day-to-day operations on the Windows VM.
+> For the Python-free development deployment, use the [.NET/IIS service, update and rollback checklist](deployment/DOTNET-IIS.md). The commands below are for the legacy Python service only.
+
 For full setup details see `DEPLOYMENT.md`. For admin prerequisites see `ADMIN_SETUP_GUIDE.md`.
 
 ---

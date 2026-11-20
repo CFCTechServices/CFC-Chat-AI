@@ -33,7 +33,12 @@ public static class InternalApiEndpoints
         app.MapGet("/api/auth/config", (IConfiguration config) => Results.Ok(new Dictionary<string, string?>
         {
             ["supabaseUrl"] = config["SUPABASE_URL"],
-            ["supabaseKey"] = config["SUPABASE_ANON_KEY"]
+            ["supabaseKey"] = config["SUPABASE_ANON_KEY"],
+            ["backend"] = "dotnet",
+            ["profileWrites"] = config.GetValue<bool>("Api:EnableProfileWrites") ? "true" : "false",
+            ["accountLifecycle"] = config.GetValue<bool>("Api:EnableAccountLifecycle") ? "true" : "false",
+            ["permanentAccountDeletion"] = config.GetValue<bool>("Api:EnableAccountLifecycle") &&
+                config.GetValue<bool>("Api:EnablePermanentAccountDeletion") ? "true" : "false"
         }));
 
         app.MapPost("/api/auth/check-email", async (EmailRequest request, IInvitationRepository invites,
@@ -82,7 +87,7 @@ public static class InternalApiEndpoints
             user.MapPost("/profile/complete", UpdateProfileAsync);
         }
 
-        user.MapGet("/chat/sessions", async (bool detail, ClaimsPrincipal principal, IConversationRepository conversations, CancellationToken ct) =>
+        user.MapGet("/chat/sessions", async (ClaimsPrincipal principal, IConversationRepository conversations, CancellationToken ct, bool detail = false) =>
         {
             var sessions = new List<object>();
             var pageSize = detail ? 100 : 500;

@@ -72,8 +72,11 @@
         }
       };
 
-      fetch('/api/auth/config')
-        .then(res => res.json())
+      fetch('/api/auth/config', { cache: 'no-store' })
+        .then(res => {
+          if (!res.ok) throw new Error('API configuration is unavailable');
+          return res.json();
+        })
         .then(config => {
           if (!window.supabase) {
             console.error('Supabase JS library not loaded');
@@ -81,6 +84,12 @@
             return;
           }
 
+          window.CFC.ApiFeatures = {
+            isDotnet: config.backend === 'dotnet',
+            profileWrites: config.profileWrites === 'true',
+            accountLifecycle: config.accountLifecycle === 'true',
+            permanentAccountDeletion: config.permanentAccountDeletion === 'true',
+          };
           const client = window.supabase.createClient(
             config.supabaseUrl,
             config.supabaseKey

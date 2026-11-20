@@ -57,6 +57,36 @@ public sealed class InternalApiContractTests
     }
 
     [Fact]
+    public async Task Sessions_WithoutDetail_UseSummaryPage()
+    {
+        using var factory = Factory();
+        using var client = Client(factory);
+        using var response = await client.GetAsync("/api/chat/sessions");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(500, (factory.Services.GetRequiredService<IConversationRepository>() as Conversations)!.LastPageSize);
+    }
+
+    [Theory]
+    [InlineData(false, false, false, "false")]
+    [InlineData(true, true, false, "false")]
+    [InlineData(false, false, true, "false")]
+    [InlineData(true, true, true, "true")]
+    public async Task Config_ReflectsFeatureFlags(bool profile, bool lifecycle, bool permanent, string expectedPermanent)
+    {
+        using var factory = Factory().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("Api:EnableProfileWrites", profile.ToString());
+            builder.UseSetting("Api:EnableAccountLifecycle", lifecycle.ToString());
+            builder.UseSetting("Api:EnablePermanentAccountDeletion", permanent.ToString());
+        });
+        using var client = Client(factory, null);
+        var json = await client.GetFromJsonAsync<JsonElement>("/api/auth/config");
+        Assert.Equal(profile ? "true" : "false", json.GetProperty("profileWrites").GetString());
+        Assert.Equal(lifecycle ? "true" : "false", json.GetProperty("accountLifecycle").GetString());
+        Assert.Equal(expectedPermanent, json.GetProperty("permanentAccountDeletion").GetString());
+    }
+
+    [Fact]
     public async Task InvalidJson_MapsToSafe400()
     {
         using var factory = Factory();

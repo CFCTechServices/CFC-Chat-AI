@@ -17,7 +17,8 @@ using CFC.ChatAI.Supabase.Conversations;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.RateLimiting;
 
-// The server is launched from the repository root. Preserve explicitly set environment variables.
+// Load from the configured working directory (repository root locally; private directory in NSSM).
+// Preserve explicitly set environment variables.
 DotNetEnv.Env.NoClobber().Load(".env");
 
 var builder = WebApplication.CreateBuilder(args);
@@ -120,9 +121,11 @@ app.Use(async (context, next) =>
         if (!context.Response.HasStarted)
             await Results.Problem("A dependency is unavailable.", statusCode: 503).ExecuteAsync(context);
     }
-    catch (Exception)
+    catch (Exception ex)
     {
-        app.Logger.LogError("Internal API request failed (trace {TraceId})", context.TraceIdentifier);
+        // Exception messages can contain request data or upstream response bodies.
+        app.Logger.LogError("Internal API request failed (trace {TraceId}): {ExceptionType}\n{StackTrace}",
+            context.TraceIdentifier, ex.GetType().FullName, ex.StackTrace);
         if (!context.Response.HasStarted)
             await Results.Problem("Request could not be completed.", statusCode: 500).ExecuteAsync(context);
     }
