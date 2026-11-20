@@ -113,12 +113,20 @@ internal sealed class PineconeService : IPineconeService, IQueryEmbeddingService
         IReadOnlyDictionary<string, JsonElement>? metadata = null;
         if (match.Metadata is not null)
         {
-            using var document = JsonDocument.Parse(JsonSerializer.Serialize(match.Metadata));
-            metadata = document.RootElement.EnumerateObject()
-                .ToDictionary(property => property.Name, property => property.Value.Clone(), StringComparer.Ordinal);
+            metadata = match.Metadata.ToDictionary(pair => pair.Key,
+                pair => JsonSerializer.SerializeToElement(UnwrapMetadataValue(pair.Value)), StringComparer.Ordinal);
         }
         return new PineconeSearchMatch(match.Id, match.Score, metadata);
     }
+
+    // Serialize the active SDK union value, not its throwing AsTn accessors.
+    private static object? UnwrapMetadataValue(MetadataValue? value) => value?.Value switch
+    {
+        Metadata nested => nested.ToDictionary(pair => pair.Key,
+            pair => UnwrapMetadataValue(pair.Value), StringComparer.Ordinal),
+        IEnumerable<MetadataValue?> items => items.Select(UnwrapMetadataValue).ToArray(),
+        var scalar => scalar,
+    };
 
     private static Metadata? ToSdkMetadata(IReadOnlyDictionary<string, JsonElement>? values)
     {
