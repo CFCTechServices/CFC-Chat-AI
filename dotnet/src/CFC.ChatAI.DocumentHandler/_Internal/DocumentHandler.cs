@@ -43,9 +43,29 @@ internal sealed class DocumentHandler : IDocumentHandler
         _pinecone = pinecone ?? throw new ArgumentNullException(nameof(pinecone));
     }
 
-    public async Task<DocumentHandlerResult> IngestAsync(
-        DocumentHandlerInput input,
+    public Task<DocumentHandlerResult> IngestAsync(DocumentHandlerInput input, CancellationToken cancellationToken = default) =>
+        StoreInputAsync(input, replacementId: null, cancellationToken);
+
+    public async Task<DocumentHandlerResult?> ReplaceAsync(string documentId, DocumentHandlerInput input,
         CancellationToken cancellationToken = default)
+    {
+        ValidateDocumentId(documentId);
+        ArgumentNullException.ThrowIfNull(input);
+        var extension = Path.GetExtension(input.FileName);
+        if (VideoExtensions.Contains(extension) ||
+            !string.Equals(DocumentProcessor.DocumentProcessor.CreateDocumentId(input.FileName), documentId, StringComparison.Ordinal))
+            throw new ReplacementConflictException();
+
+        var metadata = await _chunks.GetDocumentMetadataAsync(documentId, cancellationToken).ConfigureAwait(false);
+        if (metadata is null) return null;
+        if (!string.Equals(metadata.SourceType, "document", StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(extension) ||
+            !string.Equals(Path.GetExtension(metadata.Source), extension, StringComparison.OrdinalIgnoreCase))
+            throw new ReplacementConflictException();
+        return await StoreInputAsync(input, documentId, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<DocumentHandlerResult> StoreInputAsync(DocumentHandlerInput input, string? replacementId,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(input);
         ArgumentNullException.ThrowIfNull(input.Content);
@@ -67,6 +87,9 @@ internal sealed class DocumentHandler : IDocumentHandler
         {
             var processed = await ProcessAsync(fileName, temporaryPath, cancellationToken).ConfigureAwait(false);
             ValidateDocumentId(processed.DocumentId);
+            if (replacementId is not null && (!string.Equals(processed.DocumentId, replacementId, StringComparison.Ordinal) ||
+                !string.Equals(processed.SourceType, "document", StringComparison.OrdinalIgnoreCase)))
+                throw new ReplacementConflictException();
             if (processed.Chunks.Count == 0)
                 throw new InvalidOperationException("A processor returned no searchable chunks.");
 
@@ -100,6 +123,13 @@ internal sealed class DocumentHandler : IDocumentHandler
                     ["source"] = JsonSerializer.SerializeToElement(processed.SourceName),
                     ["source_type"] = JsonSerializer.SerializeToElement(processed.SourceType),
                 })).ToArray();
+
+            if (replacementId is not null)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                try { await PurgeAsync(replacementId, sourceObject, cancellationToken).ConfigureAwait(false); }
+                catch (Exception ex) { throw new ReplacementPartialFailureException("purge", ex); }
+            }
 
             var attemptedImageKeys = new List<ObjectKey>();
             var chunkWriteAttempted = false;
@@ -148,7 +178,7 @@ internal sealed class DocumentHandler : IDocumentHandler
                     processed.SourceType,
                     persistedChunks.Length,
                     vectorCount,
-                    sourceObject);
+                    sourceObject) { SectionCount = processed.SectionCount, ImageCount = images.Length };
             }
             catch (Exception ingestionError)
             {
@@ -192,10 +222,12 @@ internal sealed class DocumentHandler : IDocumentHandler
                     }
                 }
 
-                if (rollbackErrors.Count > 0)
-                    throw new AggregateException("Ingestion failed and one or more compensating deletions also failed.",
-                        [ingestionError, .. rollbackErrors]);
-
+                Exception failure = rollbackErrors.Count > 0
+                    ? new AggregateException("Ingestion failed and one or more compensating deletions also failed.",
+                        [ingestionError, .. rollbackErrors])
+                    : ingestionError;
+                if (replacementId is not null) throw new ReplacementPartialFailureException("publish", failure);
+                if (rollbackErrors.Count > 0) throw failure;
                 throw;
             }
         }
@@ -217,6 +249,11 @@ internal sealed class DocumentHandler : IDocumentHandler
         if (metadata is null) return new DocumentDeletionResult(documentId, false, 0, 0);
         if (!string.Equals(metadata.SourceType, "document", StringComparison.OrdinalIgnoreCase))
             throw new UnsupportedDeletionException();
+        return await PurgeAsync(documentId, preserve: null, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task<DocumentDeletionResult> PurgeAsync(string documentId, ObjectKey? preserve, CancellationToken cancellationToken)
+    {
         var chunkIds = new List<string>();
         var offset = 0;
         while (true)
@@ -240,7 +277,7 @@ internal sealed class DocumentHandler : IDocumentHandler
         // A lost response to the final chunk delete still requires manual reconciliation.
         var removedObjects = 0;
         foreach (var root in DocumentStoragePaths.GetLookupRoots(documentId))
-            removedObjects += await DeleteStorageTreeAsync(StorageArea.Documents, root, cancellationToken)
+            removedObjects += await DeleteStorageTreeAsync(StorageArea.Documents, root, preserve, cancellationToken)
                 .ConfigureAwait(false);
         await _chunks.DeleteByIdsAsync(uniqueIds, cancellationToken).ConfigureAwait(false);
 
@@ -265,6 +302,7 @@ internal sealed class DocumentHandler : IDocumentHandler
                 result.DocumentId,
                 result.SourceName,
                 result.SourceType,
+                result.Sections.Count,
                 result.Chunks.Select(chunk => new ProcessedChunk(
                     chunk.Id, chunk.SectionId, chunk.SectionTitle, chunk.Text, [])).ToArray(), []);
         }
@@ -278,6 +316,7 @@ internal sealed class DocumentHandler : IDocumentHandler
             document.DocumentId,
             document.SourceName,
             document.SourceType,
+            document.Sections.Count,
             document.Chunks.Select(chunk => new ProcessedChunk(
                 chunk.Id, chunk.SectionId, chunk.SectionTitle, chunk.Text, chunk.ImageIds)).ToArray(), document.Images);
     }
@@ -326,6 +365,7 @@ internal sealed class DocumentHandler : IDocumentHandler
     private async Task<int> DeleteStorageTreeAsync(
         StorageArea area,
         string root,
+        ObjectKey? preserve,
         CancellationToken cancellationToken)
     {
         var pending = new Stack<string>();
@@ -359,7 +399,7 @@ internal sealed class DocumentHandler : IDocumentHandler
 
             foreach (var folder in entries.Where(entry => entry.IsFolder))
                 pending.Push(folder.Key.Path);
-            var objectKeys = entries.Where(entry => !entry.IsFolder).Select(entry => entry.Key).ToArray();
+            var objectKeys = entries.Where(entry => !entry.IsFolder && entry.Key != preserve).Select(entry => entry.Key).ToArray();
             if (objectKeys.Length > 0)
             {
                 await _storage.DeleteAsync(objectKeys, cancellationToken).ConfigureAwait(false);
@@ -407,6 +447,7 @@ internal sealed class DocumentHandler : IDocumentHandler
         string DocumentId,
         string SourceName,
         string SourceType,
+        int SectionCount,
         IReadOnlyList<ProcessedChunk> Chunks,
         IReadOnlyList<DocumentImage> Images);
 

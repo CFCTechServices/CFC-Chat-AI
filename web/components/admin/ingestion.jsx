@@ -18,10 +18,12 @@
     const fetchStats = useCallback(() => {
       setLoading(true);
       setError(null);
+      setStats(null);
       fetch('/api/admin/ingestion/stats', {
         headers: { Authorization: `Bearer ${session?.access_token}` },
       })
         .then(res => {
+          if (res.status === 503) throw new Error('Local staging statistics are unavailable.');
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           return res.json();
         })
@@ -39,30 +41,26 @@
       <div className="tab-content">
         <div className="tab-header">
           <div>
-            <h2>Ingestion Status</h2>
-            <p className="muted">Monitor AI content ingestion progress</p>
+            <h2>Local Staging</h2>
+            <p className="muted">Counts local files and processed-directory matches only. Direct uploads may not appear here.</p>
           </div>
           <button className="btn btn-secondary" onClick={fetchStats} disabled={loading}>
             {loading ? 'Refreshing...' : 'Refresh'}
           </button>
         </div>
 
-        <div className="ingestion-stats">
-          <Card className="stat-card">
-            <div className="stat-label">Total Documents</div>
-            <div className="stat-number">{stats?.total_documents ?? 0}</div>
-          </Card>
-
-          <Card className="stat-card">
-            <div className="stat-label">Processing</div>
-            <div className="stat-number stat-processing">{stats?.processing ?? 0}</div>
-          </Card>
-
-          <Card className="stat-card">
-            <div className="stat-label">Completed</div>
-            <div className="stat-number stat-completed">{stats?.completed ?? 0}</div>
-          </Card>
-        </div>
+        {stats && (
+          <div className="ingestion-stats">
+            <Card className="stat-card">
+              <div className="stat-label">Local Documents</div>
+              <div className="stat-number">{stats.total_documents}</div>
+            </Card>
+            <Card className="stat-card">
+              <div className="stat-label">Matched Processed Folders</div>
+              <div className="stat-number stat-completed">{stats.completed}</div>
+            </Card>
+          </div>
+        )}
 
         {error && (
           <Card className="ingestion-empty-state">

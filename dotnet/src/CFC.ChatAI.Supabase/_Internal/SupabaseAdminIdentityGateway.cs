@@ -42,8 +42,9 @@ internal sealed class SupabaseAdminIdentityGateway(SupabaseTransport transport) 
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
-        var uri = transport.AuthUri($"admin/users/{SupabaseTransport.Escape(userId)}/logout");
-        using var request = SupabaseTransport.JsonRequest(HttpMethod.Post, uri, new { scope = "global" });
+        // GoTrue's /logout needs the target JWT. Use the installed service-only RPC after banning.
+        var uri = transport.RestUri("rpc/cfc_revoke_banned_user_sessions");
+        using var request = SupabaseTransport.JsonRequest(HttpMethod.Post, uri, new { target_user_id = userId });
         using var response = await transport.SendServiceAsync(request, cancellationToken).ConfigureAwait(false);
     }
 

@@ -18,7 +18,7 @@
     const [error, setError] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [actionState, setActionState] = useState({});
-    const deletingRef = useRef(new Set());
+    const mutatingRef = useRef(new Set());
 
     const authHeaders = useCallback(() => ({
       Authorization: `Bearer ${session?.access_token}`,
@@ -54,13 +54,13 @@
 
     // --- Delete ---
     const handleDelete = async (docId) => {
-      if (deletingRef.current.has(docId)) return;
+      if (mutatingRef.current.has(docId)) return;
       setDeleteTarget(null);
       if (!session?.access_token || (session.expires_at && session.expires_at * 1000 <= Date.now())) {
         setDocAction(docId, { error: 'Session missing or expired. Sign in again.' });
         return;
       }
-      deletingRef.current.add(docId);
+      mutatingRef.current.add(docId);
       setDocAction(docId, { busy: true, error: null, message: null });
       try {
         const res = await fetch(`/api/admin/documents/${encodeURIComponent(docId)}`, {
@@ -78,7 +78,37 @@
       } catch (err) {
         setDocAction(docId, { busy: false, error: err.message || 'Response lost. Reconciliation may be required.' });
       } finally {
-        deletingRef.current.delete(docId);
+        mutatingRef.current.delete(docId);
+      }
+    };
+
+    const handleReplace = async (doc, file) => {
+      const docId = doc.doc_id;
+      if (!file || mutatingRef.current.has(docId)) return;
+      if (!session?.access_token) {
+        setDocAction(docId, { error: 'Sign in again before replacing this document.' });
+        return;
+      }
+      if (!window.confirm(`Replace ${basename(doc.source)} with ${file.name}? The filename must match the existing document ID and format.`)) return;
+      mutatingRef.current.add(docId);
+      setDocAction(docId, { busy: true, error: null, message: null });
+      try {
+        const body = new FormData();
+        body.append('file', file);
+        const res = await fetch(`/api/admin/documents/${encodeURIComponent(docId)}/replace`, {
+          method: 'PUT', headers: authHeaders(), body,
+        }).catch(() => { throw new Error('Replacement response was lost. Ask an operator to reconcile before retrying.'); });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error((data.detail || `Replacement failed (${res.status})`) +
+          (data.reference ? ` Reference: ${data.reference}` : ''));
+        if (data.success !== true || data.ingestion?.doc_id !== docId)
+          throw new Error('Replacement response was ambiguous. Ask an operator to reconcile before retrying.');
+        setDocAction(docId, { busy: false, message: data.message });
+        fetchDocuments();
+      } catch (err) {
+        setDocAction(docId, { busy: false, error: err.message });
+      } finally {
+        mutatingRef.current.delete(docId);
       }
     };
 
@@ -248,6 +278,17 @@
                             <line x1="12" y1="15" x2="12" y2="3"/>
                           </svg>
                         </button>
+                        {doc.source_type === 'document' && (
+                          <label className="btn-secondary">
+                            Replace file
+                            <input type="file" accept=".pdf,.doc,.docx,.txt,.md,.eml" aria-label={`Replace ${basename(doc.source)}`}
+                              onChange={e => {
+                                const file = e.target.files?.[0];
+                                e.target.value = '';
+                                handleReplace(doc, file);
+                              }} />
+                          </label>
+                        )}
                         {/* Delete button — exact same as user.jsx */}
                         <button
                           className="btn-delete"

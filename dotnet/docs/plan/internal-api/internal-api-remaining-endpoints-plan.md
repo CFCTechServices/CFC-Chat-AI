@@ -1,5 +1,7 @@
 # Remaining internal API endpoints — implementation plan
 
+**Development delivery:** [implementation, configuration, reconciliation, and disposable smoke tests](internal-api-remaining-endpoints-delivery.md). Six routes are implemented; both self-profile writes remain unmapped. The table below is the original baseline, not a cutover checklist.
+
 ## Baseline and boundary
 
 This is the follow-on to `internal-api-endpoints.md` and `internal-api-endpoints-implementation.md`, updated against the merged `migration/dotnet` code. It tracks **eight remaining method/path pairs**, including the retained operator route. Video upload is deferred and is not part of this delivery. Existing routes still require provider-backed and browser validation; implementation is not a cutover approval.

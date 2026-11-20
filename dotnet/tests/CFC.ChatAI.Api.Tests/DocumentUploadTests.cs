@@ -21,7 +21,7 @@ namespace CFC.ChatAI.Api.Tests;
 
 public sealed class DocumentUploadTests
 {
-    private static WebApplicationFactory<Program> Factory(string role = "admin", bool dev = false, string environment = "Development", string ip = "127.0.0.1", bool devDelete = false, string status = "active", bool deleted = false) =>
+    internal static WebApplicationFactory<Program> Factory(string role = "admin", bool dev = false, string environment = "Development", string ip = "127.0.0.1", bool devDelete = false, string status = "active", bool deleted = false) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment(environment);
@@ -35,6 +35,8 @@ public sealed class DocumentUploadTests
             builder.UseSetting("Api:EnableDevIngest", dev.ToString());
             builder.UseSetting("Api:EnableDevDelete", devDelete.ToString());
             builder.UseSetting("Document:MaxUploadBytes", "8");
+            builder.UseSetting("Document:StagingRoot", "");
+            builder.UseSetting("Document:ProcessedRoot", "");
             builder.ConfigureServices(services =>
             {
                 services.RemoveAll<IIdentityGateway>(); services.AddSingleton<IIdentityGateway>(new Identity());
@@ -52,7 +54,7 @@ public sealed class DocumentUploadTests
         return form;
     }
 
-    private static HttpClient Client(WebApplicationFactory<Program> factory, string? token = "valid")
+    internal static HttpClient Client(WebApplicationFactory<Program> factory, string? token = "valid")
     {
         var client = factory.CreateClient();
         if (token != null) client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -367,6 +369,192 @@ public sealed class DocumentUploadTests
         await handler.Canceled.Task.WaitAsync(TimeSpan.FromSeconds(5));
     }
 
+    [Fact]
+    public async Task Replacement_validates_and_reports_partial_failure_without_mock_success()
+    {
+        const string route = "/api/admin/documents/test/replace";
+        using var factory = Factory(); using var client = Client(factory);
+        using var anonymous = Client(factory, null);
+        using var inactiveFactory = Factory(status: "inactive"); using var inactive = Client(inactiveFactory);
+        using var deletedFactory = Factory(deleted: true); using var deleted = Client(deletedFactory);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.PutAsync(route, Form())).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await inactive.PutAsync(route, Form())).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await deleted.PutAsync(route, Form())).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PutAsync("/api/admin/documents/a%2fb/replace", Form())).StatusCode);
+        var handler = (Handler)factory.Services.GetRequiredService<IDocumentHandler>();
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PutAsync(route, Form("other.txt"))).StatusCode);
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, (await client.PutAsync(route, Form("test.mp4"))).StatusCode);
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, (await client.PutAsync(route, Form(text: "123456789"))).StatusCode);
+        Assert.Null(handler.ReplacedId);
+        handler.Found = false;
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PutAsync(route, Form())).StatusCode);
+        handler.Found = true;
+        handler.Error = new ReplacementConflictException();
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PutAsync(route, Form())).StatusCode);
+        handler.Error = new ReplacementPartialFailureException("publish", new DependencyFailureException("secret", "write"));
+        using var partial = await client.PutAsync(route, Form());
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, partial.StatusCode);
+        var error = await partial.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("publish", error.GetProperty("stage").GetString());
+        Assert.False(string.IsNullOrEmpty(error.GetProperty("reference").GetString()));
+        Assert.DoesNotContain("secret", error.ToString());
+        handler.Error = null;
+        using var replaced = await client.PutAsync(route, Form());
+        Assert.Equal(HttpStatusCode.OK, replaced.StatusCode);
+        var body = await replaced.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(body.GetProperty("success").GetBoolean());
+        Assert.Equal("test", body.GetProperty("ingestion").GetProperty("doc_id").GetString());
+    }
+
+    [Fact]
+    public async Task Replacement_excludes_same_id_delete_and_upload_and_releases_slot_on_cancellation()
+    {
+        using var factory = Factory(); using var client = Client(factory);
+        var handler = (Handler)factory.Services.GetRequiredService<IDocumentHandler>();
+        handler.WaitForCancellation = true;
+        using var cancel = new CancellationTokenSource();
+        const string route = "/api/admin/documents/test";
+        var replacement = client.PutAsync(route + "/replace", Form(), cancel.Token);
+        await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(HttpStatusCode.Conflict, (await client.DeleteAsync(route)).StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsync("/api/files/upload", Form())).StatusCode);
+        Assert.Null(handler.DeletedId);
+        cancel.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => replacement);
+        await handler.Canceled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    [Fact]
+    public async Task Staging_reports_only_local_matches_in_order_and_does_not_return_zero_when_unavailable()
+    {
+        const string route = "/api/admin/ingestion/stats";
+        using var directories = new StagingDirectories();
+        using var factory = directories.Apply(Factory()); using var client = Client(factory);
+        using var unauthorized = Client(factory, null);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await unauthorized.GetAsync(route)).StatusCode);
+        using var empty = await client.GetAsync(route);
+        Assert.Equal(0, (await empty.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("total_documents").GetInt32());
+        var nested = Directory.CreateDirectory(Path.Combine(directories.Staging, "nested"));
+        File.WriteAllText(Path.Combine(nested.FullName, "sample.TXT"), "hello");
+        File.WriteAllText(Path.Combine(directories.Staging, "sample.md"), "hi");
+        File.WriteAllText(Path.Combine(directories.Staging, "pending.pdf"), "1");
+        File.WriteAllText(Path.Combine(directories.Staging, "ignore.eml"), "1");
+        Directory.CreateDirectory(Path.Combine(directories.Repository, "sample"));
+        var body = await client.GetFromJsonAsync<JsonElement>(route);
+        Assert.Equal(3, body.GetProperty("total_documents").GetInt32());
+        Assert.Equal(0, body.GetProperty("processing").GetInt32());
+        Assert.Equal(2, body.GetProperty("completed").GetInt32());
+        var docs = body.GetProperty("documents").EnumerateArray().ToArray();
+        Assert.Equal(new[] { "pending.pdf", "sample.TXT", "sample.md" }, docs.Select(x => x.GetProperty("name").GetString()));
+        Assert.Equal(new[] { "pending", "ingested", "ingested" }, docs.Select(x => x.GetProperty("status").GetString()));
+        Assert.Equal(5, docs[1].GetProperty("size").GetInt64());
+        Directory.Delete(directories.Repository, recursive: true);
+        using var unavailable = await client.GetAsync(route);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, unavailable.StatusCode);
+        Assert.DoesNotContain(directories.Repository, await unavailable.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Staging_requires_configuration_and_bounds_recursion()
+    {
+        using var unconfiguredFactory = Factory(); using var unconfigured = Client(unconfiguredFactory);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await unconfigured.GetAsync("/api/admin/ingestion/stats")).StatusCode);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await unconfigured.PostAsJsonAsync("/api/ingest/document", new { filename = "sample.txt" })).StatusCode);
+        using var directories = new StagingDirectories();
+        using var factory = directories.Apply(Factory()); using var client = Client(factory);
+        var nested = directories.Staging;
+        for (var i = 0; i < 33; i++) nested = Directory.CreateDirectory(Path.Combine(nested, "n")).FullName;
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await client.GetAsync("/api/admin/ingestion/stats")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Staged_ingest_is_admin_only_and_reads_one_validated_file()
+    {
+        const string route = "/api/ingest/document";
+        using var directories = new StagingDirectories();
+        using var factory = directories.Apply(Factory()); using var client = Client(factory);
+        using var userFactory = directories.Apply(Factory(role: "user")); using var user = Client(userFactory);
+        using var anonymous = Client(factory, null);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.PostAsJsonAsync(route, new { filename = "sample.txt" })).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await user.PostAsJsonAsync(route, new { filename = "sample.txt" })).StatusCode);
+        foreach (var unsafeName in new[] { "../sample.txt", "x\\sample.txt", "C:sample.txt", "x%2fsample.txt", "NUL.txt" })
+            Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync(route, new { filename = unsafeName })).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync(route, new { filename = "sample.txt", subdirectory = "some" })).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync(route, new { filename = "sample.txt" })).StatusCode);
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, (await client.PostAsJsonAsync(route, new { filename = "sample.mp4" })).StatusCode);
+        File.WriteAllText(Path.Combine(directories.Staging, "large.txt"), "123456789");
+        Assert.Equal(HttpStatusCode.RequestEntityTooLarge, (await client.PostAsJsonAsync(route, new { filename = "large.txt" })).StatusCode);
+        File.WriteAllText(Path.Combine(directories.Staging, "sample.txt"), "hello");
+        using var ingested = await client.PostAsJsonAsync(route, new { filename = "sample.txt" });
+        Assert.Equal(HttpStatusCode.OK, ingested.StatusCode);
+        var result = await ingested.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.True(result.GetProperty("success").GetBoolean());
+        Assert.Equal("sample.txt", result.GetProperty("source").GetString());
+        Assert.Equal("sample", result.GetProperty("doc_id").GetString());
+        Assert.Equal(1, result.GetProperty("chunks_processed").GetInt32());
+        var handler = (Handler)factory.Services.GetRequiredService<IDocumentHandler>();
+        Assert.True(handler.ReceivedCancellationToken);
+        handler.Error = new DependencyFailureException("secret", "write");
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await client.PostAsJsonAsync(route, new { filename = "sample.txt" })).StatusCode);
+        ((Chunks)factory.Services.GetRequiredService<IChunkRepository>()).Existing = "sample";
+        Assert.Equal(HttpStatusCode.Conflict, (await client.PostAsJsonAsync(route, new { filename = "sample.txt" })).StatusCode);
+    }
+
+    [Fact]
+    public async Task Staged_ingest_forwards_cancellation_and_document_routes_require_provider_settings()
+    {
+        const string route = "/api/ingest/document";
+        using var directories = new StagingDirectories();
+        File.WriteAllText(Path.Combine(directories.Staging, "test.txt"), "hello");
+        using var factory = directories.Apply(Factory()); using var client = Client(factory);
+        var handler = (Handler)factory.Services.GetRequiredService<IDocumentHandler>();
+        handler.WaitForCancellation = true;
+        using var cancel = new CancellationTokenSource();
+        var request = client.PostAsJsonAsync(route, new { filename = "test.txt" }, cancel.Token);
+        await handler.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        cancel.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => request);
+        await handler.Canceled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        using var missingFactory = factory.WithWebHostBuilder(b => b.UseSetting("PINECONE_API_KEY", ""));
+        using var missing = Client(missingFactory);
+        Assert.Equal(HttpStatusCode.NotFound, (await missing.PostAsJsonAsync(route, new { filename = "test.txt" })).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await missing.PutAsync("/api/admin/documents/test/replace", Form())).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await missing.GetAsync("/api/admin/ingestion/stats")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Staging_does_not_follow_linked_files_or_roots()
+    {
+        using var dirs = new StagingDirectories();
+        var original = Path.Combine(dirs.Repository, "outside.txt");
+        File.WriteAllText(original, "private");
+        var link = Path.Combine(dirs.Staging, "link.txt");
+        try { File.CreateSymbolicLink(link, original); }
+        catch (IOException) when (OperatingSystem.IsWindows()) { return; } // Windows may deny symlink creation to the test process.
+        catch (UnauthorizedAccessException) when (OperatingSystem.IsWindows()) { return; }
+        using var factory = dirs.Apply(Factory()); using var client = Client(factory);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsJsonAsync("/api/ingest/document", new { filename = "link.txt" })).StatusCode);
+        Assert.Equal(0, (await client.GetFromJsonAsync<JsonElement>("/api/admin/ingestion/stats")).GetProperty("total_documents").GetInt32());
+        var linkedRoot = Directory.CreateSymbolicLink(Path.Combine(dirs.Root, "link-root"), dirs.Staging);
+        using var linkedFactory = factory.WithWebHostBuilder(b => b.UseSetting("Document:StagingRoot", linkedRoot.FullName));
+        using var linkedClient = Client(linkedFactory);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await linkedClient.PostAsJsonAsync("/api/ingest/document", new { filename = "link.txt" })).StatusCode);
+    }
+
+    private sealed class StagingDirectories : IDisposable
+    {
+        public string Root { get; } = Directory.CreateTempSubdirectory().FullName;
+        public string Staging => Directory.CreateDirectory(Path.Combine(Root, "staging")).FullName;
+        public string Repository => Directory.CreateDirectory(Path.Combine(Root, "processed", "content_repository")).FullName;
+        public WebApplicationFactory<Program> Apply(WebApplicationFactory<Program> factory)
+        {
+            var staging = Staging;
+            var processed = Path.GetDirectoryName(Repository);
+            return factory.WithWebHostBuilder(b => b.UseSetting("Document:StagingRoot", staging).UseSetting("Document:ProcessedRoot", processed));
+        }
+        public void Dispose() => Directory.Delete(Root, recursive: true);
+    }
+
     private sealed class UnknownLengthContent : HttpContent
     {
         protected override bool TryComputeLength(out long length) { length = 0; return false; }
@@ -412,6 +600,12 @@ public sealed class DocumentUploadTests
             }
             await input.Content.CopyToAsync(Stream.Null, ct);
             return new(DocumentProcessor.DocumentProcessor.CreateDocumentId(input.FileName), input.FileName, "document", 1, 1, new ObjectKey(StorageArea.Documents, "test"));
+        }
+        public string? ReplacedId { get; private set; }
+        public async Task<DocumentHandlerResult?> ReplaceAsync(string id, DocumentHandlerInput input, CancellationToken ct = default)
+        {
+            ReplacedId = id;
+            return Found ? await IngestAsync(input, ct) : null;
         }
         public bool Found { get; set; } = true;
         public string? DeletedId { get; private set; }

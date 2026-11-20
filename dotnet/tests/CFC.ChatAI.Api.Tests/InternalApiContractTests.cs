@@ -194,6 +194,7 @@ public sealed class InternalApiContractTests
         public Task<Profile?> GetByEmailAsync(string email, CancellationToken ct = default) => Task.FromResult<Profile?>(null);
         public Task<Profile?> UpdateRoleAsync(string id, string role, CancellationToken ct = default) => Task.FromResult<Profile?>(null);
         public Task<Profile?> UpdateAccountStateAsync(string id, string status, DateTimeOffset? at, string? by, CancellationToken ct = default) => Task.FromResult<Profile?>(null);
+        public Task<Profile?> TryUpdateAccountStateAsync(Profile expected, string status, DateTimeOffset? at, string? by, CancellationToken ct = default) => throw new NotSupportedException();
     }
 
     private sealed class Identity : IIdentityGateway

@@ -24,4 +24,8 @@ public interface IAdminProfileRepository
         DateTimeOffset? deletedAt,
         string? deletedBy,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Updates lifecycle fields only if role and account state still match the supplied snapshot.</summary>
+    Task<Profile?> TryUpdateAccountStateAsync(Profile expected, string status, DateTimeOffset? deletedAt,
+        string? deletedBy, CancellationToken cancellationToken = default);
 }

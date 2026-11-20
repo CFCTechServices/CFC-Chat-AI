@@ -373,7 +373,7 @@ public sealed class SupabaseAdapterTests
     }
 
     [Fact]
-    public async Task AdminSessionRevocation_UsesGlobalScopeEndpoint()
+    public async Task AdminSessionRevocation_UsesServiceRoleAndTargetsOnlyTheRequestedUser()
     {
         var handler = new RecordingHandler((_, _) =>
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.NoContent)));
@@ -382,9 +382,27 @@ public sealed class SupabaseAdapterTests
         await gateway.RevokeSessionsAsync("user-1");
 
         Assert.Equal(HttpMethod.Post, handler.Method);
-        Assert.Equal("/auth/v1/admin/users/user-1/logout", handler.PathAndQuery);
-        Assert.Contains("\"scope\":\"global\"", handler.Body);
+        Assert.Equal("/rest/v1/rpc/cfc_revoke_banned_user_sessions", handler.PathAndQuery);
+        Assert.Equal("{\"target_user_id\":\"user-1\"}", handler.Body);
         Assert.Equal("Bearer service-secret", handler.Authorization);
+    }
+
+    [Fact]
+    public async Task LifecycleCompareAndSetFiltersByRoleStatusAndDeletionMetadata()
+    {
+        var handler = new RecordingHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("[]"),
+        }));
+        var repository = new SupabaseAdminProfileRepository(CreateTransport(handler));
+        var snapshot = new Profile("user-1", "example@example.test", null, null, "user", "inactive",
+            DateTimeOffset.UnixEpoch, DateTimeOffset.UnixEpoch, null);
+        Assert.Null(await repository.TryUpdateAccountStateAsync(snapshot, "active", null, null));
+        Assert.Equal(HttpMethod.Patch, handler.Method);
+        var query = Uri.UnescapeDataString(handler.PathAndQuery!);
+        Assert.Contains("&id=eq.user-1&role=eq.user&status=eq.inactive", query);
+        Assert.Contains("&deleted_at=eq.1970-01-01T00:00:00.0000000+00:00&deleted_by=is.null", query);
+        Assert.Equal("{\"status\":\"active\",\"deleted_at\":null,\"deleted_by\":null}", handler.Body);
     }
 
     [Fact]
