@@ -9,4 +9,8 @@ public sealed record DocumentHandlerResult(
     string SourceType,
     int ChunkCount,
     int VectorCount,
-    ObjectKey SourceObject);
+    ObjectKey SourceObject)
+{
+    public int SectionCount { get; init; }
+    public int ImageCount { get; init; }
+}

@@ -48,17 +48,26 @@ public static class AdminReadEndpoints
             return Results.Json(new { detail = "Too many users; pagination is required" }, statusCode: 413);
         });
         admin.MapPost("/change-role", async (RoleRequest request, ClaimsPrincipal principal,
-            IAdminProfileRepository repository, CancellationToken ct) =>
+            IAdminProfileRepository repository, AccountLifecycleJournal journal, CancellationToken ct) =>
         {
-            if (!Guid.TryParse(request.UserId, out _) || request.NewRole is not ("user" or "dev" or "admin"))
+            if (!Guid.TryParse(request.UserId, out var target) || target == Guid.Empty || request.NewRole is not ("user" or "dev" or "admin"))
                 return Results.BadRequest(new { detail = "Invalid user ID or role" });
-            if (principal.Id() == request.UserId)
+            if (Guid.Parse(principal.Id()) == target)
                 return Results.BadRequest(new { detail = "Cannot change your own role" });
-            var existing = await repository.GetByIdAsync(request.UserId, ct);
+            var id = target.ToString();
+            using var lease = journal.Slots.TryEnter(id);
+            if (lease is null) return AccountLifecycleEndpoints.Error(409, "Another account operation is in progress; retry later");
+            try
+            {
+                if (journal.HasPending(id)) return AccountLifecycleEndpoints.Error(409, "An account operation is pending");
+            }
+            catch (Exception ex) when (LocalDirectory.IsUnavailable(ex))
+            { return AccountLifecycleEndpoints.Error(503, "Account operation journal is unavailable"); }
+            var existing = await repository.GetByIdAsync(id, ct);
             if (existing is null) return Results.NotFound(new { detail = "User not found" });
             if (existing.Role == "superuser")
                 return Results.BadRequest(new { detail = "Cannot change the role of a superuser account" });
-            var changed = await repository.UpdateRoleAsync(request.UserId, request.NewRole, ct);
+            var changed = await repository.UpdateRoleAsync(id, request.NewRole, ct);
             return changed is null ? Results.NotFound(new { detail = "User not found" }) :
                 Results.Ok(new { message = $"Successfully changed user role to {request.NewRole}", request.UserId, request.NewRole });
         });

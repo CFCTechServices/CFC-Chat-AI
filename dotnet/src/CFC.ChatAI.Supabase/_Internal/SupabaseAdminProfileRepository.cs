@@ -72,13 +72,28 @@ internal sealed class SupabaseAdminProfileRepository(SupabaseTransport transport
         }, cancellationToken);
     }
 
+    public Task<Profile?> TryUpdateAccountStateAsync(Profile expected, string status, DateTimeOffset? deletedAt,
+        string? deletedBy, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(expected);
+        static string Match(string? value) => value is null ? "is.null" : "eq." + SupabaseTransport.Escape(value);
+        var filter = $"&role={Match(expected.Role)}&status={Match(expected.Status)}" +
+            $"&deleted_at={Match(expected.DeletedAt?.ToString("O", System.Globalization.CultureInfo.InvariantCulture))}" +
+            $"&deleted_by={Match(expected.DeletedBy)}";
+        return UpdateAsync(expected.Id, new Dictionary<string, object?>
+        {
+            ["status"] = status, ["deleted_at"] = deletedAt, ["deleted_by"] = deletedBy,
+        }, cancellationToken, filter);
+    }
+
     private async Task<Profile?> UpdateAsync(
         string userId,
         object body,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string filter = "")
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
-        var uri = transport.RestUri($"profiles?select={Columns}&id=eq.{SupabaseTransport.Escape(userId)}");
+        var uri = transport.RestUri($"profiles?select={Columns}&id=eq.{SupabaseTransport.Escape(userId)}{filter}");
         using var request = SupabaseTransport.JsonRequest(HttpMethod.Patch, uri, body);
         request.Headers.TryAddWithoutValidation("Prefer", "return=representation");
         using var response = await transport.SendServiceAsync(request, cancellationToken).ConfigureAwait(false);

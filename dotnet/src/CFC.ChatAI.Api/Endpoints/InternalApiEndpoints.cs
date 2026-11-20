@@ -18,6 +18,16 @@ public static class InternalApiEndpoints
     private const string ResetMessage = "If an account exists with this email, a password reset link has been sent.";
     private static readonly EmailAddressAttribute EmailValidator = new();
 
+    private static async Task<IResult> UpdateProfileAsync(UpdateOwnProfile request, ClaimsPrincipal principal,
+        IUserProfileRepository profiles, CancellationToken ct)
+    {
+        if (request.FullName is null && request.AvatarUrl is null)
+            return BadInput("No fields to update. Provide full_name or avatar_url.");
+
+        var profile = await profiles.UpdateCurrentAsync(principal.Id(), principal.Token(), request, ct);
+        return profile is null ? Results.Problem("Failed to update profile") : Results.Ok(ProfileBody(profile));
+    }
+
     public static void MapInternalApi(this WebApplication app, bool chatAvailable)
     {
         app.MapGet("/api/auth/config", (IConfiguration config) => Results.Ok(new Dictionary<string, string?>
@@ -64,6 +74,13 @@ public static class InternalApiEndpoints
             var profile = await profiles.GetCurrentAsync(principal.Id(), principal.Token(), ct);
             return profile is null ? Results.NotFound(new { detail = "Profile not found" }) : Results.Ok(ProfileBody(profile));
         });
+
+        // Enable only after verifying the target database's profile write grants and RLS.
+        if (app.Configuration.GetValue<bool>("Api:EnableProfileWrites"))
+        {
+            user.MapPatch("/profile/me", UpdateProfileAsync);
+            user.MapPost("/profile/complete", UpdateProfileAsync);
+        }
 
         user.MapGet("/chat/sessions", async (bool detail, ClaimsPrincipal principal, IConversationRepository conversations, CancellationToken ct) =>
         {

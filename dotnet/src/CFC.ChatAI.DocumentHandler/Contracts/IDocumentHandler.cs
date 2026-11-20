@@ -8,6 +8,12 @@ public interface IDocumentHandler
         DocumentHandlerInput input,
         CancellationToken cancellationToken = default);
 
+    /// <summary>Processes before purging old artifacts and replaces the original at the same key. Null indicates missing metadata.</summary>
+    Task<DocumentHandlerResult?> ReplaceAsync(
+        string documentId,
+        DocumentHandlerInput input,
+        CancellationToken cancellationToken = default);
+
     /// <summary>Removes a document's vectors, persisted chunks, and stored source/artifacts.</summary>
     Task<DocumentDeletionResult> DeleteAsync(
         string documentId,

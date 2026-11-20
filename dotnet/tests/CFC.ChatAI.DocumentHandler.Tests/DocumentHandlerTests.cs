@@ -282,6 +282,84 @@ public sealed class DocumentHandlerTests
     }
 
     [Fact]
+    public async Task Replacement_processes_before_purge_and_overwrites_only_the_same_original_key()
+    {
+        var chunks = new FakeChunkRepository(); var storage = new FakeObjectStorage(); var vectors = new FakePinecone();
+        var handler = CreateHandler(new DocumentProcessor.DocumentProcessor(new()), null, chunks, storage, vectors);
+        using var old = new MemoryStream("Old searchable text."u8.ToArray());
+        var prior = await handler.IngestAsync(new("Sample.txt", old));
+        storage.Objects[new ObjectKey(StorageArea.Documents, "docs/sample/images/obsolete.png")] = [1];
+        using var next = new MemoryStream("New searchable text."u8.ToArray());
+        Assert.Null(await handler.ReplaceAsync("missing", new("missing.txt", next)));
+        await Assert.ThrowsAsync<ReplacementConflictException>(() => handler.ReplaceAsync("sample", new("other.txt", next)));
+        await Assert.ThrowsAsync<ReplacementConflictException>(() => handler.ReplaceAsync("sample", new("sample.md", next)));
+        await Assert.ThrowsAsync<ReplacementConflictException>(() => handler.ReplaceAsync("sample", new("sample.mp4", next)));
+        using var unreadable = new MemoryStream("  \n  "u8.ToArray());
+        await Assert.ThrowsAsync<DocumentProcessingException>(() => handler.ReplaceAsync("sample", new("Sample.txt", unreadable)));
+        Assert.Equal(old.ToArray(), storage.Objects[prior.SourceObject]);
+        Assert.Contains("Old searchable", Assert.Single(chunks.Rows).Content);
+        storage.BeforeUpload = (key, options) =>
+        {
+            Assert.Equal(prior.SourceObject, key);
+            Assert.True(options.Overwrite);
+            Assert.Equal(old.ToArray(), storage.Objects[key]);
+        };
+        var replaced = (await handler.ReplaceAsync("sample", new("SAMPLE.TXT", next)))!;
+        Assert.Equal("sample", replaced.DocumentId);
+        Assert.Equal(prior.SourceObject, replaced.SourceObject);
+        Assert.Equal(next.ToArray(), Assert.Single(storage.Objects).Value);
+        Assert.Contains("New searchable", Assert.Single(chunks.Rows).Content);
+        Assert.Contains("New searchable", Assert.Single(vectors.Records).Text);
+    }
+
+    [Theory]
+    [InlineData("vector-delete", "purge")]
+    [InlineData("storage-delete", "purge")]
+    [InlineData("chunk-delete", "purge")]
+    [InlineData("image-upload", "publish")]
+    [InlineData("chunk-upsert", "publish")]
+    [InlineData("vector-upsert", "publish")]
+    [InlineData("original-upload", "publish")]
+    [InlineData("original-response-lost", "publish")]
+    [InlineData("cancellation", "publish")]
+    public async Task Replacement_failure_is_explicit_and_does_not_delete_the_canonical_original(string fault, string expectedStage)
+    {
+        using var cancel = new CancellationTokenSource();
+        var chunks = new FakeChunkRepository(); var vectors = new FakePinecone();
+        var replace = false;
+        var storage = new FakeObjectStorage { AfterUpload = (_, _) =>
+        {
+            if (replace && fault == "original-response-lost") throw new InvalidOperationException("Upload response lost");
+        }};
+        var handler = CreateHandler(new FakeDocumentProcessor { IncludeImages = fault == "image-upload" }, null, chunks, storage, vectors);
+        using var old = new MemoryStream("old"u8.ToArray());
+        var prior = await handler.IngestAsync(new("sample.txt", old));
+        storage.Objects[new ObjectKey(StorageArea.Documents, "docs/sample/images/obsolete.png")] = [1];
+        replace = true;
+        if (fault == "vector-delete") vectors.FailDelete = 2;
+        if (fault == "storage-delete") storage.FailDelete = 2;
+        if (fault == "chunk-delete") chunks.FailDelete = 2;
+        if (fault == "chunk-upsert") chunks.LoseUpsertResponse = true;
+        if (fault == "vector-upsert") vectors.LoseUpsertResponse = true;
+        storage.BeforeUpload = (key, _) =>
+        {
+            if (fault == "original-upload" || (fault == "image-upload" && key.Path.Contains("/images/")))
+                throw new InvalidOperationException("Upload failed");
+            if (fault == "cancellation") { cancel.Cancel(); cancel.Token.ThrowIfCancellationRequested(); }
+        };
+        using var next = new MemoryStream("next"u8.ToArray());
+        var error = await Assert.ThrowsAsync<ReplacementPartialFailureException>(() => handler.ReplaceAsync("sample", new("sample.txt", next), cancel.Token));
+        Assert.Equal(expectedStage, error.Stage);
+        Assert.Equal(fault == "original-response-lost" ? next.ToArray() : old.ToArray(), storage.Objects[prior.SourceObject]);
+        if (expectedStage == "publish")
+        {
+            Assert.Empty(chunks.Rows);
+            Assert.Empty(vectors.Records);
+            Assert.Equal(prior.SourceObject, Assert.Single(storage.Objects).Key);
+        }
+    }
+
+    [Fact]
     public async Task Video_upload_uses_video_processor_video_storage_and_video_metadata()
     {
         var documentProcessor = new FakeDocumentProcessor();
@@ -414,7 +492,7 @@ public sealed class DocumentHandlerTests
     {
         public List<Chunk> Rows { get; } = [];
         public bool ThrowOnDelete { get; set; }
-        public bool LoseUpsertResponse { get; init; }
+        public bool LoseUpsertResponse { get; set; }
         public int FailDelete { get; set; }
         public int MetadataReads { get; private set; }
 
@@ -541,7 +619,7 @@ public sealed class DocumentHandlerTests
     {
         public List<PineconeRecord> Records { get; } = [];
         public bool ThrowOnUpsert { get; init; }
-        public bool LoseUpsertResponse { get; init; }
+        public bool LoseUpsertResponse { get; set; }
         public int FailDelete { get; set; }
 
         public Task<PineconeSearchResult> SearchAsync(

@@ -6,6 +6,13 @@
 
   const ROLES = ['user', 'dev', 'admin'];
 
+  async function requireAccountSuccess(res) {
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((data.detail || `Account operation failed (${res.status})`) +
+      (data.reference ? ` Reference: ${data.reference}` : ''));
+    return data;
+  }
+
   function UsersTab() {
     const { session, user: currentUser } = useUser();
     const [users, setUsers] = useState([]);
@@ -85,9 +92,10 @@
           method: 'POST',
           headers: authHeaders(),
           body: JSON.stringify({}),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'Action failed');
+        }).catch(() => { throw new Error('Account operation response was lost. Contact an operator or retry the same action.'); });
+        const data = await requireAccountSuccess(res);
+        if (data.user_id !== user.id || data.status !== (isActive ? 'inactive' : 'active'))
+          throw new Error('Account operation was not confirmed. Contact an operator.');
         fetchUsers();
       } catch (e) {
         setActionError(e.message);
@@ -112,14 +120,15 @@
 
     const handleDelete = async (userId) => {
       setActionError(null);
+      setDeleteTarget(null);
       try {
         const res = await fetch(`/api/admin/users/${userId}`, {
           method: 'DELETE',
           headers: authHeaders(),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'Failed to delete user');
-        setDeleteTarget(null);
+        }).catch(() => { throw new Error('Deletion response was lost. Contact an operator or retry deletion of the same account.'); });
+        const data = await requireAccountSuccess(res);
+        if (data.user_id !== userId || data.permanently_deleted !== true)
+          throw new Error('Account deletion was not confirmed. Contact an operator.');
         fetchUsers();
       } catch (e) {
         setActionError(e.message);
@@ -301,6 +310,7 @@
                 <div className="user-actions">
                   {u.role !== 'superuser' && (() => {
                     const isSelf = u.id === currentUser?.id;
+                    if (!isSelf && u.status !== 'active' && u.status !== 'inactive') return null;
                     return !isSelf ? (
                       <>
                         <span title={u.status === 'active' ? 'Deactivate user' : 'Activate user'}>

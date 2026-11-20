@@ -21,6 +21,8 @@ public static class DocumentDeletionEndpoints
     private static async Task<IResult> DeleteAsync(string docId, HttpContext context, IDocumentHandler handler)
     {
         if (!DocumentId.IsValid(docId)) return Error(400, "Invalid document ID");
+        using var lease = context.RequestServices.GetRequiredService<DocumentMutations>().Slots.TryEnter(docId);
+        if (lease is null) return Error(409, "Another document operation is in progress; retry later");
         try
         {
             var result = await handler.DeleteAsync(docId, context.RequestAborted);

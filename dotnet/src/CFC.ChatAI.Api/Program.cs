@@ -55,6 +55,9 @@ if (hasSupabase)
     });
     builder.Services.AddSingleton(TimeProvider.System);
     builder.Services.AddSingleton<AdminSettingsStore>();
+    builder.Services.AddSingleton(new AccountLifecycleJournal(config["Api:AccountLifecycleJournalDirectory"],
+        config.GetValue<bool>("Api:EnableAccountLifecycle"), config.GetValue<bool>("Api:EnablePermanentAccountDeletion")));
+    builder.Services.AddSingleton<AccountLifecycleWorkflow>();
     builder.Services.AddAuthentication("Bearer").AddScheme<AuthenticationSchemeOptions, ApiAuthenticationHandler>("Bearer", null);
     builder.Services.AddAuthorizationBuilder()
         .AddPolicy("current-user", policy => policy.RequireAuthenticatedUser().RequireClaim("active", "true"))
@@ -83,6 +86,7 @@ if (hasSupabase)
             o.LibreOfficePath = config["Document:LibreOfficePath"] ?? o.LibreOfficePath;
         });
         builder.Services.AddDocumentHandling(o => o.MaxUploadBytes = maxDocumentBytes);
+        builder.Services.AddSingleton<DocumentMutations>();
         builder.Services.AddFeedback();
         builder.Services.AddChatService(o =>
         {
@@ -132,10 +136,14 @@ if (hasSupabase)
     app.MapInternalApi(hasPinecone);
     app.MapDocumentImages();
     app.MapAdminReads();
+    app.MapAccountLifecycle();
+    app.MapStagingStats(config["Document:StagingRoot"], config["Document:ProcessedRoot"]);
     if (hasPinecone)
     {
         app.MapDocumentUploads(maxDocumentBytes, app.Environment.IsDevelopment() && config.GetValue<bool>("Api:EnableDevIngest"));
         app.MapDocumentDeletions(app.Environment.IsDevelopment() && config.GetValue<bool>("Api:EnableDevDelete"));
+        app.MapDocumentReplacement(maxDocumentBytes);
+        app.MapStagedIngest(config["Document:StagingRoot"], maxDocumentBytes);
     }
 }
 app.Run();
