@@ -208,6 +208,8 @@ def normalize(value, maps, key="", context=""):
         return [normalize(v, maps, key, context) for v in value]
     if not isinstance(value, str):
         return value
+    if key in {"path", "image_paths"}:
+        value = re.sub(r"(/images/)[0-9a-f]{32}(__img\d+\.(?:png|jpg|gif))$", r"\1<image-ingest>\2", value)
     if key == "section_id":
         return sections.get(value, value)
     if key == "chunk_id" or (key == "id" and context == "vectors") or key == "ids":

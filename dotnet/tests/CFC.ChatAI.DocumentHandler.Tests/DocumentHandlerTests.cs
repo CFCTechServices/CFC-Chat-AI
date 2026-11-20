@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Text.Json;
 using CFC.ChatAI.DocumentHandler;
 using CFC.ChatAI.DocumentProcessor;
@@ -73,6 +74,111 @@ public sealed class DocumentHandlerTests
         Assert.Empty(pinecone.Records);
         Assert.Empty(storage.Objects);
     }
+
+    [Fact]
+    public async Task Image_paths_point_to_uploaded_bytes_and_delete_removes_them()
+    {
+        var chunks = new FakeChunkRepository(); var storage = new FakeObjectStorage(); var vectors = new FakePinecone();
+        var handler = CreateHandler(new DocumentProcessor.DocumentProcessor(new()), null, chunks, storage, vectors);
+        await using var input = OpenImageDocument();
+        var result = await handler.IngestAsync(new DocumentHandlerInput("Café Guide.docx", input));
+        var path = Assert.Single(Assert.Single(chunks.Rows).ImagePaths!);
+        Assert.StartsWith(DocumentStoragePaths.GetRoot(result.DocumentId) + "/images/", path);
+        var key = new ObjectKey(StorageArea.Documents, path);
+        Assert.Equal(new UploadOptions("image/png", Overwrite: false), storage.Uploads[key]);
+        Assert.Equal("f688dd6e21f010dd1052e979d9bd19c3a054ca0266e15e5e5673f97e3f7f9271",
+            Convert.ToHexStringLower(SHA256.HashData(storage.Objects[key])));
+        Assert.DoesNotContain("image_paths", Assert.Single(vectors.Records).Metadata!.Keys);
+        var neighbor = new ObjectKey(StorageArea.Documents, "docs/neighbor/images/keep.png");
+        storage.Objects[neighbor] = [1];
+        Assert.Equal(2, (await handler.DeleteAsync(result.DocumentId)).StorageObjectCount);
+        Assert.Equal(neighbor, Assert.Single(storage.Objects).Key);
+        Assert.Empty(chunks.Rows);
+        Assert.Empty(vectors.Records);
+    }
+
+    [Theory]
+    [InlineData("image")]
+    [InlineData("chunks")]
+    [InlineData("vector")]
+    [InlineData("original")]
+    [InlineData("cancellation")]
+    public async Task Failed_image_ingest_cleans_only_its_own_attempted_images(string failure)
+    {
+        using var cancellation = new CancellationTokenSource();
+        var chunks = new FakeChunkRepository { LoseUpsertResponse = failure == "chunks" };
+        var vectors = new FakePinecone { LoseUpsertResponse = failure == "vector" };
+        var storage = new FakeObjectStorage { BeforeUpload = (key, _) =>
+        {
+            if (failure == "original" && key.Path.Contains("/original/")) throw new InvalidOperationException("Original unavailable");
+        }, AfterUpload = (key, ct) =>
+        {
+            if (key.Path.Contains("/images/"))
+            {
+                if (failure == "image") throw new InvalidOperationException("Image upload response lost");
+                if (failure == "cancellation") { cancellation.Cancel(); ct.ThrowIfCancellationRequested(); }
+            }
+        }};
+        var earlierImage = new ObjectKey(StorageArea.Documents, "docs/sample/images/earlier-ingest.png");
+        var earlierOriginal = new ObjectKey(StorageArea.Documents, "docs/sample/original/sample.docx");
+        storage.Objects[earlierImage] = [1]; storage.Objects[earlierOriginal] = [2];
+        chunks.Rows.Add(new Chunk("earlier-chunk", "sample", "Earlier text", ImagePaths: [earlierImage.Path]));
+        vectors.Records.Add(new PineconeRecord("earlier-chunk", "Earlier text", null));
+        var handler = CreateHandler(new DocumentProcessor.DocumentProcessor(new()), null, chunks, storage, vectors);
+        await using var input = OpenImageDocument();
+        var ingest = () => handler.IngestAsync(new DocumentHandlerInput("sample.docx", input), cancellation.Token);
+        if (failure == "cancellation") await Assert.ThrowsAnyAsync<OperationCanceledException>(ingest);
+        else await Assert.ThrowsAsync<InvalidOperationException>(ingest);
+        Assert.Equal(new[] { earlierImage, earlierOriginal }, storage.Objects.Keys);
+        Assert.Equal("earlier-chunk", Assert.Single(chunks.Rows).Id);
+        Assert.Equal("earlier-chunk", Assert.Single(vectors.Records).Id);
+    }
+
+    [Fact]
+    public async Task Failure_on_second_image_rolls_back_both_upload_attempts_before_writing_chunks()
+    {
+        var storage = new FakeObjectStorage { AfterUpload = (key, _) =>
+        {
+            if (key.Path.EndsWith("__img002.gif", StringComparison.Ordinal))
+                throw new InvalidOperationException("Second image response lost");
+        }};
+        var chunks = new FakeChunkRepository();
+        var handler = CreateHandler(new FakeDocumentProcessor { IncludeImages = true }, null, chunks, storage, new());
+        await using var input = new MemoryStream("synthetic body"u8.ToArray());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => handler.IngestAsync(new("sample.docx", input)));
+        Assert.Equal(2, storage.Uploads.Count);
+        Assert.Empty(storage.Objects);
+        Assert.Empty(chunks.Rows);
+    }
+
+    [Fact]
+    public async Task Confirmed_create_conflict_does_not_delete_the_existing_object()
+    {
+        var storage = new FakeObjectStorage();
+        storage.BeforeUpload = (key, options) =>
+        {
+            Assert.False(options.Overwrite);
+            storage.Objects[key] = [42];
+            throw new StorageObjectConflictException();
+        };
+        var handler = CreateHandler(new DocumentProcessor.DocumentProcessor(new()), null, new(), storage, new());
+        await using var input = OpenImageDocument();
+        await Assert.ThrowsAsync<StorageObjectConflictException>(() => handler.IngestAsync(new("sample.docx", input)));
+        Assert.Equal(new byte[] { 42 }, Assert.Single(storage.Objects).Value);
+    }
+
+    [Fact]
+    public async Task Failed_image_cleanup_is_reported_for_reconciliation()
+    {
+        var storage = new FakeObjectStorage { FailDelete = 1, AfterUpload = (_, _) => throw new InvalidOperationException("Image response lost") };
+        var handler = CreateHandler(new DocumentProcessor.DocumentProcessor(new()), null, new(), storage, new());
+        await using var input = OpenImageDocument();
+        var error = await Assert.ThrowsAsync<AggregateException>(() => handler.IngestAsync(new("sample.docx", input)));
+        Assert.Equal(2, error.InnerExceptions.Count);
+        Assert.Single(storage.Objects);
+    }
+
+    private static FileStream OpenImageDocument() => File.OpenRead(Path.Combine(AppContext.BaseDirectory, "embedded-image.docx"));
 
     [Fact]
     public async Task Unicode_ingest_and_delete_use_provider_safe_keys_and_preserve_exact_ids()
@@ -271,6 +377,7 @@ public sealed class DocumentHandlerTests
     private sealed class FakeDocumentProcessor : IDocumentProcessor
     {
         public int CallCount { get; private set; }
+        public bool IncludeImages { get; init; }
 
         public async Task<DocumentProcessingResult> ProcessAsync(
             DocumentInput document,
@@ -278,9 +385,12 @@ public sealed class DocumentHandlerTests
         {
             CallCount++;
             await document.Content.CopyToAsync(Stream.Null, cancellationToken);
+            DocumentImage[] images = IncludeImages
+                ? [new("png", ".png", "image/png", new byte[] { 1 }), new("gif", ".gif", "image/gif", new byte[] { 2 })] : [];
             return new DocumentProcessingResult(
                 "sample", document.FileName, "document", [],
-                [new DocumentChunk("doc-chunk", "section-1", "Body", "document text")]);
+                [new DocumentChunk("doc-chunk", "section-1", "Body", "document text") { ImageIds = images.Select(image => image.Id).ToArray() }])
+            { Images = images };
         }
     }
 
@@ -304,6 +414,7 @@ public sealed class DocumentHandlerTests
     {
         public List<Chunk> Rows { get; } = [];
         public bool ThrowOnDelete { get; set; }
+        public bool LoseUpsertResponse { get; init; }
         public int FailDelete { get; set; }
         public int MetadataReads { get; private set; }
 
@@ -311,6 +422,7 @@ public sealed class DocumentHandlerTests
         {
             Rows.RemoveAll(existing => chunks.Any(chunk => chunk.Id == existing.Id));
             Rows.AddRange(chunks);
+            if (LoseUpsertResponse) throw new InvalidOperationException("Chunk upsert response lost");
             return Task.CompletedTask;
         }
 
@@ -356,6 +468,9 @@ public sealed class DocumentHandlerTests
     {
         public Dictionary<ObjectKey, byte[]> Objects { get; } = [];
         public bool ThrowOnUpload { get; init; }
+        public Dictionary<ObjectKey, UploadOptions> Uploads { get; } = [];
+        public Action<ObjectKey, UploadOptions>? BeforeUpload { get; set; }
+        public Action<ObjectKey, CancellationToken>? AfterUpload { get; init; }
         public bool ReturnInvalidChild { get; init; }
         public int FailDelete { get; set; }
 
@@ -366,9 +481,12 @@ public sealed class DocumentHandlerTests
             CancellationToken cancellationToken = default)
         {
             if (ThrowOnUpload) throw new InvalidOperationException("storage failed");
+            BeforeUpload?.Invoke(key, options);
+            Uploads[key] = options;
             using var memory = new MemoryStream();
             await content.CopyToAsync(memory, cancellationToken);
             Objects[key] = memory.ToArray();
+            AfterUpload?.Invoke(key, cancellationToken);
             return new StoredObject(key, options.ContentType, memory.Length);
         }
 
@@ -423,6 +541,7 @@ public sealed class DocumentHandlerTests
     {
         public List<PineconeRecord> Records { get; } = [];
         public bool ThrowOnUpsert { get; init; }
+        public bool LoseUpsertResponse { get; init; }
         public int FailDelete { get; set; }
 
         public Task<PineconeSearchResult> SearchAsync(
@@ -436,6 +555,7 @@ public sealed class DocumentHandlerTests
         {
             if (ThrowOnUpsert) throw new InvalidOperationException("Pinecone is unavailable.");
             Records.AddRange(records);
+            if (LoseUpsertResponse) throw new InvalidOperationException("Pinecone response lost");
             return Task.FromResult(records.Count);
         }
 

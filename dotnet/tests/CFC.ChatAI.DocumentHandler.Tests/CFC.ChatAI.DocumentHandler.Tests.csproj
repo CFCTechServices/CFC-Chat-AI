@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\CFC.ChatAI.DocumentHandler\CFC.ChatAI.DocumentHandler.csproj" />
+    <None Include="..\DocumentUploadParity\fixtures\embedded-image.docx" Link="embedded-image.docx" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

@@ -456,6 +456,22 @@ public sealed class SupabaseAdapterTests
         Assert.DoesNotContain("token", exception.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData(HttpStatusCode.Conflict, "{}")]
+    [InlineData(HttpStatusCode.BadRequest, "{\"statusCode\":\"409\",\"error\":\"Duplicate\"}")]
+    [InlineData(HttpStatusCode.BadRequest, "{\"code\":\"ResourceAlreadyExists\"}")]
+    public async Task StorageUpload_ClassifiesConfirmedConflictsOnCreateWithoutOverwrite(HttpStatusCode status, string body)
+    {
+        var handler = new RecordingHandler((_, _) => Task.FromResult(new HttpResponseMessage(status)
+        {
+            Content = new StringContent(body),
+        }));
+        var storage = new SupabaseObjectStorage(CreateTransport(handler), CreateOptions());
+        using var bytes = new MemoryStream([1, 2]);
+        await Assert.ThrowsAsync<StorageObjectConflictException>(() => storage.UploadAsync(
+            new ObjectKey(StorageArea.Documents, "docs/sample/images/object.png"), bytes, new("image/png", Overwrite: false)));
+    }
+
     [Fact]
     public async Task StorageUpload_DoesNotTakeOwnershipOfCallerStream()
     {

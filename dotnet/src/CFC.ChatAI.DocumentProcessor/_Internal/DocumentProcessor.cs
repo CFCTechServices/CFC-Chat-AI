@@ -4,13 +4,12 @@ using System.IO.Compression;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Xml;
 using System.Xml.Linq;
 using UglyToad.PdfPig;
 
 namespace CFC.ChatAI.DocumentProcessor;
 
-/// <summary>Extracts text-only content from uploaded files without coupling to storage or indexing.</summary>
+/// <summary>Extracts searchable text and supported DOCX images from uploaded files without coupling to storage or indexing.</summary>
 public sealed class DocumentProcessor : IDocumentProcessor
 {
     private static readonly XNamespace WordNamespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
@@ -51,12 +50,13 @@ public sealed class DocumentProcessor : IDocumentProcessor
         cancellationToken.ThrowIfCancellationRequested();
 
         List<SectionContent> sections;
+        IReadOnlyList<DocumentImage> images = [];
         try
         {
             sections = extension switch
             {
                 ".pdf" => ExtractPdf(data, cancellationToken),
-                ".docx" => ExtractDocx(data),
+                ".docx" => ExtractDocx(data, cancellationToken, out images),
                 ".doc" => await ExtractLegacyWordAsync(data, sourceName, cancellationToken).ConfigureAwait(false),
                 ".txt" => [new SectionContent("Untitled", 1, DecodeText(data))],
                 ".md" => ExtractMarkdown(DecodeText(data)),
@@ -74,7 +74,7 @@ public sealed class DocumentProcessor : IDocumentProcessor
         }
         catch (Exception exception)
         {
-            throw new DocumentProcessingException($"Failed to extract text from '{sourceName}'.", exception);
+            throw new DocumentProcessingException($"Failed to extract content from '{sourceName}'.", exception);
         }
 
         var outputSections = new List<DocumentSection>();
@@ -85,15 +85,26 @@ public sealed class DocumentProcessor : IDocumentProcessor
             var text = Normalize(section.Text);
             if (text.Length == 0)
             {
+                if (section.ImagePlacements.Count > 0)
+                    throw new DocumentProcessingException("A DOCX section with images has no searchable text to associate with them.");
                 continue;
             }
 
             var sectionId = Guid.NewGuid().ToString("D");
             var title = string.IsNullOrWhiteSpace(section.Title) ? "Untitled" : section.Title.Trim();
             outputSections.Add(new DocumentSection(sectionId, title, Math.Max(section.Level, 1)));
-            foreach (var chunkText in SplitIntoChunks(text, _options.MaxChunkCharacters))
+            var nextImage = 0;
+            foreach (var (chunkText, end) in SplitIntoChunks(text, _options.MaxChunkCharacters))
             {
-                chunks.Add(new DocumentChunk(Guid.NewGuid().ToString("D"), sectionId, title, chunkText));
+                cancellationToken.ThrowIfCancellationRequested();
+                var firstImage = nextImage;
+                while (nextImage < section.ImagePlacements.Count && section.ImagePlacements[nextImage].Offset <= end)
+                    nextImage++;
+                chunks.Add(new DocumentChunk(Guid.NewGuid().ToString("D"), sectionId, title, chunkText)
+                {
+                    ImageIds = firstImage == nextImage ? [] : section.ImagePlacements
+                        .GetRange(firstImage, nextImage - firstImage).Select(image => image.Id).Distinct(StringComparer.Ordinal).ToArray()
+                });
             }
         }
 
@@ -107,7 +118,7 @@ public sealed class DocumentProcessor : IDocumentProcessor
             sourceName,
             "document",
             outputSections,
-            chunks);
+            chunks) { Images = images };
     }
 
     private async Task<byte[]> ReadDocumentAsync(Stream input, CancellationToken cancellationToken)
@@ -153,16 +164,13 @@ public sealed class DocumentProcessor : IDocumentProcessor
         return [new SectionContent("Untitled", 1, string.Join(Environment.NewLine, pageTexts))];
     }
 
-    private static List<SectionContent> ExtractDocx(byte[] data)
+    private static List<SectionContent> ExtractDocx(byte[] data, CancellationToken ct,
+        out IReadOnlyList<DocumentImage> images, bool includeImages = true)
     {
         using var stream = new MemoryStream(data, writable: false);
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: false);
-        var documentEntry = archive.GetEntry("word/document.xml")
-            ?? throw new DocumentProcessingException("The DOCX file does not contain word/document.xml.");
-
-        using var xmlStream = documentEntry.Open();
-        using var reader = XmlReader.Create(xmlStream, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit });
-        var xml = XDocument.Load(reader);
+        var xml = DocxImages.ReadXml(archive, "word/document.xml", 16 * 1024 * 1024, ct);
+        var imageReader = includeImages ? new DocxImages(archive, ct) : null;
         var body = xml.Root?.Element(WordNamespace + "body")
             ?? throw new DocumentProcessingException("The DOCX file has no document body.");
 
@@ -170,25 +178,21 @@ public sealed class DocumentProcessor : IDocumentProcessor
         SectionContent? current = null;
         foreach (var item in body.Elements())
         {
+            ct.ThrowIfCancellationRequested();
             if (item.Name == WordNamespace + "p")
             {
                 var paragraphText = ReadWordParagraph(item);
-                if (paragraphText.Length == 0)
-                {
-                    continue;
-                }
-
                 var style = (string?)item.Element(WordNamespace + "pPr")?.Element(WordNamespace + "pStyle")?.Attribute(WordNamespace + "val");
                 var headingMatch = style is null ? Match.Empty : HeadingStyle.Match(style);
-                if (headingMatch.Success)
+                if (headingMatch.Success && paragraphText.Length > 0)
                 {
                     current = new SectionContent(paragraphText, int.TryParse(headingMatch.Groups[1].Value, out var level) ? level : 1, string.Empty);
                     sections.Add(current);
                 }
-                else
+                else if (paragraphText.Length > 0)
                 {
                     current ??= AddDefaultSection(sections);
-                    current.Append(paragraphText);
+                    current.Append(paragraphText, " ");
                 }
             }
             else if (item.Name == WordNamespace + "tbl")
@@ -196,15 +200,30 @@ public sealed class DocumentProcessor : IDocumentProcessor
                 var rows = item.Elements(WordNamespace + "tr")
                     .Select(row => string.Join(" | ", row.Elements(WordNamespace + "tc").Select(ReadWordCell)))
                     .Where(row => !string.IsNullOrWhiteSpace(row));
-                var tableText = string.Join(Environment.NewLine, rows);
+                var tableText = Normalize(string.Join(Environment.NewLine, rows));
                 if (tableText.Length > 0)
                 {
                     current ??= AddDefaultSection(sections);
-                    current.Append(tableText);
+                    current.Append(tableText, " ");
                 }
             }
+            else
+            {
+                continue;
+            }
+
+            // Like Python, a paragraph or table contributes its text before its pictures.
+            // Keep .NET's existing chunk boundaries and assign the placement to the chunk
+            // ending at/after that text position (initial images go to the first chunk).
+            if (imageReader is not null)
+                foreach (var imageId in imageReader.ReadReferences(item))
+                {
+                    current ??= AddDefaultSection(sections);
+                    current.ImagePlacements.Add((current.TextLength, imageId));
+                }
         }
 
+        images = imageReader?.Images ?? [];
         return sections;
     }
 
@@ -308,7 +327,8 @@ public sealed class DocumentProcessor : IDocumentProcessor
                     $"LibreOffice could not convert '{sourceName}' to DOCX (exit code {process.ExitCode}).");
             }
 
-            return ExtractDocx(await File.ReadAllBytesAsync(convertedPath, cancellationToken).ConfigureAwait(false));
+            return ExtractDocx(await File.ReadAllBytesAsync(convertedPath, cancellationToken).ConfigureAwait(false),
+                cancellationToken, out _, includeImages: false);
         }
         catch (DocumentProcessingException)
         {
@@ -682,7 +702,7 @@ public sealed class DocumentProcessor : IDocumentProcessor
         return section;
     }
 
-    private static IEnumerable<string> SplitIntoChunks(string text, int maximumLength)
+    private static IEnumerable<(string Text, int End)> SplitIntoChunks(string text, int maximumLength)
     {
         var start = 0;
         while (start < text.Length)
@@ -693,7 +713,7 @@ public sealed class DocumentProcessor : IDocumentProcessor
                 var final = text[start..].Trim();
                 if (final.Length > 0)
                 {
-                    yield return final;
+                    yield return (final, text.Length);
                 }
 
                 yield break;
@@ -723,7 +743,7 @@ public sealed class DocumentProcessor : IDocumentProcessor
             var chunk = text[start..breakAt].Trim();
             if (chunk.Length > 0)
             {
-                yield return chunk;
+                yield return (chunk, breakAt);
             }
 
             start = breakAt;
@@ -786,12 +806,14 @@ public sealed class DocumentProcessor : IDocumentProcessor
         public int Level { get; } = level;
         private readonly StringBuilder _text = new(text);
         public string Text => _text.ToString();
+        public int TextLength => _text.Length;
+        public List<(int Offset, string Id)> ImagePlacements { get; } = [];
 
-        public void Append(string value)
+        public void Append(string value, string? separator = null)
         {
             if (_text.Length > 0)
             {
-                _text.AppendLine();
+                _text.Append(separator ?? Environment.NewLine);
             }
 
             _text.Append(value);

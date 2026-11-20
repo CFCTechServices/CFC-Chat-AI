@@ -1,6 +1,6 @@
 # Document upload image and filename remediation plan
 
-**Status: Unicode filename remediation implemented and verified offline; DOCX image remediation remains planned.** See the [Unicode filename completion note](../complete/document-upload-unicode-filename.md) for the implemented storage layout and remaining live checks. Findings and scope decisions are in [document-upload-parity-decisions.md](../tests/document-upload-parity-decisions.md); the evidence is in [document-upload-parity-report.md](../tests/document-upload-parity-report.md).
+**Archived implementation plan.** See the [completion note](README.md) for what shipped, test evidence, limitations, and the outstanding live smoke test. The [Unicode filename completion note](../document-upload-unicode-filename.md) covers the filename work. Findings are in the [parity decisions](../../tests/document-upload-parity-decisions.md); the [parity report](../../tests/document-upload-parity-report.md) contains the updated captures.
 
 ## Goals and boundaries
 
@@ -27,7 +27,7 @@ The image baseline is the tested embedded DOCX case, not a claim of complete Pyt
 
 ## 3. Make document IDs consistent and safe for filenames
 
-Implemented as described in the [completion note](../complete/document-upload-unicode-filename.md); the bullets below describe the original design work.
+Implemented as described in the [filename completion note](../document-upload-unicode-filename.md); the bullets below describe the original design work.
 
 - Align `CreateDocumentId` and `DocumentId.IsValid` for the tested accented filename, with a single documented normalization/validation policy used by upload preflight, processing, duplicate lookup, storage keys, download and delete routes. `DocumentId.IsValid` currently restricts IDs to ASCII, and is shared by the handler and API endpoints. Audit `ObjectKey`/prefix validation, URL encoding, database queries and any other ID consumers before expanding it.
 - Preserve `café-guide-v2` for the tested input rather than transliterating it to a different ID. Define Unicode normalization and casing, allowed characters, maximum length, empty/fallback cases and collisions deliberately; Python and .NET regex/casing rules are not necessarily equivalent for all scripts. Do not silently rename already stored documents or claim universal Unicode parity. Determine how existing Python IDs, including normalization variants, are looked up without creating duplicate identities.

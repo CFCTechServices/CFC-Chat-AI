@@ -31,8 +31,15 @@ internal sealed class SupabaseObjectStorage(SupabaseTransport transport, Supabas
         if (!string.IsNullOrWhiteSpace(uploadOptions.ContentType))
             request.Content.Headers.ContentType = MediaTypeHeaderValue.Parse(uploadOptions.ContentType);
 
-        using var response = await transport.SendServiceAsync(request, cancellationToken).ConfigureAwait(false);
-        return new StoredObject(key, uploadOptions.ContentType);
+        try
+        {
+            using var response = await transport.SendServiceAsync(request, cancellationToken).ConfigureAwait(false);
+            return new StoredObject(key, uploadOptions.ContentType);
+        }
+        catch (SupabaseRequestException exception) when (!uploadOptions.Overwrite && exception.IsStorageConflict)
+        {
+            throw new StorageObjectConflictException();
+        }
     }
 
     public async Task<DownloadedObject> DownloadAsync(

@@ -167,6 +167,59 @@ public sealed class DocumentUploadTests
         Assert.Equal(id, ((Handler)factory.Services.GetRequiredService<IDocumentHandler>()).DeletedId);
     }
 
+    [Theory]
+    [InlineData("/api/chat/content/images/", "docs/sample/images/example.png", "docs/sample/images/example.png")]
+    [InlineData("/content/images/", "docs/!u-Y2Fmw6ktZ3VpZGUtdjI/images/example.png", "docs/%21u-Y2Fmw6ktZ3VpZGUtdjI/images/example.png")]
+    [InlineData("/api/chat/content/images/", "docs/café/images/example.png", "docs/caf%C3%A9/images/example.png")]
+    public async Task Image_resolver_signs_exact_paths_only_for_active_users(string route, string path, string requestPath)
+    {
+        var key = new ObjectKey(StorageArea.Documents, path);
+        var storage = new DownloadStorage(key, "image/png");
+        using var factory = Factory(role: "user").WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IObjectStorage>(); services.AddSingleton<IObjectStorage>(storage);
+        }));
+        using var anonymous = Client(factory, null);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.GetAsync(route + requestPath)).StatusCode);
+        Assert.Equal(0, storage.ListCalls);
+        using var client = Client(factory);
+        using var response = await client.GetAsync(route + requestPath);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.CacheControl?.NoStore);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("https://example.invalid/signed", body.GetProperty("url").GetString());
+        Assert.True(body.GetProperty("expires_at").GetDateTimeOffset() > DateTimeOffset.UtcNow);
+        Assert.Equal(TimeSpan.FromMinutes(5), storage.SignedLifetime);
+        Assert.Equal(key, storage.SignedKey);
+    }
+
+    [Fact]
+    public async Task Image_resolver_denies_inactive_users_unsafe_paths_and_missing_or_wrong_mime_objects()
+    {
+        const string route = "/api/chat/content/images/";
+        const string path = "docs/sample/images/example.png";
+        var storage = new DownloadStorage(new ObjectKey(StorageArea.Documents, path), "text/html");
+        using var inactiveFactory = Factory(status: "inactive").WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IObjectStorage>(); services.AddSingleton<IObjectStorage>(storage);
+        }));
+        using var inactive = Client(inactiveFactory);
+        Assert.Equal(HttpStatusCode.Forbidden, (await inactive.GetAsync(route + path)).StatusCode);
+        using var activeFactory = Factory(role: "user").WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IObjectStorage>(); services.AddSingleton<IObjectStorage>(storage);
+        }));
+        using var active = Client(activeFactory);
+        foreach (var invalid in new[] { "docs/sample/original/example.png", "docs/sample/images/example.svg", "images/legacy.png",
+            "docs/sample%252fescape/images/example.png", "docs%2Fsample/images/example.png", "docs/sample%5cescape/images/example.png",
+            "docs/sample/images/path%2Fexample.png", "docs/sample/images/exam%01ple.png", "docs/!u-c2FtcGxl/images/example.png" })
+            Assert.Equal(HttpStatusCode.NotFound, (await active.GetAsync(route + invalid)).StatusCode);
+        Assert.Equal(0, storage.ListCalls);
+        Assert.Equal(HttpStatusCode.NotFound, (await active.GetAsync(route + path)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await active.GetAsync(route + "docs/sample/images/missing.png")).StatusCode);
+        Assert.Null(storage.SignedKey);
+    }
+
     [Fact]
     public async Task Conflict_and_dev_gates()
     {
@@ -376,15 +429,21 @@ public sealed class DocumentUploadTests
             return new(id, Found, 1, 1);
         }
     }
-    private sealed class DownloadStorage(ObjectKey key) : IObjectStorage
+    private sealed class DownloadStorage(ObjectKey key, string? contentType = null) : IObjectStorage
     {
         public ObjectKey? SignedKey { get; private set; }
-        public Task<Page<StorageEntry>> ListAsync(ObjectPrefix prefix, PageRequest page, CancellationToken ct = default) =>
-            Task.FromResult(new Page<StorageEntry>(key.Area == prefix.Area &&
-                Path.GetDirectoryName(key.Path)!.Replace('\\', '/') == prefix.Path ? [new StorageEntry(key, false)] : [], false));
+        public TimeSpan? SignedLifetime { get; private set; }
+        public int ListCalls { get; private set; }
+        public Task<Page<StorageEntry>> ListAsync(ObjectPrefix prefix, PageRequest page, CancellationToken ct = default)
+        {
+            ListCalls++;
+            return Task.FromResult(new Page<StorageEntry>(key.Area == prefix.Area &&
+                Path.GetDirectoryName(key.Path)!.Replace('\\', '/') == prefix.Path ? [new StorageEntry(key, false, contentType)] : [], false));
+        }
         public Task<Uri> CreateSignedUrlAsync(ObjectKey objectKey, TimeSpan lifetime, CancellationToken ct = default)
         {
             SignedKey = objectKey;
+            SignedLifetime = lifetime;
             return Task.FromResult(new Uri("https://example.invalid/signed"));
         }
         public Task<StoredObject> UploadAsync(ObjectKey key, Stream content, UploadOptions options, CancellationToken ct = default) => throw new NotSupportedException();

@@ -1,14 +1,14 @@
 # Document upload parity findings and decisions
 
-**Status: Unicode filename fix implemented and verified offline; DOCX image support remains planned.** This note interprets the synthetic results in [document-upload-parity-report.md](document-upload-parity-report.md). The implementation plan is [document upload image and filename remediation](../plan/document-upload-image-filename-remediation.md).
+**Status: Unicode filename and supported DOCX image behavior are implemented and verified offline.** This note interprets the synthetic results in [document-upload-parity-report.md](document-upload-parity-report.md). See the [completion note](../complete/document-upload-remediation/README.md) and [archived plan](../complete/document-upload-remediation/document-upload-image-filename-remediation.md).
 
 ## Three principal gaps
 
-### 1. Embedded document images — plan to fix
+### 1. Embedded document images — fixed offline for supported DOCX images
 
-In the embedded-image DOCX fixture, both endpoints returned HTTP 200, and the text embedding input and captured vector matched after ID aliasing. Python attempted to store an extracted image and put its storage path in the chunk's `image_paths`; C# did neither. This is a functional gap, not just a different wire format: retrieval and chat read image paths from chunk data or vector metadata, so the tested C# ingestion does not provide this image through that mechanism.
+Initially, only Python uploaded the extracted PNG and wrote its key into the chunk's `image_paths`. The regenerated report confirms that both endpoints write the same PNG bytes and each chunk references its implementation's exact image key. .NET uses an ingest-specific key, `image/png`, and no overwrite. Retrieval reads the paths from chunk rows; no image embeddings or new Pinecone metadata are needed.
 
-The fixture establishes the gap for one DOCX image; it does not establish image behavior for every document format or image layout. The plan starts with DOCX and explicitly tests the association between images and chunks rather than assuming that all images belong to all chunks. These are document images, not embedding vectors.
+The fixture verifies one DOCX case, not every format or layout. See the completion note for the association rules, unsupported features, and the live verification still needed.
 
 ### 2. Filename / document ID compatibility — fixed offline
 
@@ -22,7 +22,7 @@ The inspected Python ingestion code assigns section paths to in-memory chunks, b
 
 ## Other observed differences
 
-- **Ordering and failure handling:** Python attempts original storage before chunk/vector writes; C# writes chunks and vectors before the original and attempts compensating deletes on failure. Prefer retaining explicit C# error statuses and compensation rather than copying Python's HTTP 200 with failure in the body. This is a direction, not evidence that rollback always succeeds; lost responses, cleanup failures, overwrites and concurrency still need testing.
+- **Ordering and failure handling:** Python attempts original storage before chunk/vector writes; C# writes any DOCX images first, then chunks, vectors and the original, and attempts compensating deletes on failure. Keep explicit C# error statuses rather than copying Python's HTTP 200 with failure in the body. Offline tests exercise lost image/chunk/vector responses and failed cleanup; provider behavior and concurrency are not proven by the report.
 - **Response shape and endpoint:** Success bodies differ. The report compares Python's upload route with C#'s development-only route, which skips the authenticated route's duplicate check. Do not infer full production API compatibility from this report; review client contract and authenticated-route tests separately.
 - **TXT:** C# ingests the tested TXT file, while Python stores its original but reports unsupported ingestion. Retain C# support unless product requirements say otherwise; broader support is not inherently a defect.
 - **Supabase request details:** Raw versus multipart upload, headers, cache control and upsert parameters differ. Do not chase byte-for-byte SDK requests merely for parity; confirm required storage options and actual upsert/overwrite semantics against the target service before rollout. The synthetic test doesn't establish equivalent remote effects.

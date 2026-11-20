@@ -130,6 +130,7 @@ if (hasSupabase)
     app.UseAuthentication();
     app.UseAuthorization();
     app.MapInternalApi(hasPinecone);
+    app.MapDocumentImages();
     app.MapAdminReads();
     if (hasPinecone)
     {

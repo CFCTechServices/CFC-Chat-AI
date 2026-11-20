@@ -12,12 +12,13 @@ import json
 import os
 from pathlib import Path
 import platform
+import re
 import subprocess
 import sys
 import tempfile
 from urllib.parse import unquote
 
-from comparison import CaptureError, MISSING, compare, display, storage_object, validate
+from comparison import CaptureError, MISSING, collect, compare, display, storage_object, validate
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
@@ -103,7 +104,8 @@ def missing_expected(case, py, cs):
         "C#": {"storage-original", "chunks-upsert", "vectors-upsert"},
     }
     if case.key == "image":
-        expected["Python"].add("storage-image")
+        for operations in expected.values():
+            operations.add("storage-image")
     errors = []
     for name, cap in (("Python", py), ("C#", cs)):
         found = {op.get("kind") for op in cap.get("operations", [])}
@@ -116,6 +118,8 @@ def missing_expected(case, py, cs):
     ingestion = response.get("ingestion") if isinstance(response, dict) else None
     if not isinstance(ingestion, dict) or ingestion.get("success") is not True:
         errors.append("Python ingestion did not report success")
+    if case.key == "image":
+        errors.extend(check_image_fixture(py, cs))
     if case.key == "filename":
         if not isinstance(ingestion, dict) or ingestion.get("doc_id") != "café-guide-v2":
             errors.append("Python did not report the expected Unicode ID")
@@ -126,6 +130,31 @@ def missing_expected(case, py, cs):
         path = obj.get("path", "") if isinstance(obj, dict) else ""
         if unquote(path) != "/storage/v1/object/parity-bucket/docs/!u-Y2Fmw6ktZ3VpZGUtdjI/original/document.eml":
             errors.append("C# did not attempt the expected ASCII-safe original object key")
+    return errors
+
+
+def check_image_fixture(py, cs):
+    errors = []
+    expected_blob = {"size": 68, "sha256": "f688dd6e21f010dd1052e979d9bd19c3a054ca0266e15e5e5673f97e3f7f9271"}
+    for name, capture in (("Python", py), ("C#", cs)):
+        operations = [op for op in capture["operations"] if op["kind"] == "storage-image"]
+        if len(operations) != 1:
+            errors.append(f"{name} did not upload exactly one image")
+            continue
+        image = storage_object(operations[0])
+        if image["object"] != expected_blob:
+            errors.append(f"{name} image bytes differ from the fixture")
+        prefix = "/storage/v1/object/parity-bucket/"
+        path = unquote(image["path"])
+        key = path.removeprefix(prefix)
+        name_pattern = r"[0-9a-f]{32}__img001" if name == "C#" else "embedded-image__img001"
+        if not path.startswith(prefix) or not re.fullmatch(r"docs/embedded-image/images/" + name_pattern + r"\.png", key):
+            errors.append(f"{name} did not write a supported object key beneath the document images prefix")
+        _, rows, _ = collect(capture)
+        if len(rows) != 1 or rows[0].get("image_paths") != [key]:
+            errors.append(f"{name} did not persist the uploaded image's key on the fixture's chunk")
+        if name == "C#" and (image["object_content_type"] != "image/png" or image["x-upsert"] != "false"):
+            errors.append("C# did not create the image with image/png and overwrite disabled")
     return errors
 
 
@@ -140,7 +169,10 @@ def evaluate(case, py, cs):
             errors.append(f"{name}: {exc}")
     if errors:
         return {"outcome": "ERROR", "errors": errors, "comparison": None}
-    errors.extend(missing_expected(case, py, cs))
+    try:
+        errors.extend(missing_expected(case, py, cs))
+    except (CaptureError, TypeError, KeyError, ValueError) as exc:
+        errors.append(f"Acceptance checks: {exc}")
     if errors:
         return {"outcome": "ERROR", "errors": errors, "comparison": None}
     try:
@@ -243,7 +275,7 @@ def render(results, stability):
                   "position-weighted byte sum modulo 997, and ASCII-space count. Inputs and all values appear in the captures; equality is exact.",
                   "- Before per-side section/chunk aliases are assigned, section-to-row and row-to-vector references are validated where observable. "
                   "C# emits no section artifacts, so its section IDs are first observed in rows and empty sections are unobservable. Different chunk boundaries are displayed as unmatched ordered lists. "
-                  "Document text, paths, filenames, field presence, types, request order and batches are not normalized. "
+                  "For image paths only, the random .NET ingest ID is shown as `<image-ingest>` in comparisons. Other paths, filenames, field presence, types, request order and batches are not normalized. "
                   "Multipart boundary strings are normalized only in comparisons; original IDs and boundaries remain in details. "
                   "Object key order is ignored; array order is retained. `<MISSING>` and `null` are distinct; "
                   "`<NOT OBSERVABLE>` denotes the C# SDK capture limitation, not an absent request. Difference counts include these coverage gaps.",
@@ -254,7 +286,10 @@ def render(results, stability):
     for case, py, cs, result in results:
         note = (" Both endpoints must accept the file and report `café-guide-v2`. "
                 "C# intentionally encodes the new original's storage key to meet Supabase's ASCII key restriction."
-                if case.key == "filename" else "")
+                if case.key == "filename" else
+                " Both endpoints must persist an image reference that points to the captured PNG bytes. "
+                "C# uploads with `image/png` and no overwrite, under an ingest-specific key used for safe rollback."
+                if case.key == "image" else "")
         lines.extend([f"## {case.title}", "", case.description + f" Fixture: `{case.fixture}` as `{case.filename}`. "
                       "Capture: Supabase transport; Pinecone Python transport / C# application boundary." + note, "",
                       f"**Outcome:** {result['outcome']}. " + (" ".join(result["errors"]) if result["errors"] else short_summary(py, cs, result["comparison"])), "",

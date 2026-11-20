@@ -75,13 +75,18 @@ internal sealed class DocumentHandler : IDocumentHandler
             var videoUrl = string.Equals(processed.SourceType, "video", StringComparison.OrdinalIgnoreCase)
                 ? _storage.GetPublicUrl(sourceObject).AbsoluteUri
                 : null;
+            var imageRoot = DocumentStoragePaths.GetRoot(processed.DocumentId) + "/images";
+            var ingestId = Guid.NewGuid().ToString("N");
+            var images = processed.Images.Select((image, index) => (Image: image,
+                Key: new ObjectKey(StorageArea.Documents, $"{imageRoot}/{ingestId}__img{index + 1:D3}{image.Extension}"))).ToArray();
+            var imageKeys = images.ToDictionary(item => item.Image.Id, item => item.Key.Path, StringComparer.Ordinal);
             var persistedChunks = processed.Chunks.Select(chunk => new Chunk(
                 chunk.Id,
                 processed.DocumentId,
                 chunk.Text,
                 chunk.SectionId,
                 chunk.SectionTitle,
-                [],
+                chunk.ImageIds.Select(id => imageKeys[id]).ToArray(),
                 processed.SourceName,
                 processed.SourceType,
                 VideoUrl: videoUrl)).ToArray();
@@ -96,10 +101,29 @@ internal sealed class DocumentHandler : IDocumentHandler
                     ["source_type"] = JsonSerializer.SerializeToElement(processed.SourceType),
                 })).ToArray();
 
+            var attemptedImageKeys = new List<ObjectKey>();
             var chunkWriteAttempted = false;
             var vectorWriteAttempted = false;
             try
             {
+                foreach (var (image, key) in images)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    using var content = new MemoryStream(image.Content.ToArray(), writable: false);
+                    attemptedImageKeys.Add(key);
+                    try
+                    {
+                        await _storage.UploadAsync(key, content, new UploadOptions(image.ContentType, Overwrite: false),
+                            cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (StorageObjectConflictException)
+                    {
+                        // The provider confirmed that this create did not acquire the key.
+                        attemptedImageKeys.RemoveAt(attemptedImageKeys.Count - 1);
+                        throw;
+                    }
+                }
+
                 chunkWriteAttempted = true;
                 await _chunks.UpsertAsync(persistedChunks, cancellationToken).ConfigureAwait(false);
 
@@ -149,6 +173,18 @@ internal sealed class DocumentHandler : IDocumentHandler
                     try
                     {
                         await _chunks.DeleteByIdsAsync(ids, CancellationToken.None).ConfigureAwait(false);
+                    }
+                    catch (Exception rollbackError)
+                    {
+                        rollbackErrors.Add(rollbackError);
+                    }
+                }
+
+                if (attemptedImageKeys.Count > 0)
+                {
+                    try
+                    {
+                        await _storage.DeleteAsync(attemptedImageKeys, CancellationToken.None).ConfigureAwait(false);
                     }
                     catch (Exception rollbackError)
                     {
@@ -230,7 +266,7 @@ internal sealed class DocumentHandler : IDocumentHandler
                 result.SourceName,
                 result.SourceType,
                 result.Chunks.Select(chunk => new ProcessedChunk(
-                    chunk.Id, chunk.SectionId, chunk.SectionTitle, chunk.Text)).ToArray());
+                    chunk.Id, chunk.SectionId, chunk.SectionTitle, chunk.Text, [])).ToArray(), []);
         }
 
         await using var documentStream = new FileStream(
@@ -243,7 +279,7 @@ internal sealed class DocumentHandler : IDocumentHandler
             document.SourceName,
             document.SourceType,
             document.Chunks.Select(chunk => new ProcessedChunk(
-                chunk.Id, chunk.SectionId, chunk.SectionTitle, chunk.Text)).ToArray());
+                chunk.Id, chunk.SectionId, chunk.SectionTitle, chunk.Text, chunk.ImageIds)).ToArray(), document.Images);
     }
 
     private async Task<string> StageUploadAsync(Stream content, CancellationToken cancellationToken)
@@ -371,7 +407,8 @@ internal sealed class DocumentHandler : IDocumentHandler
         string DocumentId,
         string SourceName,
         string SourceType,
-        IReadOnlyList<ProcessedChunk> Chunks);
+        IReadOnlyList<ProcessedChunk> Chunks,
+        IReadOnlyList<DocumentImage> Images);
 
-    private sealed record ProcessedChunk(string Id, string? SectionId, string? SectionTitle, string Text);
+    private sealed record ProcessedChunk(string Id, string? SectionId, string? SectionTitle, string Text, IReadOnlyList<string> ImageIds);
 }

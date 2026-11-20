@@ -51,7 +51,7 @@ internal sealed class SupabaseTransport(IHttpClientFactory clients, SupabaseOpti
         if (!response.IsSuccessStatusCode)
         {
             var statusCode = response.StatusCode;
-            (string? SqlState, string? ConstraintName) error;
+            (string? Code, string? ConstraintName, bool StorageConflict) error;
             try
             {
                 error = await ReadDatabaseErrorAsync(response, cancellationToken).ConfigureAwait(false);
@@ -60,7 +60,7 @@ internal sealed class SupabaseTransport(IHttpClientFactory clients, SupabaseOpti
             {
                 response.Dispose();
             }
-            throw new SupabaseRequestException(statusCode, error.SqlState, error.ConstraintName);
+            throw new SupabaseRequestException(statusCode, error.Code, error.ConstraintName, error.StorageConflict);
         }
 
         return response;
@@ -97,7 +97,7 @@ internal sealed class SupabaseTransport(IHttpClientFactory clients, SupabaseOpti
 
     internal static HttpRequestMessage Request(HttpMethod method, Uri uri) => new(method, uri);
 
-    private static async Task<(string? SqlState, string? ConstraintName)> ReadDatabaseErrorAsync(
+    private static async Task<(string? Code, string? ConstraintName, bool StorageConflict)> ReadDatabaseErrorAsync(
         HttpResponseMessage response,
         CancellationToken cancellationToken)
     {
@@ -113,11 +113,14 @@ internal sealed class SupabaseTransport(IHttpClientFactory clients, SupabaseOpti
             var details = root.TryGetProperty("details", out var detailsValue) ? detailsValue.GetString() : null;
             var providerText = $"{message} {details}";
             const string marker = "idx_one_active_invite_per_email";
-            return (sqlState, providerText.Contains(marker, StringComparison.Ordinal) ? marker : null);
+            var storageConflict = sqlState is "ResourceAlreadyExists" or "KeyAlreadyExists" ||
+                root.TryGetProperty("error", out var error) && error.ValueKind == JsonValueKind.String &&
+                error.GetString() is "Duplicate" or "AlreadyExists";
+            return (sqlState, providerText.Contains(marker, StringComparison.Ordinal) ? marker : null, storageConflict);
         }
         catch (Exception exception) when (exception is JsonException or IOException or InvalidOperationException)
         {
-            return (null, null);
+            return (null, null, false);
         }
     }
 }
@@ -125,10 +128,12 @@ internal sealed class SupabaseTransport(IHttpClientFactory clients, SupabaseOpti
 internal sealed class SupabaseRequestException(
     HttpStatusCode statusCode,
     string? sqlState,
-    string? constraintName)
+    string? constraintName,
+    bool storageConflict)
     : DependencyFailureException("Supabase", "HTTP request")
 {
     internal HttpStatusCode StatusCode { get; } = statusCode;
     internal bool IsUniqueViolation => sqlState == "23505";
+    internal bool IsStorageConflict => StatusCode == HttpStatusCode.Conflict || storageConflict;
     internal string? ConstraintName { get; } = constraintName;
 }

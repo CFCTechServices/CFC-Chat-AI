@@ -18,7 +18,7 @@ public sealed class UploadParityFixtureTests
     }
 
     [Fact]
-    public async Task EmbeddedImageDocxHasSearchableText()
+    public async Task EmbeddedImageDocxHasSearchableTextAndImage()
     {
         var processor = new DocumentProcessor(new DocumentProcessorOptions());
         await using var content = File.OpenRead(Fixture("embedded-image.docx"));
@@ -28,6 +28,12 @@ public sealed class UploadParityFixtureTests
         Assert.Single(result.Chunks);
         Assert.Contains("Synthetic text before the image", result.Chunks[0].Text);
         Assert.Contains("Synthetic text after the image", result.Chunks[0].Text);
+        var image = Assert.Single(result.Images);
+        Assert.Equal("image/png", image.ContentType);
+        Assert.Equal(".png", image.Extension);
+        Assert.Equal("f688dd6e21f010dd1052e979d9bd19c3a054ca0266e15e5e5673f97e3f7f9271", image.Id);
+        Assert.Equal(68, image.Content.Length);
+        Assert.Equal(new[] { image.Id }, result.Chunks[0].ImageIds);
     }
 
     [Theory]
@@ -43,5 +49,7 @@ public sealed class UploadParityFixtureTests
         Assert.Single(result.Sections);
         Assert.Single(result.Chunks);
         Assert.Contains("synthetic", result.Chunks[0].Text, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(result.Images);
+        Assert.Empty(result.Chunks[0].ImageIds);
     }
 }
