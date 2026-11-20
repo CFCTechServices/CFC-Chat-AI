@@ -1,7 +1,7 @@
 import http from 'node:http';
-import { readFile, stat } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolve, sep } from 'node:path';
 const routes = JSON.parse(await readFile(new URL('./routes-dotnet.manifest', import.meta.url)));
 const patterns = Object.entries(routes).map(([method, paths]) => [method, `^(?:${paths.join('|')})/?$`]);
 const deny = '^api/ingest/dev(?:/|$)';
@@ -14,11 +14,11 @@ function endToEndHeaders(headers) {
     ...String(headers.connection || '').toLowerCase().split(',').map(name => name.trim())]);
   return Object.fromEntries(Object.entries(headers).filter(([name]) => !hopByHop.has(name)));
 }
-if (process.argv[2] === '--iis') {
+const isCli = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isCli && process.argv[2] === '--iis') {
   const proxy = patterns.map(([method, pattern]) => `<rule name="API ${method}" stopProcessing="true"><match url="${pattern}"/><conditions><add input="{REQUEST_METHOD}" pattern="^${method}$"/></conditions><action type="Rewrite" url="http://127.0.0.1:5000/{R:0}" appendQueryString="true"/></rule>`).join('\n');
   console.log(`<configuration><system.webServer>
 <httpErrors existingResponse="PassThrough"/>
-<staticContent><remove fileExtension=".jsx"/><mimeMap fileExtension=".jsx" mimeType="text/javascript"/></staticContent>
 <defaultDocument enabled="true"><files><clear/><add value="index.html"/></files></defaultDocument>
 <security><requestFiltering allowDoubleEscaping="false"><requestLimits maxAllowedContentLength="53477376"/></requestFiltering></security>
 <rewrite><rules><clear/>
@@ -28,13 +28,16 @@ ${proxy}
 <rule name="UI page" stopProcessing="true"><match url="${uiPage}"/><conditions><add input="{REQUEST_METHOD}" pattern="^(GET|HEAD)$"/></conditions><action type="Rewrite" url="ui/index.html"/></rule>
 <rule name="Only UI files" stopProcessing="true"><match url="^ui(?:/|$)" negate="true"/><action type="CustomResponse" statusCode="404" statusReason="Not Found"/></rule>
 </rules></rewrite></system.webServer></configuration>`);
-} else {
-  const root = fileURLToPath(new URL('../web/', import.meta.url));
-  const mime = { html: 'text/html', js: 'text/javascript', jsx: 'text/javascript', css: 'text/css', png: 'image/png' };
+}
+
+export async function createLocalEdge(upstreamPort = 5000) {
+  const { buildUi } = await import('./build-ui.mjs');
+  const files = await buildUi();
+  const mime = { html: 'text/html; charset=utf-8', js: 'text/javascript', css: 'text/css', png: 'image/png' };
   const compiled = patterns.map(([method, pattern]) => [method, new RegExp(pattern, 'i')]);
   const blocked = new RegExp(deny, 'i');
   const pageRoute = new RegExp(uiPage, 'i');
-  http.createServer(async (req, res) => {
+  return http.createServer(async (req, res) => {
     const error = (code) => res.writeHead(code, { 'content-type': 'text/plain' }).end(http.STATUS_CODES[code]);
     try {
       const raw = req.url.split('?')[0];
@@ -42,9 +45,9 @@ ${proxy}
       if (!path.startsWith('/') || /%2f/i.test(raw) || /[\\%\x00-\x1f]/.test(path) || path.split('/').some(x => x === '.' || x === '..')) return error(404);
       if (blocked.test(path.slice(1))) return error(404);
       if (compiled.some(([method, pattern]) => req.method === method && pattern.test(path.slice(1)))) {
-        const headers = { ...endToEndHeaders(req.headers), host: '127.0.0.1:5000' };
+        const headers = { ...endToEndHeaders(req.headers), host: `127.0.0.1:${upstreamPort}` };
         for (const key of Object.keys(headers)) if (key === 'forwarded' || key.startsWith('x-forwarded-')) delete headers[key];
-        const upstream = http.request({ hostname: '127.0.0.1', port: 5000, method: req.method, path: req.url, headers }, reply => {
+        const upstream = http.request({ hostname: '127.0.0.1', port: upstreamPort, method: req.method, path: req.url, headers }, reply => {
           res.writeHead(reply.statusCode, endToEndHeaders(reply.headers));
           reply.on('error', () => res.destroy());
           reply.pipe(res);
@@ -65,11 +68,14 @@ ${proxy}
       if (path === '/' || path === '/ui') return res.writeHead(302, { location: '/ui/' }).end();
       const page = pageRoute.test(path.slice(1));
       if (!page && !path.startsWith('/ui/')) return error(404);
-      const file = resolve(root, page ? 'index.html' : path.slice(4) || 'index.html');
-      const type = mime[file.split('.').at(-1)];
-      if (!file.startsWith(resolve(root) + sep) || !type || !(await stat(file)).isFile()) return error(404);
-      res.writeHead(200, { 'content-type': type });
-      res.end(req.method === 'HEAD' ? undefined : await readFile(file));
+      const file = page ? 'index.html' : path.slice(4) || 'index.html';
+      if (!files.has(file)) return error(404);
+      res.writeHead(200, { 'content-type': mime[file.split('.').at(-1)] });
+      res.end(req.method === 'HEAD' ? undefined : files.get(file));
     } catch { if (!res.headersSent) error(404); else res.destroy(); }
-  }).listen(8080, '127.0.0.1', () => console.log('http://127.0.0.1:8080/ui/'));
+  });
+}
+
+if (isCli && process.argv[2] !== '--iis') {
+  (await createLocalEdge()).listen(8080, '127.0.0.1', () => console.log('http://127.0.0.1:8080/ui/'));
 }

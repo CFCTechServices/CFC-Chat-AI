@@ -1,11 +1,47 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
-import { spawn, execFileSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { once } from 'node:events';
+import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+import { runInNewContext } from 'node:vm';
+import { createLocalEdge } from './dotnet-edge.mjs';
 
 const script = fileURLToPath(new URL('./dotnet-edge.mjs', import.meta.url));
+
+function bundleUrl(html) {
+  assert.doesNotMatch(html, /babel|\.jsx\b/);
+  const match = html.match(/<script defer src="(\/ui\/app-[a-f0-9]{16}\.js)"><\/script>/);
+  assert.ok(match, 'expected a precompiled classic UI script');
+  return match[1];
+}
+
+test('IIS staging emits only deployable assets and the classic bundle reaches React mount', async t => {
+  const temp = await mkdtemp(join(tmpdir(), 'cfc-ui-'));
+  t.after(() => rm(temp, { recursive: true, force: true }));
+  const output = join(temp, 'ui');
+  const builder = fileURLToPath(new URL('./build-ui.mjs', import.meta.url));
+  execFileSync(process.execPath, [builder, output]);
+  const html = await readFile(join(output, 'index.html'), 'utf8');
+  const name = bundleUrl(html).slice('/ui/'.length);
+  assert.deepEqual((await readdir(output)).sort(), [name, 'index.html', 'logo-cfc.png', 'styles.css']);
+
+  const root = {};
+  let rendered;
+  runInNewContext(await readFile(join(output, name), 'utf8'), {
+    window: { location: {} },
+    document: { getElementById: id => { assert.equal(id, 'root'); return root; } },
+    React: { createContext: () => ({}), createElement: component => ({ component }) },
+    ReactDOM: { createRoot: element => {
+      assert.equal(element, root);
+      return { render: tree => { rendered = tree; } };
+    } },
+  });
+  assert.equal(typeof rendered?.component, 'function');
+});
 
 test('generated IIS config has deny-first routing, no Python fallback, and a bounded body size', () => {
   const xml = execFileSync(process.execPath, [script, '--iis'], { encoding: 'utf8' });
@@ -25,19 +61,18 @@ test('local same-origin edge passes approved traffic and rejects everything else
     received.push({ url: req.url, method: req.method, headers: req.headers, body });
     res.writeHead(409, { 'content-type': 'application/json' }).end('{"detail":"mock response"}');
   });
-  upstream.listen(5000, '127.0.0.1');
+  upstream.listen(0, '127.0.0.1');
   await once(upstream, 'listening');
   t.after(() => upstream.close());
-  const proxy = spawn(process.execPath, [script], { stdio: ['ignore', 'pipe', 'inherit'] });
-  t.after(() => proxy.kill());
-  await Promise.race([
-    once(proxy.stdout, 'data'),
-    once(proxy, 'exit').then(([code]) => { throw new Error(`Proxy exited: ${code}`); }),
-  ]);
+  const proxy = await createLocalEdge(upstream.address().port);
+  proxy.listen(0, '127.0.0.1');
+  await once(proxy, 'listening');
+  t.after(() => proxy.close());
+  const { port } = proxy.address();
 
   // Native HTTP keeps request paths intact for the encoding checks.
   const request = (path, method = 'GET', body) => new Promise((resolve, reject) => {
-    const req = http.request({ hostname: '127.0.0.1', port: 8080, path, method, agent: false, headers: {
+    const req = http.request({ hostname: '127.0.0.1', port, path, method, agent: false, headers: {
       authorization: 'Bearer local-test', 'x-forwarded-for': '203.0.113.12', forwarded: 'for=203.0.113.12',
       ...(body ? { 'content-length': Buffer.byteLength(body), 'content-type': 'application/json' } : {}),
     } }, async res => {
@@ -53,12 +88,20 @@ test('local same-origin edge passes approved traffic and rejects everything else
   const root = await request('/');
   assert.equal(root.status, 302);
   assert.equal(root.headers.location, '/ui/');
-  assert.match((await request('/ui/')).text, /\/ui\/main\.jsx/);
-  assert.equal((await request('/ui/main.jsx?v=dev2')).headers['content-type'], 'text/javascript');
-  assert.equal((await request('/ui/styles.css', 'HEAD')).text, '');
-  assert.match((await request('/reset-password')).text, /\/ui\/main\.jsx/);
-  assert.match((await request('/chat')).text, /\/ui\/main\.jsx/);
-  assert.match((await request('/docs')).text, /\/ui\/main\.jsx/);
+  const entry = await request('/ui/');
+  assert.equal(entry.status, 200);
+  const bundle = await request(bundleUrl(entry.text));
+  assert.equal(bundle.status, 200);
+  assert.equal(bundle.headers['content-type'], 'text/javascript');
+  assert.ok(bundle.text.length > 0);
+  const css = await request('/ui/styles.css', 'HEAD');
+  assert.equal(css.headers['content-type'], 'text/css');
+  assert.equal(css.text, '');
+  for (const page of ['/reset-password', '/chat', '/admin', '/docs']) {
+    const reply = await request(page);
+    assert.equal(reply.status, 200);
+    assert.equal(reply.text, entry.text);
+  }
 
   const body = '{"title":"New chat"}';
   const reply = await request('/api/chat/sessions?example=a%2Bb', 'POST', body);
@@ -87,7 +130,7 @@ test('local same-origin edge passes approved traffic and rejects everything else
   const approvedCount = received.length;
 
   for (const [path, method] of [
-    ['/unknown'], ['/ui/missing.jsx'], ['/ui/not-a-page'], ['/api/missing'], ['/api/health', 'POST'],
+    ['/unknown'], ['/ui/missing.js'], ['/ui/main.jsx?v=dev2'], ['/ui/not-a-page'], ['/api/missing'], ['/api/health', 'POST'],
     ['/api/videos/upload', 'POST'], ['/api/ingest/document', 'POST'], ['/api/health/detailed'],
     ['/api/ingest/dev', 'POST'], ['/API/Ingest/DEV/', 'POST'], ['/api/ingest/dev/a', 'DELETE'],
     ['/api/%69ngest/%64ev/a', 'DELETE'], ['/api/ingest%2Fdev', 'POST'],

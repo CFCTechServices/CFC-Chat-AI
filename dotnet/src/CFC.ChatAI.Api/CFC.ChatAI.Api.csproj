@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- dotnet run otherwise starts in the project directory and misses the repository .env. -->
+    <RunWorkingDirectory Condition="'$(RunWorkingDirectory)' == ''">$(MSBuildProjectDirectory)/../../..</RunWorkingDirectory>
   </PropertyGroup>
 
   <ItemGroup>
