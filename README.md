@@ -70,7 +70,7 @@ dotnet test dotnet/CFC.ChatAI.slnx
 dotnet run --project dotnet/src/CFC.ChatAI.Api/CFC.ChatAI.Api.csproj
 ```
 
-The API loads the root `.env` when launched from the repository root, without overwriting existing environment variables. It listens on `http://127.0.0.1:5000` by default; `DOTNET_API_PORT` changes the port, and `Api:Urls` overrides the URL. It does not serve the Python UI or FastAPI Swagger documentation. The checked-in Python host serves the UI and its own API; no development proxy to .NET or .NET CORS policy is provided. Verify same-origin frontend routing (or configure and verify CORS) before using the updated UI with .NET; never proxy the dev ingest or delete routes.
+The API loads the root `.env` when launched from the repository root, without overwriting existing environment variables. It listens on `http://127.0.0.1:5000` by default; `DOTNET_API_PORT` changes the port, and `Api:Urls` overrides the URL. It does not serve static UI files. With the API on its default port, run `node deployment/dotnet-edge.mjs` (Node.js 22+) in a second terminal and open `http://127.0.0.1:8080/ui/`. The local proxy serves the UI and forwards only the allowed API methods and paths; no CORS changes or Python service are needed. Development ingest/delete routes are never proxied.
 
 - Health routes are mapped without provider credentials. `/api/health` checks the host, not end-to-end readiness. `/api/health/detailed` checks dependencies, but its Azure OpenAI check only checks configuration, not a live completion.
 - Supabase-backed routes are mapped only when `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are all nonempty. Chat, feedback submission and vector stats additionally require `PINECONE_API_KEY`, `PINECONE_INDEX_NAME`, `Embedding:ModelPath` and `Embedding:VocabularyPath`. Missing configuration means routes are absent (404), not mock successes. Nonempty placeholder values do not prove connectivity.
@@ -119,7 +119,7 @@ Use a disposable non-production project for provider-backed tests and inspect te
 
 ## Windows deployment and operations
 
-The checked-in deployment is a native Python service on Windows, managed by NSSM, with IIS/ARR serving the UI and reverse-proxying API requests. It is not a .NET deployment script. The proposed Python-free deployment is tracked in the [routing and hosting plan](dotnet/docs/plan/routing-and-hosting.md); it has not been implemented or validated. Confirm the host, paths, network access, service identity and currently deployed config with the operator before making changes; historic private IPs and VPN instructions may no longer be valid.
+For a Python-free development deployment, follow the [.NET/IIS deployment checklist](deployment/DOTNET-IIS.md). It uses IIS/ARR and a self-contained Windows x64 .NET service managed by NSSM. Validate IIS routing and browser flows on the target host before relying on it. The instructions below describe the legacy Python deployment and are not steps for the .NET target.
 
 ### One-time preparation
 

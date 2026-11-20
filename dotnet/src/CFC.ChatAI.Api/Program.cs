@@ -17,7 +17,8 @@ using CFC.ChatAI.Supabase.Conversations;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.RateLimiting;
 
-// The server is launched from the repository root. Preserve explicitly set environment variables.
+// Load from the configured working directory (repository root locally; private directory in NSSM).
+// Preserve explicitly set environment variables.
 DotNetEnv.Env.NoClobber().Load(".env");
 
 var builder = WebApplication.CreateBuilder(args);

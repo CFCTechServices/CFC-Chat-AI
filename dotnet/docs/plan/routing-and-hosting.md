@@ -1,6 +1,6 @@
 # Plan: host and route the system without the Python backend
 
-**Status: proposed; not implemented or approved for cutover.** This plan covers Windows IIS/ARR and the .NET API, the current deployment target in the repository. It does not close the [API cutover](internal-api-cutover.md), [profile security](supabase-profile-self-service-security.md), or provider acceptance gates. Confirm the real deployment with the operator before changing it.
+**Status: development deployment path implemented in the repository; IIS/ARR and live provider checks are pending.** Use the [.NET/IIS checklist](../../../deployment/DOTNET-IIS.md), [route inventory](routing-and-hosting-routes.md) and [recorded development defaults](routing-and-hosting-preflight.md). The original design and release gates below are retained for reference; the checklist governs the current development deployment. This does not close the [API cutover](internal-api-cutover.md), [profile security](supabase-profile-self-service-security.md), or provider acceptance gates.
 
 ## Goal and current state
 
