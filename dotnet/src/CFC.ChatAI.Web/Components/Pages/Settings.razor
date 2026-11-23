@@ -1,0 +1,163 @@
+@page "/settings"
+@using CFC.ChatAI.Web.Models
+@using CFC.ChatAI.Web.Services
+@inject SupabaseSessionService Session
+@implements IDisposable
+
+<PageTitle>Settings | CFC Chat AI</PageTitle>
+@if (Profile is { } account)
+{
+    <section class="settings" aria-labelledby="settings-title">
+        <h1 id="settings-title">Settings</h1>
+        <form @onsubmit="SaveProfileAsync" @onsubmit:preventDefault>
+            <fieldset disabled="@busy">
+                <legend>Profile</legend>
+                <dl>
+                    <dt>Email address</dt><dd>@account.Email</dd>
+                    <dt>Account role</dt><dd>@account.Role</dd>
+                </dl>
+                <label for="settings-name">Full name</label>
+                <input id="settings-name" type="text" autocomplete="name" @bind="name" @bind:event="oninput" />
+                <div class="avatar-row">
+                    @if (AvatarUrl is { } url && url != failedImage)
+                    {
+                        <img @key="url" src="@url" alt="Profile avatar" width="60" height="60" referrerpolicy="no-referrer"
+                             @onerror="() => ImageFailed(url)" />
+                    }
+                    <div>
+                        <label for="settings-avatar">Profile image</label>
+                        <small id="avatar-help">PNG, JPEG, WebP or GIF, up to 512 KiB.</small>
+                        <InputFile @key="fileVersion" id="settings-avatar" accept="@ProfileAvatar.AcceptedTypes"
+                                   aria-describedby="avatar-help" OnChange="SelectAvatarAsync" />
+                    </div>
+                </div>
+                @if (avatar is not null || invalidFile)
+                {
+                    <button type="button" class="secondary" @onclick="DiscardAvatar">Discard image selection</button>
+                }
+                <button type="submit" disabled="@(!HasProfileChange || invalidFile)">Save profile</button>
+            </fieldset>
+            @if (profileResult is { } result)
+            {
+                <p role="@(result.Success ? "status" : "alert")">@result.Message</p>
+            }
+        </form>
+        <form @onsubmit="ChangePasswordAsync" @onsubmit:preventDefault>
+            <fieldset disabled="@busy">
+                <legend>Change password</legend>
+                <label for="settings-password">New password</label>
+                <input id="settings-password" type="password" autocomplete="new-password" required minlength="6"
+                       aria-describedby="password-help" @ref="password" />
+                <small id="password-help">Use at least 6 characters. A longer password or a mix of character types improves strength.</small>
+                <label for="settings-confirmation">Confirm new password</label>
+                <input id="settings-confirmation" type="password" autocomplete="new-password" required @ref="confirmation" />
+                <button type="submit">Update password</button>
+            </fieldset>
+            @if (passwordResult is { } outcome)
+            {
+                <p role="@(outcome.Success ? "status" : "alert")">@outcome.Message</p>
+            }
+        </form>
+    </section>
+}
+
+@code {
+    [CascadingParameter] public ProfileResponse? Profile { get; set; }
+    private readonly CancellationTokenSource lifetime = new();
+    private string name = "";
+    private string savedName = "";
+    private ProfileAvatar? avatar;
+    private string? failedImage;
+    private int fileVersion;
+    private bool busy;
+    private bool invalidFile;
+    private SettingsResult? profileResult, passwordResult;
+    private ElementReference password, confirmation;
+
+    private string? AvatarUrl => avatar?.DataUrl ?? ProfileAvatar.DisplayUrl(Profile?.AvatarUrl);
+    private bool HasProfileChange => name != savedName || avatar is not null;
+
+    protected override void OnParametersSet()
+    {
+        var latestName = Profile?.FullName ?? "";
+        if (name == savedName) name = latestName;
+        savedName = latestName;
+    }
+
+    private async Task SelectAvatarAsync(InputFileChangeEventArgs args)
+    {
+        if (busy || Profile is null) return;
+        busy = true;
+        profileResult = null;
+        avatar = null;
+        invalidFile = true;
+        try
+        {
+            avatar = await ProfileAvatar.ReadAsync(args.File, lifetime.Token);
+            failedImage = null;
+            invalidFile = false;
+        }
+        catch (InvalidDataException ex) { profileResult = new(false, ex.Message); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        catch (Exception ex) when (ex is IOException or JSException or OperationCanceledException)
+        {
+            profileResult = new(false, "Could not read the image. Select the file again.");
+        }
+        finally { busy = false; }
+    }
+
+    private void DiscardAvatar()
+    {
+        fileVersion++;
+        avatar = null;
+        invalidFile = false;
+        profileResult = null;
+    }
+
+    private void ImageFailed(string url)
+    {
+        if (AvatarUrl != url) return;
+        failedImage = url;
+        if (avatar is null) return;
+        invalidFile = true;
+        profileResult = new(false, "Your browser could not display this image. Choose another file.");
+    }
+
+    private async Task SaveProfileAsync()
+    {
+        if (busy || invalidFile || Profile is null || !HasProfileChange) return;
+        var owner = Profile.Id;
+        busy = true;
+        profileResult = null;
+        try
+        {
+            var result = await Session.SaveProfileAsync(owner, name == savedName ? null : name, avatar, lifetime.Token);
+            if (lifetime.IsCancellationRequested) return;
+            if (result.Success)
+            {
+                if (Session.State.Profile is not { } saved || saved.Id != owner) return;
+                DiscardAvatar();
+                name = savedName = saved.FullName ?? "";
+            }
+            profileResult = result;
+        }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        finally { busy = false; }
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        if (busy || Profile is null) return;
+        busy = true;
+        passwordResult = null;
+        try { passwordResult = await Session.ChangePasswordAsync(Profile.Id, password, confirmation, lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
+        finally { busy = false; }
+    }
+
+    public void Dispose()
+    {
+        lifetime.Cancel();
+        lifetime.Dispose();
+    }
+}

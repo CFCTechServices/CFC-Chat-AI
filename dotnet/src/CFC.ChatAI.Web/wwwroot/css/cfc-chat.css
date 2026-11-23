@@ -711,6 +711,15 @@ body:has(.login-page) {
     margin-top: 10px;
 }
 
+.answer-sources {
+    margin-top: 0.75rem;
+    font-size: 0.9em;
+    color: #475569;
+    overflow-wrap: anywhere;
+}
+
+.answer-sources summary { cursor: pointer; }
+
 .chat-answer-image-button {
     padding: 0;
     background: transparent;
@@ -722,7 +731,7 @@ body:has(.login-page) {
 
     .chat-answer-image-button img {
         display: block;
-        max-width: 260px;
+        max-width: min(260px, 100%);
         max-height: 220px;
         width: auto;
         height: auto;

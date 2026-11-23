@@ -340,3 +340,77 @@ test("ordinary, expired, and mismatched sessions cannot update a password throug
         assert.equal(await tab.api.updatePassword({}, {}), "invalid");
     }
 });
+
+test("Settings validates both password fields before calling the SDK", async () => {
+    const tab = await startTab();
+    tab.sdk.getSession = () => assert.fail("Invalid input reached the SDK");
+    for (const [password, confirmation, outcome] of [
+        ["short", "short", "short"], ["abcdef", "abcdef", "weak_password"], [randomUUID(), "", "mismatch"]
+    ]) {
+        assert.equal(await tab.api.changePassword("a", "current", { value: password }, { value: confirmation }), outcome);
+    }
+});
+
+test("Settings submits through the verified account, clears the fields and rejects duplicate submissions", async () => {
+    const token = randomUUID();
+    let sent = 0;
+    const tab = createTab(undefined, undefined, undefined, { globals: {
+        Headers, fetch() { sent++; return {}; }
+    } });
+    await tab.initialize();
+    tab.sdk.getSession = () => ({ data: { session: { user: { id: "a" }, access_token: token } } });
+    const entered = randomUUID(), input = { value: entered }, confirm = { value: entered };
+    tab.sdk.updateUser = async ({ password }) => {
+        assert.equal(password, entered);
+        await tab.sdkFetch("https://example.test/auth/v1/user", { method: "PUT", headers: { authorization: "Bearer " + token } });
+        return { data: { user: { id: "a" } } };
+    };
+    const pending = tab.api.changePassword("a", "current", input, confirm);
+    assert.equal(await tab.api.changePassword("a", "current", input, confirm), "busy");
+    assert.equal(await pending, "updated");
+    assert.equal(sent, 1);
+    assert.equal(input.value, "");
+    assert.equal(confirm.value, "");
+});
+
+test("Settings refuses writes after an account or circuit changes, including during the SDK lock", async () => {
+    for (const scenario of ["expired", "otherOwner", "reconnected", "replacedToken", "disconnected"]) {
+        let sent = 0, sdkCalls = 0;
+        const tab = createTab(undefined, undefined, undefined, { globals: {
+            Headers, fetch() { sent++; return {}; }
+        } });
+        await tab.initialize();
+        const token = randomUUID(), password = randomUUID();
+        tab.sdk.getSession = () => ({ data: { session: scenario === "expired" ? null :
+            { access_token: token, user: { id: scenario === "otherOwner" ? "b" : "a" } } } });
+        tab.sdk.updateUser = async () => {
+            sdkCalls++;
+            if (scenario === "disconnected") tab.api.disconnect("current");
+            await tab.sdkFetch("https://example.test/auth/v1/user", {
+                method: "PUT", headers: { authorization: "Bearer " + (scenario === "replacedToken" ? randomUUID() : token) }
+            });
+            return { data: { user: { id: "a" } } };
+        };
+        const status = await tab.api.changePassword("a", scenario === "reconnected" ? "previous" : "current",
+            { value: password }, { value: password });
+        assert.equal(status, scenario === "expired" ? "expired" : "changed", scenario);
+        assert.equal(sent, 0, scenario);
+        assert.equal(sdkCalls, ["disconnected", "replacedToken"].includes(scenario) ? 1 : 0, scenario);
+    }
+});
+
+test("Settings returns safe Supabase error codes and requires a matching successful result", async () => {
+    const tab = await startTab();
+    tab.sdk.getSession = () => ({ data: { session: { user: { id: "a" }, access_token: randomUUID() } } });
+    for (const [response, expected] of [
+        [{ error: { code: "weak_password" } }, "weak_password"],
+        [{ error: { code: "same_password" } }, "same_password"],
+        [{ error: { code: "reauthentication_needed" } }, "reauthenticate"],
+        [{ error: { status: 401 } }, "expired"], [{ error: { status: 429 } }, "rate_limit"],
+        [{ data: { user: { id: "b" } } }, "changed"], [null, "unavailable"]
+    ]) {
+        tab.sdk.updateUser = () => { if (!response) throw new Error("private provider detail"); return response; };
+        const password = randomUUID();
+        assert.equal(await tab.api.changePassword("a", "current", { value: password }, { value: password }), expected);
+    }
+});

@@ -58,6 +58,7 @@
                 {
                     <ChatMessage @key="message" Sender="@(message.Role == "user" ? "You" : "CFC AI")"
                                  Text="@message.Content" Rating="@message.Rating"
+                                 Metadata="@(message.Role == "assistant" ? message.Metadata : null)" BackendAddress="@Api.BaseAddress"
                                  FeedbackDisabled="@(!message.IsSavedAssistant || !chat.CanRate(active))"
                                  OnVote="thumb => chat.ToggleFeedbackAsync(active, message, thumb)" />
                 }

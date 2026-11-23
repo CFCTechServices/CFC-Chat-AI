@@ -54,6 +54,17 @@ public sealed class FastApiClientTests : IDisposable
     }
 
     [Fact]
+    public async Task PatchesOnlyChangedProfileFieldsForBearerOwner()
+    {
+        const string profileJson = """{"id":"u1","email":"user@example.test","role":"user","status":"active","created_at":"today","full_name":"Pat","avatar_url":"image"}""";
+        Expect(HttpMethod.Patch, "api/profile/me", profileJson, token, """{"full_name":"Pat"}""");
+        Assert.Equal("Pat", (await client.UpdateProfileAsync(token, new("Pat", null))).FullName);
+        Expect(HttpMethod.Patch, "api/profile/me", profileJson, token, """{"avatar_url":"image"}""");
+        Assert.Equal("image", (await client.UpdateProfileAsync(token, new(null, "image"))).AvatarUrl);
+        Assert.Null(http.DefaultRequestHeaders.Authorization);
+    }
+
+    [Fact]
     public async Task ListsLightweightAndDetailedSessions()
     {
         Expect(HttpMethod.Get, "api/chat/sessions", $"[{SessionJson}]", token);

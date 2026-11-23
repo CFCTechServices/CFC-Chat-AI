@@ -4,6 +4,7 @@ window.cfcAuth = (() => {
     let subscription;
     let listener;
     let connection;
+    let passwordChange;
     let storageKey;
     let operations = 0;
     let sdkLoad;
@@ -47,6 +48,21 @@ window.cfcAuth = (() => {
         const timeout = AbortSignal.timeout(30000);
         const signal = init.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
         return fetch(input, { ...init, signal });
+    }
+
+    function sessionFetch(input, init = {}) {
+        // updateUser acquires the SDK lock after getSession. If the SDK switched
+        // sessions while waiting, stop the write before it reaches Supabase.
+        if ((init.method ?? input.method)?.toUpperCase() === "PUT" &&
+            new URL(input.url ?? input).pathname.endsWith("/user")) {
+            const change = passwordChange;
+            const authorization = new Headers(init.headers ?? input.headers).get("authorization");
+            if (!change?.token || !listener || connection !== change.connection || authorization !== "Bearer " + change.token) {
+                if (change) change.stale = true;
+                throw new Error("The authenticated session changed.");
+            }
+        }
+        return authFetch(input, init);
     }
 
     function loadSdk() {
@@ -97,7 +113,7 @@ window.cfcAuth = (() => {
                 removeItem: key => sessionStorage.removeItem(tabKey(key))
             };
             auth = sdk.createClient(url, publicKey, {
-                global: { fetch: authFetch },
+                global: { fetch: sessionFetch },
                 auth: { storage, storageKey: clientKey, persistSession: true,
                     autoRefreshToken: true, detectSessionInUrl: false }
             }).auth;
@@ -222,6 +238,44 @@ window.cfcAuth = (() => {
         return "updated";
     }
 
+    async function changePassword(ownerId, connectionId, passwordInput, confirmationInput) {
+        if (!listener || connection !== connectionId) return "changed";
+        if (passwordChange) return "busy";
+        const password = passwordInput.value;
+        if (password.length < 6) return "short";
+        if (password !== confirmationInput.value) return "mismatch";
+        // Match the active React Settings form's minimum strength.
+        const score = Math.min(30, password.length * 3) + (/[a-z]/.test(password) ? 10 : 0) +
+            (/[A-Z]/.test(password) ? 10 : 0) + (/\d/.test(password) ? 10 : 0) +
+            (/[^A-Za-z0-9]/.test(password) ? 20 : 0) + (password.length >= 12 ? 20 : 0);
+        if (score < 60) return "weak_password";
+
+        const change = { connection: connectionId };
+        passwordChange = change;
+        passwordInput.value = confirmationInput.value = "";
+        try {
+            const current = await auth.getSession();
+            if (current.error) return classify(current.error);
+            const session = current.data?.session;
+            if (!session?.access_token) return "expired";
+            if (!listener || connection !== connectionId || session.user?.id !== ownerId) return "changed";
+            change.token = session.access_token;
+            const { data, error } = await auth.updateUser({ password });
+            if (change.stale || !listener || connection !== connectionId) return "changed";
+            if (error) {
+                if (error.code === "same_password" || error.code === "weak_password") return error.code;
+                if (["reauthentication_needed", "reauthentication_not_valid", "insufficient_aal"].includes(error.code))
+                    return "reauthenticate";
+                return classify(error);
+            }
+            return data?.user?.id === ownerId ? "updated" : "changed";
+        } catch {
+            return change.stale ? "changed" : "unavailable";
+        } finally {
+            passwordChange = undefined;
+        }
+    }
+
     async function signOut() {
         operations++;
         try {
@@ -245,7 +299,7 @@ window.cfcAuth = (() => {
     }
 
     return {
-        initialize, signIn, signUp, signOut, disconnect,
+        initialize, signIn, signUp, signOut, disconnect, changePassword,
         readEmail: input => input.value.trim(),
         hasRecoveryLink: () => Boolean(recoveryLink || recoveryAuth), prepareRecovery, updatePassword, discardRecovery,
         restore: () => checkSession(() => auth.getSession()),

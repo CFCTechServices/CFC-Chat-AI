@@ -40,9 +40,10 @@ public sealed partial class SupabaseSessionTests
             Assert.Contains("Sign Out", html);
             var nav = Regex.Match(html, "<nav aria-label=\"Primary navigation\"[^>]*>(.*?)</nav>", RegexOptions.Singleline);
             Assert.True(nav.Success);
-            Assert.Equal(2, Regex.Matches(nav.Value, "<a\\b").Count);
+            Assert.Equal(3, Regex.Matches(nav.Value, "<a\\b").Count);
             Assert.Contains("href=\"/chat\"", nav.Value);
             Assert.Contains("href=\"/history\"", nav.Value);
+            Assert.Contains("href=\"/settings\"", nav.Value);
             Assert.Contains("aria-current=\"page\"", nav.Value);
         });
     }
@@ -50,6 +51,7 @@ public sealed partial class SupabaseSessionTests
     [Theory]
     [InlineData(typeof(Chat), null, "login")]
     [InlineData(typeof(History), null, "login")]
+    [InlineData(typeof(Settings), null, "login")]
     [InlineData(typeof(AdminRouteProbe), null, "login")]
     [InlineData(typeof(AdminRouteProbe), "user", "chat")]
     [InlineData(typeof(AdminRouteProbe), "Admin", "chat")]
@@ -68,6 +70,7 @@ public sealed partial class SupabaseSessionTests
             Assert.DoesNotContain("Admin route probe", html);
             Assert.DoesNotContain("New Chat", html);
             Assert.DoesNotContain("Search conversations", html);
+            Assert.DoesNotContain("Save profile", html);
             Assert.DoesNotContain("Primary navigation", html);
             Assert.EndsWith("/" + redirect, navigation.Uri);
         });
@@ -139,7 +142,7 @@ public sealed partial class SupabaseSessionTests
 
     [Theory]
     [InlineData(typeof(History), "/history")]
-    [InlineData(typeof(SettingsRouteProbe), "/settings")]
+    [InlineData(typeof(Settings), "/settings")]
     [InlineData(typeof(DocsRouteProbe), "/docs")]
     public void PlannedMemberRoutesRequireAnActiveProfile(Type pageType, string path)
     {
@@ -184,6 +187,5 @@ public sealed partial class SupabaseSessionTests
         protected override void BuildRenderTree(RenderTreeBuilder builder) => builder.AddContent(0, "Admin route probe");
     }
 
-    [Route("/settings")] private sealed class SettingsRouteProbe : ComponentBase { }
     [Route("/docs")] private sealed class DocsRouteProbe : ComponentBase { }
 }

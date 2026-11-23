@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using CFC.ChatAI.Web.Serialization;
 
 namespace CFC.ChatAI.Web.Models;
 
@@ -23,8 +24,8 @@ public sealed record ChatMessageResponse(
     string Role,
     string Content,
     [property: JsonPropertyName("created_at")] string CreatedAt,
-    IReadOnlyList<Dictionary<string, JsonElement>>? Citations = null,
-    [property: JsonPropertyName("relevant_images")] IReadOnlyList<ChatImage>? RelevantImages = null);
+    [property: JsonConverter(typeof(ChatCitationsConverter))] IReadOnlyList<Dictionary<string, JsonElement>>? Citations = null,
+    [property: JsonPropertyName("relevant_images"), JsonConverter(typeof(ChatImageListConverter))] IReadOnlyList<ChatImage>? RelevantImages = null);
 
 public sealed record ChatHistoryMessage(
     string Id,
@@ -32,11 +33,11 @@ public sealed record ChatHistoryMessage(
     string Role,
     string Content,
     [property: JsonPropertyName("created_at")] string CreatedAt,
-    ChatMessageMetadata? Metadata = null);
+    [property: JsonConverter(typeof(StoredChatMetadataConverter))] ChatMessageMetadata? Metadata = null);
 
 public sealed record ChatMessageMetadata(
-    IReadOnlyList<Dictionary<string, JsonElement>>? Citations = null,
-    [property: JsonPropertyName("relevant_images")] IReadOnlyList<ChatImage>? RelevantImages = null)
+    [property: JsonConverter(typeof(ChatCitationsConverter))] IReadOnlyList<Dictionary<string, JsonElement>>? Citations = null,
+    [property: JsonPropertyName("relevant_images"), JsonConverter(typeof(ChatImageListConverter))] IReadOnlyList<ChatImage>? RelevantImages = null)
 {
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? AdditionalFields { get; init; }

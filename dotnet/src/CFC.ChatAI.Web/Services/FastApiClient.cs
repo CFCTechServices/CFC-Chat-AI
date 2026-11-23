@@ -7,6 +7,8 @@ namespace CFC.ChatAI.Web.Services;
 
 public sealed class FastApiClient(HttpClient httpClient) : IAuthenticationBackend
 {
+    public Uri? BaseAddress => httpClient.BaseAddress;
+
     private const string SessionsPath = "api/chat/sessions";
     private const string FeedbackPath = "api/chat/feedback";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
@@ -26,6 +28,9 @@ public sealed class FastApiClient(HttpClient httpClient) : IAuthenticationBacken
 
     public Task<ProfileResponse> GetProfileAsync(string accessToken, CancellationToken cancellationToken = default) =>
         SendAsync<ProfileResponse>(HttpMethod.Get, "api/profile/me", cancellationToken, Bearer(accessToken));
+
+    public Task<ProfileResponse> UpdateProfileAsync(string accessToken, UpdateProfileRequest request, CancellationToken cancellationToken = default) =>
+        SendAsync<ProfileResponse>(HttpMethod.Patch, "api/profile/me", cancellationToken, Bearer(accessToken), request);
 
     public Task<IReadOnlyList<ChatSession>> GetSessionsAsync(
         string accessToken, bool detail = false, CancellationToken cancellationToken = default)

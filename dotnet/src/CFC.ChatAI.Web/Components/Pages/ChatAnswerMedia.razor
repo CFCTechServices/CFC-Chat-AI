@@ -1,19 +1,26 @@
 ﻿
 @using Microsoft.JSInterop
+@using CFC.ChatAI.Web.Services
 @inject IJSRuntime JS
 
-@if (Images.Count > 0 || !string.IsNullOrWhiteSpace(VideoUrl))
+@if (Image is not null || !string.IsNullOrWhiteSpace(VideoUrl))
 {
     <div class="chat-answer-media">
 
-        @foreach (var url in Images)
+        @if (imageFailed)
+        {
+            <small>Image unavailable (@Image?.AltText)</small>
+        }
+        else if (Image is not null)
         {
             <button type="button"
                     class="chat-answer-image-button"
                     title="Enlarge image"
-                    @onclick="() => imagePreview = url">
-                <img src="@url"
-                     alt="Image referenced by CFC AI"
+                    @onclick="() => imagePreview = true">
+                <img src="@Image.Url.AbsoluteUri"
+                     alt="@Image.AltText"
+                     referrerpolicy="no-referrer"
+                     @onerror="ImageUnavailable"
                      loading="lazy" />
             </button>
         }
@@ -52,7 +59,7 @@
     </div>
 }
 
-@if (imagePreview is not null)
+@if (imagePreview && Image is not null)
 {
     <div class="cfc-media-backdrop"
          @onclick="CloseImage">
@@ -64,12 +71,12 @@
 
             <button type="button"
                     class="cfc-media-close"
+                    aria-label="Close image preview"
                     @onclick="CloseImage">
                 ✕
             </button>
 
-            <img src="@imagePreview"
-                 alt="Enlarged document image" />
+            <img src="@Image.Url.AbsoluteUri" alt="@Image.AltText" referrerpolicy="no-referrer" @onerror="ImageUnavailable" />
         </div>
     </div>
 }
@@ -100,8 +107,7 @@
 
 @code {
     [Parameter]
-    public IReadOnlyList<string> Images { get; set; }
-        = Array.Empty<string>();
+    public AnswerImage? Image { get; set; }
 
     [Parameter]
     public string? VideoUrl { get; set; }
@@ -111,14 +117,21 @@
         { get; set; } =
         Array.Empty<(double Seconds, string Label)>();
 
-    private string? imagePreview;
+    private bool imagePreview;
+    private bool imageFailed;
+    private Uri? previousUrl;
     private bool videoExpanded;
     private ElementReference videoElement;
 
-    private void CloseImage()
+    protected override void OnParametersSet()
     {
-        imagePreview = null;
+        if (previousUrl == Image?.Url) return;
+        previousUrl = Image?.Url;
+        imagePreview = imageFailed = false;
     }
+
+    private void CloseImage() => imagePreview = false;
+    private void ImageUnavailable() { imageFailed = true; CloseImage(); }
 
     private void CloseVideo()
     {

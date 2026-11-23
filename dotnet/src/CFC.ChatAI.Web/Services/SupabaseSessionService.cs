@@ -14,7 +14,7 @@ public sealed record SessionState(SessionStatus Status, string? Message = null, 
 public enum SignUpOutcome { Failed, InvitationDenied, ConfirmationRequired, SessionReceived }
 public sealed record SignUpResult(SignUpOutcome Outcome, string? Message = null);
 
-public sealed class SupabaseSessionService(IAuthenticationBackend backend, IJSRuntime js, TimeProvider clock)
+public sealed partial class SupabaseSessionService(IAuthenticationBackend backend, IJSRuntime js, TimeProvider clock)
     : IChatSessionAccess, IAsyncDisposable
 {
     private readonly CancellationTokenSource lifetime = new();

@@ -232,7 +232,9 @@ public sealed partial class SupabaseSessionTests : IAsyncDisposable
 
         private ulong submitHandler;
         private ulong buttonHandler, inputHandler, changeHandler;
+        private ulong keyDownHandler, errorHandler;
         private int chatComponentId;
+        private int settingsComponentId;
 
         protected override Task UpdateDisplayAsync(in RenderBatch batch)
         {
@@ -240,6 +242,8 @@ public sealed partial class SupabaseSessionTests : IAsyncDisposable
             {
                 if (frame.FrameType == RenderTreeFrameType.Component && frame.ComponentType == typeof(Chat))
                     chatComponentId = frame.ComponentId;
+                if (frame.FrameType == RenderTreeFrameType.Component && frame.ComponentType == typeof(Settings))
+                    settingsComponentId = frame.ComponentId;
                 if (frame.FrameType == RenderTreeFrameType.Attribute && frame.AttributeName == "onsubmit")
                     submitHandler = frame.AttributeEventHandlerId;
                 if (frame.FrameType == RenderTreeFrameType.Attribute && frame.AttributeName == "onclick")
@@ -248,12 +252,26 @@ public sealed partial class SupabaseSessionTests : IAsyncDisposable
                     inputHandler = frame.AttributeEventHandlerId;
                 if (frame.FrameType == RenderTreeFrameType.Attribute && frame.AttributeName == "onchange")
                     changeHandler = frame.AttributeEventHandlerId;
+                if (frame.FrameType == RenderTreeFrameType.Attribute && frame.AttributeName == "onkeydown")
+                    keyDownHandler = frame.AttributeEventHandlerId;
+                if (frame.FrameType == RenderTreeFrameType.Attribute && frame.AttributeName == "onerror")
+                    errorHandler = frame.AttributeEventHandlerId;
             }
             return Task.CompletedTask;
         }
 
         public Task SubmitAsync() => DispatchEventAsync(submitHandler, null, EventArgs.Empty);
+        public Task SubmitSettingsFormAsync(int index)
+        {
+            var frames = GetCurrentRenderTreeFrames(settingsComponentId);
+            var handler = frames.Array.Take(frames.Count)
+                .Where(frame => frame.FrameType == RenderTreeFrameType.Attribute && frame.AttributeName == "onsubmit")
+                .ElementAt(index).AttributeEventHandlerId;
+            return DispatchEventAsync(handler, null, EventArgs.Empty);
+        }
         public Task ClickButtonAsync() => DispatchEventAsync(buttonHandler, null, new MouseEventArgs());
+        public Task PressEnterAsync() => DispatchEventAsync(keyDownHandler, null, new KeyboardEventArgs { Key = "Enter" });
+        public Task ImageErrorAsync() => DispatchEventAsync(errorHandler, null, new Microsoft.AspNetCore.Components.Web.ErrorEventArgs());
         public Task InputAsync(string text) => DispatchEventAsync(inputHandler, null, new ChangeEventArgs { Value = text });
         public Task SelectAsync(string value) => DispatchEventAsync(changeHandler, null, new ChangeEventArgs { Value = value });
 
@@ -618,6 +636,10 @@ public sealed partial class SupabaseSessionTests : IAsyncDisposable
     {
         public AuthConfigResponse Config = new("https://auth.example.test", "sb_publishable_" + Guid.NewGuid());
         public Func<string, Task<ProfileResponse>> Profile = _ => Task.FromResult(ActiveProfile());
+        public Func<string, UpdateProfileRequest, Task<ProfileResponse>> Update = (_, _) =>
+            throw new InvalidOperationException("Unexpected profile write.");
+        public Task<ProfileResponse> UpdateProfileAsync(string token, UpdateProfileRequest request, CancellationToken ct) =>
+            Update(token, request);
         public List<string> CheckedTokens { get; } = [];
         public List<string> InvitationEmails { get; } = [];
         public Func<string, Task<CheckEmailResponse>> Check = _ => Task.FromResult(new CheckEmailResponse(true, "Eligible"));
@@ -641,12 +663,14 @@ public sealed partial class SupabaseSessionTests : IAsyncDisposable
         public bool InitializeFails;
         public bool HasRecoveryLink, RecoveryVerified;
         public bool ConfirmationRequired;
+        public string PasswordOutcome = "updated";
         public List<string> Calls { get; } = [];
         public ValueTask<T> InvokeAsync<T>(string method, object?[]? args) => InvokeAsync<T>(method, default, args);
         public ValueTask<T> InvokeAsync<T>(string method, CancellationToken ct, object?[]? args)
         {
             if (Disconnected) throw new JSDisconnectedException("Circuit unavailable.");
-            if (method == "Blazor._internal.domWrapper.focusBySelector") return ValueTask.FromResult(default(T)!);
+            if (method is "Blazor._internal.domWrapper.focusBySelector" or "Blazor._internal.InputFile.init")
+                return ValueTask.FromResult(default(T)!);
             var action = method.Replace("cfcAuth.", "", StringComparison.Ordinal);
             Calls.Add(action);
             if (action == "initialize" && InitializeFails) throw new JSException("SDK unavailable.");
@@ -658,6 +682,7 @@ public sealed partial class SupabaseSessionTests : IAsyncDisposable
                 "prepareRecovery" => RecoveryVerified,
                 "discardRecovery" => null,
                 "updatePassword" when RecoveryVerified && args is [ElementReference, ElementReference] => "updated",
+                "changePassword" when args is ["user-a", Guid, ElementReference, ElementReference] => PasswordOutcome,
                 "readEmail" => "user@example.test",
                 "signUp" when args is [string, ElementReference, ElementReference] =>
                     new SupabaseSessionService.BrowserSession { AccessToken = Session, Error = Error, ConfirmationRequired = ConfirmationRequired },

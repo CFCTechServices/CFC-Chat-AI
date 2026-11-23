@@ -12,6 +12,10 @@ public sealed record CheckEmailResponse(bool Eligible, string Message);
 
 public sealed record ForgotPasswordResponse(bool Success, string Message);
 
+public sealed record UpdateProfileRequest(
+    [property: JsonPropertyName("full_name"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? FullName,
+    [property: JsonPropertyName("avatar_url"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? AvatarUrl);
+
 public sealed record ProfileResponse(
     string Id,
     string Email,
