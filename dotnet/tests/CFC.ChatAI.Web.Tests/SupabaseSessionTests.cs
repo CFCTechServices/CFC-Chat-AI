@@ -233,15 +233,15 @@ public sealed partial class SupabaseSessionTests : IAsyncDisposable
         private ulong submitHandler;
         private ulong buttonHandler, inputHandler, changeHandler;
         private ulong keyDownHandler, errorHandler;
-        private int chatComponentId;
+        private readonly Dictionary<Type, int> buttonOwners = [];
         private int settingsComponentId;
 
         protected override Task UpdateDisplayAsync(in RenderBatch batch)
         {
             foreach (var frame in batch.ReferenceFrames.Array.AsSpan(0, batch.ReferenceFrames.Count))
             {
-                if (frame.FrameType == RenderTreeFrameType.Component && frame.ComponentType == typeof(Chat))
-                    chatComponentId = frame.ComponentId;
+                if (frame.FrameType == RenderTreeFrameType.Component)
+                    buttonOwners[frame.ComponentType] = frame.ComponentId;
                 if (frame.FrameType == RenderTreeFrameType.Component && frame.ComponentType == typeof(Settings))
                     settingsComponentId = frame.ComponentId;
                 if (frame.FrameType == RenderTreeFrameType.Attribute && frame.AttributeName == "onsubmit")
@@ -275,23 +275,26 @@ public sealed partial class SupabaseSessionTests : IAsyncDisposable
         public Task InputAsync(string text) => DispatchEventAsync(inputHandler, null, new ChangeEventArgs { Value = text });
         public Task SelectAsync(string value) => DispatchEventAsync(changeHandler, null, new ChangeEventArgs { Value = value });
 
-        public Task ClickChatButtonAsync(string label)
+        public Task ClickChatButtonAsync(string label) => ClickButtonAsync<Chat>(label);
+
+        public Task ClickButtonAsync<T>(string label)
         {
-            var frames = GetCurrentRenderTreeFrames(chatComponentId);
+            var frames = GetCurrentRenderTreeFrames(buttonOwners[typeof(T)]);
             for (var i = 0; i < frames.Count; i++)
             {
                 var element = frames.Array[i];
                 if (element.FrameType != RenderTreeFrameType.Element || element.ElementName != "button") continue;
                 ulong handler = 0;
+                var caption = "";
                 foreach (var child in frames.Array.AsSpan(i + 1, element.ElementSubtreeLength - 1))
                 {
                     if (child.FrameType == RenderTreeFrameType.Attribute && child.AttributeName == "onclick")
                         handler = child.AttributeEventHandlerId;
-                    if (child.FrameType == RenderTreeFrameType.Text && child.TextContent.Trim() == label && handler != 0)
-                        return DispatchEventAsync(handler, null, new MouseEventArgs());
+                    if (child.FrameType == RenderTreeFrameType.Text) caption += child.TextContent;
                 }
+                if (handler != 0 && caption.Trim() == label) return DispatchEventAsync(handler, null, new MouseEventArgs());
             }
-            throw new InvalidOperationException($"Chat button '{label}' was not rendered.");
+            throw new InvalidOperationException($"Button '{label}' was not rendered by {typeof(T).Name}.");
         }
     }
 #pragma warning restore BL0006

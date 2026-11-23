@@ -13,7 +13,7 @@ public sealed class AppDestination
 
     private static readonly AppDestination Chat = new("Chat", "/chat");
     private static readonly AppDestination Docs = new("Docs", "/docs");
-    private static readonly AppDestination Admin = new("Admin", "/admin");
+    public static AppDestination Admin { get; } = new("Admin", "/admin");
     private static readonly AppDestination[] Destinations =
         [Chat, new("History", "/history"), new("Settings", "/settings"), Docs, Admin];
 

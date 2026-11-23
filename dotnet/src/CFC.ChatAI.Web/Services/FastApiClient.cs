@@ -11,6 +11,7 @@ public sealed class FastApiClient(HttpClient httpClient) : IAuthenticationBacken
 
     private const string SessionsPath = "api/chat/sessions";
     private const string FeedbackPath = "api/chat/feedback";
+    private const string AdminUsersPath = "api/admin/users";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         RespectRequiredConstructorParameters = true,
@@ -31,6 +32,31 @@ public sealed class FastApiClient(HttpClient httpClient) : IAuthenticationBacken
 
     public Task<ProfileResponse> UpdateProfileAsync(string accessToken, UpdateProfileRequest request, CancellationToken cancellationToken = default) =>
         SendAsync<ProfileResponse>(HttpMethod.Patch, "api/profile/me", cancellationToken, Bearer(accessToken), request);
+
+    public Task<AdminUserList> GetAdminUsersAsync(string token, CancellationToken ct) =>
+        SendAsync<AdminUserList>(HttpMethod.Get, AdminUsersPath, ct, Bearer(token));
+
+    public Task<AdminInvitation> InviteUserAsync(string token, EmailRequest request, CancellationToken ct) =>
+        SendAsync<AdminInvitation>(HttpMethod.Post, "api/admin/invite", ct, Bearer(token), request);
+
+    public Task<ChangeRoleResponse> ChangeUserRoleAsync(string token, ChangeRoleRequest request, CancellationToken ct) =>
+        SendAsync<ChangeRoleResponse>(HttpMethod.Post, "api/admin/change-role", ct, Bearer(token), request);
+
+    public Task<DeactivateUserResponse> DeactivateUserAsync(string token, string userId, CancellationToken ct) =>
+        SendAsync<DeactivateUserResponse>(HttpMethod.Post, AdminUserPath(userId) + "/deactivate", ct, Bearer(token), new { });
+
+    public Task<ReactivateUserResponse> ReactivateUserAsync(string token, string userId, CancellationToken ct) =>
+        SendAsync<ReactivateUserResponse>(HttpMethod.Post, AdminUserPath(userId) + "/reactivate", ct, Bearer(token));
+
+    public Task<DeleteUserResponse> DeleteUserAsync(string token, string userId, CancellationToken ct) =>
+        SendAsync<DeleteUserResponse>(HttpMethod.Delete, AdminUserPath(userId), ct, Bearer(token));
+
+    private static string AdminUserPath(string userId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+        if (userId is "." or "..") throw new ArgumentException("Invalid user ID.", nameof(userId));
+        return $"{AdminUsersPath}/{Uri.EscapeDataString(userId)}";
+    }
 
     public Task<IReadOnlyList<ChatSession>> GetSessionsAsync(
         string accessToken, bool detail = false, CancellationToken cancellationToken = default)

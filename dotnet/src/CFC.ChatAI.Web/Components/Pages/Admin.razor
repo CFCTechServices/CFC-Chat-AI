@@ -1,0 +1,16 @@
+@page "/admin"
+
+<PageTitle>Admin Console | CFC Chat AI</PageTitle>
+<section class="admin-console" aria-labelledby="console-title">
+    <h1 id="console-title">Admin Console</h1>
+    <div class="admin-tabs" role="tablist" aria-label="Admin sections">
+        <button type="button" role="tab" id="users-tab" aria-controls="users-panel" aria-selected="true">Users</button>
+        @foreach (var label in new[] { "Upload", "Content", "Settings" })
+        {
+            <button type="button" role="tab" aria-selected="false" disabled title="Not available yet">@label</button>
+        }
+    </div>
+    <section id="users-panel" role="tabpanel" aria-labelledby="users-tab">
+        <AdminUsers />
+    </section>
+</section>

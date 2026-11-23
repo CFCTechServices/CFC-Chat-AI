@@ -4,7 +4,7 @@ using CFC.ChatAI.Web.Components.Pages;
 using CFC.ChatAI.Web.Models;
 using CFC.ChatAI.Web.Services;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Rendering;
+using CFC.ChatAI.Web.Components.Layout;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -40,10 +40,11 @@ public sealed partial class SupabaseSessionTests
             Assert.Contains("Sign Out", html);
             var nav = Regex.Match(html, "<nav aria-label=\"Primary navigation\"[^>]*>(.*?)</nav>", RegexOptions.Singleline);
             Assert.True(nav.Success);
-            Assert.Equal(3, Regex.Matches(nav.Value, "<a\\b").Count);
+            Assert.Equal(role == "user" ? 3 : 4, Regex.Matches(nav.Value, "<a\\b").Count);
             Assert.Contains("href=\"/chat\"", nav.Value);
             Assert.Contains("href=\"/history\"", nav.Value);
             Assert.Contains("href=\"/settings\"", nav.Value);
+            Assert.Equal(role != "user", nav.Value.Contains("href=\"/admin\""));
             Assert.Contains("aria-current=\"page\"", nav.Value);
         });
     }
@@ -52,9 +53,10 @@ public sealed partial class SupabaseSessionTests
     [InlineData(typeof(Chat), null, "login")]
     [InlineData(typeof(History), null, "login")]
     [InlineData(typeof(Settings), null, "login")]
-    [InlineData(typeof(AdminRouteProbe), null, "login")]
-    [InlineData(typeof(AdminRouteProbe), "user", "chat")]
-    [InlineData(typeof(AdminRouteProbe), "Admin", "chat")]
+    [InlineData(typeof(Admin), null, "login")]
+    [InlineData(typeof(Admin), "user", "chat")]
+    [InlineData(typeof(Admin), "dev", "chat")]
+    [InlineData(typeof(Admin), "Admin", "chat")]
     public async Task DirectNavigationDeniesAccessBeforeRendering(Type pageType, string? role, string redirect)
     {
         browser.Session = role is null ? null : Token();
@@ -67,7 +69,7 @@ public sealed partial class SupabaseSessionTests
             var page = renderer.BeginRenderingComponent(typeof(SessionRouteView), RouteParameters(pageType));
             await page.QuiescenceTask;
             var html = page.ToHtmlString();
-            Assert.DoesNotContain("Admin route probe", html);
+            Assert.DoesNotContain("Admin Console", html);
             Assert.DoesNotContain("New Chat", html);
             Assert.DoesNotContain("Search conversations", html);
             Assert.DoesNotContain("Save profile", html);
@@ -85,13 +87,14 @@ public sealed partial class SupabaseSessionTests
         var verification = new TaskCompletionSource<ProfileResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
         backend.Profile = _ => verification.Task;
         var navigation = new TestNavigation("admin");
-        using var services = NavigationServices(session, navigation);
+        using var http = HistoryHttp(_ => AdminList());
+        using var services = HistoryServices(http, navigation, browser);
         await using var renderer = new LoginRenderer(services, services.GetRequiredService<ILoggerFactory>());
         await renderer.Dispatcher.InvokeAsync(async () =>
         {
-            var page = renderer.BeginRenderingComponent(typeof(SessionRouteView), RouteParameters(typeof(AdminRouteProbe)));
+            var page = renderer.BeginRenderingComponent(typeof(SessionRouteView), RouteParameters(typeof(Admin)));
             Assert.Contains("Checking access", page.ToHtmlString());
-            Assert.DoesNotContain("Admin route probe", page.ToHtmlString());
+            Assert.DoesNotContain("Admin Console", page.ToHtmlString());
             // Quiescence does not wait for the browser restoration in OnAfterRenderAsync.
             var restored = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             void OnRestored() { if (session.CanAccessChat) restored.TrySetResult(); }
@@ -99,13 +102,13 @@ public sealed partial class SupabaseSessionTests
             verification.SetResult(ActiveProfile() with { Role = role });
             try { await restored.Task.WaitAsync(TimeSpan.FromSeconds(5)); }
             finally { session.Changed -= OnRestored; }
-            Assert.Contains("Admin route probe", page.ToHtmlString());
+            Assert.Contains("Admin Console", page.ToHtmlString());
             Assert.Contains("Sign Out", page.ToHtmlString());
-            Assert.DoesNotContain("href=\"/admin\"", page.ToHtmlString());
-            await renderer.ClickButtonAsync();
+            Assert.Contains("href=\"/admin\"", page.ToHtmlString());
+            await renderer.ClickButtonAsync<AppNavigation>("Sign Out");
             Assert.Contains("signOut", browser.Calls);
             Assert.Null(browser.Session);
-            Assert.DoesNotContain("Admin route probe", page.ToHtmlString());
+            Assert.DoesNotContain("Admin Console", page.ToHtmlString());
             Assert.DoesNotContain("Primary navigation", page.ToHtmlString());
             Assert.EndsWith("/login", navigation.Uri);
         });
@@ -134,8 +137,8 @@ public sealed partial class SupabaseSessionTests
         await using var renderer = new HtmlRenderer(services, services.GetRequiredService<ILoggerFactory>());
         await renderer.Dispatcher.InvokeAsync(async () =>
         {
-            var page = await renderer.RenderComponentAsync<SessionRouteView>(RouteParameters(typeof(AdminRouteProbe)));
-            Assert.DoesNotContain("Admin route probe", page.ToHtmlString());
+            var page = await renderer.RenderComponentAsync<SessionRouteView>(RouteParameters(typeof(Admin)));
+            Assert.DoesNotContain("Admin Console", page.ToHtmlString());
             Assert.DoesNotContain("Primary navigation", page.ToHtmlString());
         });
     }
@@ -159,16 +162,17 @@ public sealed partial class SupabaseSessionTests
         browser.Session = Token();
         backend.Profile = _ => Task.FromResult(ActiveProfile() with { Role = "admin" });
         var navigation = new TestNavigation("admin");
-        using var services = NavigationServices(session, navigation);
+        using var http = HistoryHttp(_ => AdminList());
+        using var services = HistoryServices(http, navigation, browser);
         await using var renderer = new LoginRenderer(services, services.GetRequiredService<ILoggerFactory>());
         await renderer.Dispatcher.InvokeAsync(async () =>
         {
-            var page = renderer.BeginRenderingComponent(typeof(SessionRouteView), RouteParameters(typeof(AdminRouteProbe)));
+            var page = renderer.BeginRenderingComponent(typeof(SessionRouteView), RouteParameters(typeof(Admin)));
             await page.QuiescenceTask;
-            Assert.Contains("Admin route probe", page.ToHtmlString());
+            Assert.Contains("Admin Console", page.ToHtmlString());
             backend.Profile = _ => Task.FromResult(ActiveProfile());
             await session.RestoreAsync();
-            Assert.DoesNotContain("Admin route probe", page.ToHtmlString());
+            Assert.DoesNotContain("Admin Console", page.ToHtmlString());
             Assert.EndsWith("/chat", navigation.Uri);
         });
     }
@@ -179,13 +183,6 @@ public sealed partial class SupabaseSessionTests
 
     private static ParameterView RouteParameters(Type pageType) => ParameterView.FromDictionary(
         new Dictionary<string, object?> { [nameof(SessionRouteView.RouteData)] = new RouteData(pageType, new Dictionary<string, object?>()) });
-
-    // The test assembly is outside the app router. Exercise the real guard without publishing an admin page.
-    [Route("/admin")]
-    public sealed class AdminRouteProbe : ComponentBase
-    {
-        protected override void BuildRenderTree(RenderTreeBuilder builder) => builder.AddContent(0, "Admin route probe");
-    }
 
     [Route("/docs")] private sealed class DocsRouteProbe : ComponentBase { }
 }

@@ -65,6 +65,37 @@ public sealed class FastApiClientTests : IDisposable
     }
 
     [Fact]
+    public async Task AdminUsersUseExactFastApiContractsAndPerRequestAuthorization()
+    {
+        Expect(HttpMethod.Get, "api/admin/users", """
+            {"users":[{"id":"u/1","email":"p@example.test","full_name":"Pat","role":"dev","status":"inactive",
+            "created_at":"joined","deleted_at":"when","deleted_by":"owner","last_active":null}],"total":1}
+            """, token);
+        var list = await client.GetAdminUsersAsync(token, default);
+        Assert.Equal(1, list.Total);
+        var user = Assert.Single(list.Users);
+        Assert.Equal("Pat", user.FullName);
+        Assert.Equal("owner", user.DeletedBy);
+
+        Expect(HttpMethod.Post, "api/admin/invite", """{"message":"Created","email":"p@example.test","expires_at":"later"}""",
+            token, """{"email":"p@example.test"}""");
+        Assert.Equal("later", (await client.InviteUserAsync(token, new(user.Email), default)).ExpiresAt);
+        Expect(HttpMethod.Post, "api/admin/change-role", """{"message":"Changed","user_id":"u/1","new_role":"admin"}""",
+            token, """{"user_id":"u/1","new_role":"admin"}""");
+        Assert.Equal("admin", (await client.ChangeUserRoleAsync(token, new(user.Id, "admin"), default)).NewRole);
+        Expect(HttpMethod.Post, "api/admin/users/u%2F1/deactivate",
+            """{"message":"Done","user_id":"u/1","email":"p@example.test","status":"inactive","deleted_at":"now"}""", token, "{}");
+        Assert.Equal("now", (await client.DeactivateUserAsync(token, user.Id, default)).DeletedAt);
+        Expect(HttpMethod.Post, "api/admin/users/u%2F1/reactivate",
+            """{"message":"Done","user_id":"u/1","email":"p@example.test","status":"active","restored_at":"later"}""", token);
+        Assert.Equal("later", (await client.ReactivateUserAsync(token, user.Id, default)).RestoredAt);
+        Expect(HttpMethod.Delete, "api/admin/users/u%2F1",
+            """{"message":"Deleted","user_id":"u/1","email":"p@example.test","permanently_deleted":true}""", token);
+        Assert.True((await client.DeleteUserAsync(token, user.Id, default)).PermanentlyDeleted);
+        Assert.Null(http.DefaultRequestHeaders.Authorization);
+    }
+
+    [Fact]
     public async Task ListsLightweightAndDetailedSessions()
     {
         Expect(HttpMethod.Get, "api/chat/sessions", $"[{SessionJson}]", token);
