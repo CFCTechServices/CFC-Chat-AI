@@ -51,34 +51,46 @@ public sealed class ChatWorkspace(FastApiClient api, IChatSessionAccess access, 
     public string? Notice { get; private set; }
     public event Action? Changed;
     public bool CanSend => !disposed && ListReady && !LoadingList && !Creating &&
-        (Active is null || (Active.Activity == ChatActivity.Idle && Active.HistoryLoaded));
+        (Active is null ? Notice is null : Active.Activity == ChatActivity.Idle && Active.HistoryLoaded);
     public string Draft
     {
         get => Active?.Draft ?? firstDraft;
         set { if (Active is null) firstDraft = value; else Active.Draft = value; }
     }
 
-    public async Task LoadAsync(string? preferredId)
+    public async Task<IReadOnlyList<ChatSession>?> GetOwnedSessionsAsync(bool detail)
+    {
+        Notice = null;
+        var rows = await RequestAsync((token, ct) => api.GetSessionsAsync(token, detail, ct),
+            "The conversation list could not be loaded.", message => Notice = message);
+        return rows?.Where(row => row.UserId == ownerId && !string.IsNullOrWhiteSpace(row.Id)).ToArray();
+    }
+
+    public async Task LoadAsync(string? preferredId, bool requireSelection = false)
     {
         if (disposed || LoadingList || Creating) return;
         LoadingList = true;
         ListReady = false;
         Notice = null;
+        if (requireSelection && Active?.Id != preferredId) Active = null;
         Notify();
         try
         {
-            var rows = await RequestAsync((token, ct) => api.GetSessionsAsync(token, cancellationToken: ct),
-                "The conversation list could not be loaded.", message => Notice = message);
+            var rows = await GetOwnedSessionsAsync(detail: false);
             if (rows is null) return;
             var previous = Conversations.ToDictionary(c => c.Id);
             Conversations.Clear();
-            foreach (var row in rows.Where(row => row.UserId == ownerId))
+            foreach (var row in rows)
             {
                 var thread = previous.GetValueOrDefault(row.Id) ?? new Conversation(row);
                 thread.Title = row.Title ?? "New Chat";
                 Conversations.Add(thread);
             }
-            Active = Conversations.Find(c => c.Id == preferredId) ?? Conversations.FirstOrDefault();
+            Active = Conversations.Find(c => c.Id == preferredId);
+            if (Active is null && requireSelection)
+                Notice = "This conversation is unavailable. Choose a saved conversation or start a new chat.";
+            else
+                Active ??= Conversations.FirstOrDefault();
             if (Active is not null && firstDraft.Length > 0 && Active.Draft.Length == 0)
             {
                 Active.Draft = firstDraft;
@@ -94,6 +106,7 @@ public sealed class ChatWorkspace(FastApiClient api, IChatSessionAccess access, 
     {
         if (disposed || !ListReady || Creating || !Conversations.Contains(thread)) return;
         Active = thread;
+        Notice = null;
         Notify();
         if (thread.Activity != ChatActivity.Idle) return;
         thread.Activity = ChatActivity.Loading;

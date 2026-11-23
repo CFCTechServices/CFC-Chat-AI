@@ -6,7 +6,7 @@ namespace CFC.ChatAI.Web.Models;
 public sealed record ChatSession(
     string Id,
     [property: JsonPropertyName("user_id")] string UserId,
-    [property: JsonPropertyName("created_at")] string CreatedAt,
+    [property: JsonPropertyName("created_at")] string? CreatedAt = null,
     string? Title = null,
     [property: JsonPropertyName("message_count")] int? MessageCount = null,
     [property: JsonPropertyName("last_message")] string? LastMessage = null);

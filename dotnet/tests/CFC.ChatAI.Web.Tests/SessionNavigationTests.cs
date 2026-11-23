@@ -40,14 +40,16 @@ public sealed partial class SupabaseSessionTests
             Assert.Contains("Sign Out", html);
             var nav = Regex.Match(html, "<nav aria-label=\"Primary navigation\"[^>]*>(.*?)</nav>", RegexOptions.Singleline);
             Assert.True(nav.Success);
-            Assert.Single(Regex.Matches(nav.Value, "<a\\b"));
+            Assert.Equal(2, Regex.Matches(nav.Value, "<a\\b").Count);
             Assert.Contains("href=\"/chat\"", nav.Value);
+            Assert.Contains("href=\"/history\"", nav.Value);
             Assert.Contains("aria-current=\"page\"", nav.Value);
         });
     }
 
     [Theory]
     [InlineData(typeof(Chat), null, "login")]
+    [InlineData(typeof(History), null, "login")]
     [InlineData(typeof(AdminRouteProbe), null, "login")]
     [InlineData(typeof(AdminRouteProbe), "user", "chat")]
     [InlineData(typeof(AdminRouteProbe), "Admin", "chat")]
@@ -55,7 +57,7 @@ public sealed partial class SupabaseSessionTests
     {
         browser.Session = role is null ? null : Token();
         backend.Profile = _ => Task.FromResult(ActiveProfile() with { Role = role! });
-        var navigation = new TestNavigation(pageType == typeof(Chat) ? "chat" : "admin");
+        var navigation = new TestNavigation(AppDestination.ForPage(pageType)!.Path.TrimStart('/'));
         using var services = NavigationServices(session, navigation);
         await using var renderer = new LoginRenderer(services, services.GetRequiredService<ILoggerFactory>());
         await renderer.Dispatcher.InvokeAsync(async () =>
@@ -65,6 +67,7 @@ public sealed partial class SupabaseSessionTests
             var html = page.ToHtmlString();
             Assert.DoesNotContain("Admin route probe", html);
             Assert.DoesNotContain("New Chat", html);
+            Assert.DoesNotContain("Search conversations", html);
             Assert.DoesNotContain("Primary navigation", html);
             Assert.EndsWith("/" + redirect, navigation.Uri);
         });
@@ -135,7 +138,7 @@ public sealed partial class SupabaseSessionTests
     }
 
     [Theory]
-    [InlineData(typeof(HistoryRouteProbe), "/history")]
+    [InlineData(typeof(History), "/history")]
     [InlineData(typeof(SettingsRouteProbe), "/settings")]
     [InlineData(typeof(DocsRouteProbe), "/docs")]
     public void PlannedMemberRoutesRequireAnActiveProfile(Type pageType, string path)
@@ -181,7 +184,6 @@ public sealed partial class SupabaseSessionTests
         protected override void BuildRenderTree(RenderTreeBuilder builder) => builder.AddContent(0, "Admin route probe");
     }
 
-    [Route("/history")] private sealed class HistoryRouteProbe : ComponentBase { }
     [Route("/settings")] private sealed class SettingsRouteProbe : ComponentBase { }
     [Route("/docs")] private sealed class DocsRouteProbe : ComponentBase { }
 }

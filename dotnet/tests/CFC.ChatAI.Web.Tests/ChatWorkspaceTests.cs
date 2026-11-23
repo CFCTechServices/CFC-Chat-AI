@@ -28,6 +28,58 @@ public sealed class ChatWorkspaceTests : IDisposable
     private ChatWorkspace NewPage() => new(new FastApiClient(http), access, access.Owner);
 
     [Fact]
+    public async Task DetailedListReflectsChatCreatesAndDeletesAndUsesTheCurrentOwnerToken()
+    {
+        using var history = NewPage();
+        await OpenAsync();
+        var first = handler.Hold("GET", "sessions?detail=true");
+        first.Return(new[] { Session("a"), Session("private", owner: "other") });
+        Assert.Equal("a", Assert.Single((await history.GetOwnedSessionsAsync(true))!).Id);
+        Assert.Equal(access.Token, first.Bearer);
+
+        handler.Expect("POST", "sessions", Session("new"));
+        var created = await chat.NewAsync();
+        access.Token = Guid.NewGuid().ToString("N");
+        var refresh = handler.Hold("GET", "sessions?detail=true");
+        refresh.Return(new[] { Session("new"), Session("a") });
+        Assert.Equal(new[] { "new", "a" }, (await history.GetOwnedSessionsAsync(true))!.Select(row => row.Id));
+        Assert.Equal(access.Token, refresh.Bearer);
+
+        handler.Expect("DELETE", "sessions/new", new { success = true });
+        handler.Expect("GET", "sessions/a", Array.Empty<object>());
+        await chat.DeleteAsync(created!);
+        handler.Expect("GET", "sessions?detail=true", new[] { Session("a") });
+        Assert.Equal("a", Assert.Single((await history.GetOwnedSessionsAsync(true))!).Id);
+    }
+
+    [Theory]
+    [InlineData("deleted")]
+    [InlineData("private")]
+    public async Task UnavailableExplicitSelectionNeverLoadsAnotherChat(string id)
+    {
+        handler.Expect("GET", "sessions", new[] { Session("mine"), Session("private", owner: "other") });
+        await chat.LoadAsync(id, requireSelection: true);
+        Assert.Null(chat.Active);
+        Assert.Contains("unavailable", chat.Notice);
+        Assert.False(chat.CanSend);
+        handler.Expect("GET", "sessions/mine", Array.Empty<object>());
+        await chat.SelectAsync(Assert.Single(chat.Conversations));
+        Assert.Null(chat.Notice);
+        Assert.True(chat.CanSend);
+    }
+
+    [Fact]
+    public async Task FailedDeepLinkLoadCannotLeaveThePreviousConversationOpen()
+    {
+        await OpenAsync(Row("a", "saved", "user", "Original question"));
+        handler.Fail("GET", "sessions", HttpStatusCode.Forbidden);
+        await chat.LoadAsync("different", requireSelection: true);
+        Assert.Null(chat.Active);
+        Assert.Contains("Access was denied", chat.Notice);
+        Assert.False(chat.CanSend);
+    }
+
+    [Fact]
     public async Task LoadsRememberedSessionAndRestoresSavedMessagesOnRefresh()
     {
         for (var opening = 0; opening < 2; opening++)

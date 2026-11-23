@@ -133,11 +133,11 @@ public sealed partial class SupabaseSessionTests : IAsyncDisposable
                 new Dictionary<string, object?> { ["RouteData"] = new RouteData(typeof(Login), new Dictionary<string, object?>()) }));
             await page.QuiescenceTask;
             await renderer.ClickButtonAsync();
-            await renderer.EnterEmailAsync("invalid");
+            await renderer.InputAsync("invalid");
             Assert.Contains("<button type=\"submit\" disabled", page.ToHtmlString());
             await renderer.SubmitAsync();
             Assert.Empty(backend.InvitationEmails);
-            await renderer.EnterEmailAsync(" invitee@example.test ");
+            await renderer.InputAsync(" invitee@example.test ");
             Assert.Contains("<button type=\"submit\">", page.ToHtmlString());
             var pending = renderer.SubmitAsync();
             Assert.Contains("Checking invitation", page.ToHtmlString());
@@ -223,29 +223,58 @@ public sealed partial class SupabaseSessionTests : IAsyncDisposable
 
     // Acknowledge the render batch as a browser would, then dispatch the form's actual handler ID.
 #pragma warning disable BL0006
-    private sealed class LoginRenderer(IServiceProvider services, ILoggerFactory loggerFactory)
-        : StaticHtmlRenderer(services, loggerFactory)
+    private sealed class LoginRenderer : StaticHtmlRenderer
     {
+        public LoginRenderer(IServiceProvider services, ILoggerFactory loggerFactory) : base(services, loggerFactory)
+        {
+            ElementReferenceContext = new WebElementReferenceContext(services.GetRequiredService<IJSRuntime>());
+        }
+
         private ulong submitHandler;
-        private ulong buttonHandler, inputHandler;
+        private ulong buttonHandler, inputHandler, changeHandler;
+        private int chatComponentId;
 
         protected override Task UpdateDisplayAsync(in RenderBatch batch)
         {
             foreach (var frame in batch.ReferenceFrames.Array.AsSpan(0, batch.ReferenceFrames.Count))
             {
+                if (frame.FrameType == RenderTreeFrameType.Component && frame.ComponentType == typeof(Chat))
+                    chatComponentId = frame.ComponentId;
                 if (frame.FrameType == RenderTreeFrameType.Attribute && frame.AttributeName == "onsubmit")
                     submitHandler = frame.AttributeEventHandlerId;
                 if (frame.FrameType == RenderTreeFrameType.Attribute && frame.AttributeName == "onclick")
                     buttonHandler = frame.AttributeEventHandlerId;
                 if (frame.FrameType == RenderTreeFrameType.Attribute && frame.AttributeName == "oninput")
                     inputHandler = frame.AttributeEventHandlerId;
+                if (frame.FrameType == RenderTreeFrameType.Attribute && frame.AttributeName == "onchange")
+                    changeHandler = frame.AttributeEventHandlerId;
             }
             return Task.CompletedTask;
         }
 
         public Task SubmitAsync() => DispatchEventAsync(submitHandler, null, EventArgs.Empty);
         public Task ClickButtonAsync() => DispatchEventAsync(buttonHandler, null, new MouseEventArgs());
-        public Task EnterEmailAsync(string email) => DispatchEventAsync(inputHandler, null, new ChangeEventArgs { Value = email });
+        public Task InputAsync(string text) => DispatchEventAsync(inputHandler, null, new ChangeEventArgs { Value = text });
+        public Task SelectAsync(string value) => DispatchEventAsync(changeHandler, null, new ChangeEventArgs { Value = value });
+
+        public Task ClickChatButtonAsync(string label)
+        {
+            var frames = GetCurrentRenderTreeFrames(chatComponentId);
+            for (var i = 0; i < frames.Count; i++)
+            {
+                var element = frames.Array[i];
+                if (element.FrameType != RenderTreeFrameType.Element || element.ElementName != "button") continue;
+                ulong handler = 0;
+                foreach (var child in frames.Array.AsSpan(i + 1, element.ElementSubtreeLength - 1))
+                {
+                    if (child.FrameType == RenderTreeFrameType.Attribute && child.AttributeName == "onclick")
+                        handler = child.AttributeEventHandlerId;
+                    if (child.FrameType == RenderTreeFrameType.Text && child.TextContent.Trim() == label && handler != 0)
+                        return DispatchEventAsync(handler, null, new MouseEventArgs());
+                }
+            }
+            throw new InvalidOperationException($"Chat button '{label}' was not rendered.");
+        }
     }
 #pragma warning restore BL0006
 

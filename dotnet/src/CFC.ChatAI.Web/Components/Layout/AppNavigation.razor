@@ -12,7 +12,7 @@
         <nav aria-label="Primary navigation">
             @foreach (var destination in AppDestination.Toolbar(Profile))
             {
-                <NavLink href="@destination.Path" Match="NavLinkMatch.All" class="navigation-link">@destination.Label</NavLink>
+                <NavLink href="@destination.Path" class="navigation-link">@destination.Label</NavLink>
             }
         </nav>
         <button type="button" class="sign-out" @onclick="Session.SignOutAsync">Sign Out</button>

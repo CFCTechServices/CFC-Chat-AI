@@ -1,7 +1,9 @@
 ﻿@page "/chat"
+@page "/chat/{SessionId}"
 @inject CFC.ChatAI.Web.Services.SupabaseSessionService Session
 @using Microsoft.JSInterop
 @inject IJSRuntime JS
+@inject NavigationManager Navigation
 @using CFC.ChatAI.Web.Services
 @inject FastApiClient Api
 @implements IDisposable
@@ -42,7 +44,7 @@
 
     <div class="chat-main">
         <div class="chat-thread" @ref="chatThreadElement">
-            @if (chat.ListReady && (chat.Active is null ||
+            @if (chat.ListReady && chat.Notice is null && (chat.Active is null ||
                 (chat.Active.HistoryLoaded && chat.Active.Messages.Count == 0 && chat.Active.PendingContent is null)))
             {
                 <div class="chat-empty-state">
@@ -144,10 +146,15 @@
 }
 
 @code {
+    [Parameter] public string? SessionId { get; set; }
+    public static string PathForSession(string? id) => id is null ? "/chat" : "/chat/" + Uri.EscapeDataString(id);
+
     private ChatWorkspace chat = default!;
     private ElementReference chatThreadElement;
     private string selectionKey = "";
     private string? rememberedId;
+    private bool storageChecked;
+    private string? handledRouteId;
     private Conversation? displayed;
     private int displayedCount;
     private string? displayedPending;
@@ -163,7 +170,11 @@
         chat.Changed += StateHasChanged;
     }
 
-    private Task ReloadSessions() => chat.LoadAsync(chat.Active?.Id ?? rememberedId);
+    private Task ReloadSessions()
+    {
+        handledRouteId = SessionId;
+        return chat.LoadAsync(SessionId ?? chat.Active?.Id ?? rememberedId, requireSelection: SessionId is not null);
+    }
 
     private async Task StartNewChat()
     {
@@ -197,13 +208,30 @@
             try { rememberedId = await JS.InvokeAsync<string?>("sessionStorage.getItem", selectionKey); }
             catch (JSException) { /* Storage is optional. Default to the newest conversation. */ }
             catch (JSDisconnectedException) { }
-            if (!disposed) await chat.LoadAsync(rememberedId);
+            storageChecked = true;
+            if (!disposed) await ReloadSessions();
         }
-        if (disposed) return;
+        if (disposed || !storageChecked || chat.LoadingList || chat.Creating) return;
+        if (handledRouteId != SessionId)
+        {
+            handledRouteId = SessionId;
+            if (chat.Notice is not null || (SessionId is not null && SessionId != chat.Active?.Id))
+            {
+                await ReloadSessions();
+                return;
+            }
+        }
         var active = chat.Active;
+        // Keep a deep link accurate when the sidebar changes selection or deletes the linked chat.
+        if (chat.ListReady && SessionId is not null && active?.Id != SessionId && chat.Notice is null)
+        {
+            var path = PathForSession(active?.Id);
+            if (Navigation.Uri != Navigation.ToAbsoluteUri(path).AbsoluteUri)
+                Navigation.NavigateTo(path, replace: true);
+        }
         try
         {
-            if (chat.ListReady && active?.Id != rememberedId)
+            if (chat.ListReady && chat.Notice is null && active?.Id != rememberedId)
             {
                 rememberedId = active?.Id;
                 if (rememberedId is null) await JS.InvokeVoidAsync("sessionStorage.removeItem", selectionKey);
