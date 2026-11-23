@@ -12,7 +12,8 @@ public sealed class ChatLine(string role, string content, string? id = null, str
     public string? Id { get; } = id;
     public string? CreatedAt { get; } = createdAt;
     public ChatMessageMetadata? Metadata { get; } = metadata;
-    public string? Feedback { get; set; }
+    public bool IsSavedAssistant => Role == "assistant" && !string.IsNullOrWhiteSpace(Id);
+    public int? Rating { get; internal set; }
 }
 
 public enum ChatActivity { Idle, Loading, Sending, UpdatingTitle, Deleting }
@@ -29,6 +30,8 @@ public sealed class Conversation(ChatSession session)
     public string? Notice { get; internal set; }
     public string? PendingTitle { get; internal set; }
     public string? TitleError { get; internal set; }
+    public string? FeedbackError { get; internal set; }
+    internal Task PendingFeedback { get; set; } = Task.CompletedTask;
     internal UnconfirmedSend? Unconfirmed { get; set; }
 }
 
@@ -198,12 +201,14 @@ public sealed class ChatWorkspace(FastApiClient api, IChatSessionAccess access, 
             return false;
         }
         thread.Notice = null;
-        var votes = thread.Messages.Where(m => m.Id is not null && m.Feedback is not null)
-            .ToDictionary(m => m.Id!, m => m.Feedback);
+        // Reselecting a conversation can overlap a vote. Read its ratings after that write settles.
+        await thread.PendingFeedback;
+        if (disposed) return false;
         thread.Messages.Clear();
         foreach (var row in rows!)
-            thread.Messages.Add(new ChatLine(row.Role, row.Content, row.Id, row.CreatedAt, row.Metadata)
-                { Feedback = votes.GetValueOrDefault(row.Id) });
+            thread.Messages.Add(new ChatLine(row.Role, row.Content, row.Id, row.CreatedAt, row.Metadata));
+        Notify();
+        await LoadFeedbackAsync(thread);
 
         if (thread.Unconfirmed is { } attempt)
         {
@@ -229,6 +234,62 @@ public sealed class ChatWorkspace(FastApiClient api, IChatSessionAccess access, 
             }
         }
         return true;
+    }
+
+    private async Task LoadFeedbackAsync(Conversation thread)
+    {
+        thread.FeedbackError = null;
+        if (!thread.Messages.Any(m => m.IsSavedAssistant)) return;
+        var result = await RequestAsync((token, ct) => api.GetFeedbackAsync(token, thread.Id, ct),
+            "Saved ratings could not be loaded.", error => thread.FeedbackError = error);
+        if (result is null) return;
+
+        foreach (var message in thread.Messages)
+        {
+            if (message.IsSavedAssistant)
+                message.Rating = result.Feedback.TryGetValue(message.Id!, out var score) && score is 1 or -1 ? score : null;
+        }
+    }
+
+    private bool FeedbackReady(Conversation thread) => !disposed && ListReady && thread == Active &&
+        thread.HistoryLoaded && thread.Activity == ChatActivity.Idle && thread.PendingFeedback.IsCompleted;
+
+    public bool CanRate(Conversation thread) => FeedbackReady(thread) && thread.FeedbackError is null;
+
+    public Task ReloadFeedbackAsync(Conversation thread)
+    {
+        if (!FeedbackReady(thread) || thread.FeedbackError is null) return Task.CompletedTask;
+        return TrackFeedbackAsync(thread, LoadFeedbackAsync(thread));
+    }
+
+    public Task ToggleFeedbackAsync(Conversation thread, ChatLine message, int thumb)
+    {
+        if (!CanRate(thread) || thumb is not (1 or -1) || !message.IsSavedAssistant || !thread.Messages.Contains(message))
+            return Task.CompletedTask;
+
+        int? rating = message.Rating == thumb ? null : thumb;
+        return TrackFeedbackAsync(thread, SaveFeedbackAsync(thread, message, rating));
+    }
+
+    private async Task TrackFeedbackAsync(Conversation thread, Task request)
+    {
+        thread.PendingFeedback = request;
+        Notify();
+        try { await request; }
+        finally { Notify(); }
+    }
+
+    private async Task SaveFeedbackAsync(Conversation thread, ChatLine message, int? rating)
+    {
+        const string failure = "Your rating could not be confirmed. Reload feedback to see the saved rating.";
+        var result = await RequestAsync((token, ct) =>
+            api.SubmitFeedbackAsync(token, new(message.Id!, thread.Id, rating), ct),
+            failure, error => thread.FeedbackError = error);
+        if (result is null) return;
+        if (result.Success && result.Score == rating)
+            message.Rating = result.Score;
+        else
+            thread.FeedbackError = failure;
     }
 
     private static string MakeTitle(string content)

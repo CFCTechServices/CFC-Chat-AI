@@ -1,9 +1,19 @@
 ﻿@inherits LayoutComponentBase
 
-@Body
+@using CFC.ChatAI.Web.Models
+
+@if (VerifiedProfile is not null)
+{
+    <AppNavigation Profile="VerifiedProfile" />
+}
+<main>@Body</main>
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    [CascadingParameter] public ProfileResponse? VerifiedProfile { get; set; }
+}

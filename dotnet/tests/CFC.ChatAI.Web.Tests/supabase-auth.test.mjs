@@ -49,6 +49,7 @@ function createTab(storage = new Map(), loadScript = script => script.onload(), 
         return { auth: sdk };
     } } };
     const document = {
+        baseURI: "https://app.example.test/",
         createElement: () => ({ remove() {} }),
         head: { appendChild: loadScript }
     };
@@ -66,6 +67,73 @@ async function startTab(storage) {
     await tab.initialize();
     return tab;
 }
+
+test("signup validates the two browser fields before calling Supabase", async () => {
+    const tab = await startTab();
+    let calls = 0;
+    tab.sdk.signUp = async () => { calls++; return {}; };
+    for (const [password, confirm, error] of [
+        ["", "", "short"], ["short", "short", "short"], [randomUUID(), "", "mismatch"],
+        [randomUUID(), randomUUID(), "mismatch"]
+    ]) {
+        const result = await tab.api.signUp("invitee@example.test", { value: password }, { value: confirm });
+        assert.equal(result.error, error);
+    }
+    assert.equal(calls, 0);
+});
+
+test("signup handles confirmation or an immediate session without forwarding passwords or refresh tokens", async () => {
+    const tab = await startTab();
+    for (const immediate of [false, true]) {
+        const password = randomUUID(), token = randomUUID();
+        tab.sdk.signUp = async input => {
+            assert.equal(input.email, "invitee@example.test");
+            assert.equal(input.password, password);
+            assert.equal(input.options.emailRedirectTo, "https://app.example.test/login?signup=confirm");
+            if (immediate) tab.emit("SIGNED_IN", { user: { id: "person" } });
+            return { data: { user: { id: "person" }, session: immediate ? { access_token: token, refresh_token: randomUUID() } : null } };
+        };
+        const first = { value: password }, second = { value: password };
+        const result = await tab.api.signUp("invitee@example.test", first, second);
+        assert.deepEqual({ ...result }, immediate ? { accessToken: token } : { confirmationRequired: true });
+        assert.equal(first.value, "");
+        assert.equal(second.value, "");
+    }
+    await wait(5);
+    assert.equal(tab.events.length, 0);
+});
+
+test("provider signup failures return safe codes, including existing accounts and rate limits", async () => {
+    const tab = await startTab();
+    const password = randomUUID();
+    for (const [error, code] of [
+        [{ code: "user_already_exists" }, "existing_account"], [{ code: "email_exists" }, "existing_account"],
+        [{ code: "weak_password" }, "weak_password"], [{ status: 429 }, "rate_limit"],
+        [{ code: "signup_disabled" }, "signup_disabled"], [{ status: 503 }, "registration_failed"]
+    ]) {
+        tab.sdk.signUp = async () => ({ error: { ...error, message: "private provider detail" } });
+        assert.deepEqual({ ...await tab.api.signUp("invitee@example.test", { value: password }, { value: password }) }, { error: code });
+    }
+    for (const operation of [async () => ({ data: {} }), async () => { throw new Error("Network failure"); }]) {
+        tab.sdk.signUp = operation;
+        const result = await tab.api.signUp("invitee@example.test", { value: password }, { value: password });
+        assert.deepEqual({ ...result }, { error: "registration_failed" });
+    }
+});
+
+test("confirmation callbacks strip provider data before Blazor starts and return to normal sign-in", () => {
+    for (const [hash, outcome] of [
+        [`#type=signup&access_token=${randomUUID()}&refresh_token=${randomUUID()}`, "return"],
+        ["#error=access_denied&error_code=otp_expired", "link-error"]
+    ]) {
+        const location = new URL("https://app.example.test/login?signup=confirm" + hash);
+        const history = { replaceState(_state, _title, path) { location.href = new URL(path, location).href; } };
+        const tab = createTab(undefined, undefined, undefined, { window: { location, history } });
+        assert.equal(location.href, "https://app.example.test/login?signup=" + outcome);
+        assert.equal(tab.api.hasRecoveryLink(), false);
+        assert.equal(tab.storage.size, 0);
+    }
+});
 
 test("a failed SDK download can be retried without reloading the page", async () => {
     const scripts = [];

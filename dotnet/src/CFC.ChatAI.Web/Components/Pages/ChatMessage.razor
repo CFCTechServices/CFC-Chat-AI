@@ -64,20 +64,22 @@
                     </button>
 
                     <button type="button"
-                            class="msg-action-btn @(Feedback == "up" ? "active" : "")"
+                            class="msg-action-btn @(Rating == 1 ? "active" : "")"
                             title="Helpful"
                             aria-label="Mark as helpful"
-                            aria-pressed="@(Feedback == "up")"
-                            @onclick="VoteUp">
+                            aria-pressed="@(Rating == 1 ? "true" : "false")"
+                            disabled="@FeedbackDisabled"
+                            @onclick="() => OnVote.InvokeAsync(1)">
                         👍
                     </button>
 
                     <button type="button"
-                            class="msg-action-btn @(Feedback == "down" ? "active" : "")"
+                            class="msg-action-btn @(Rating == -1 ? "active" : "")"
                             title="Not helpful"
                             aria-label="Mark as not helpful"
-                            aria-pressed="@(Feedback == "down")"
-                            @onclick="VoteDown">
+                            aria-pressed="@(Rating == -1 ? "true" : "false")"
+                            disabled="@FeedbackDisabled"
+                            @onclick="() => OnVote.InvokeAsync(-1)">
                         👎
                     </button>
 
@@ -106,12 +108,14 @@
         Array.Empty<string>();
 
     [Parameter]
-    public string? Feedback { get; set; }
+    public int? Rating { get; set; }
 
     [Parameter]
-    public EventCallback<string?> FeedbackChanged { get; set; }
+    public bool FeedbackDisabled { get; set; }
 
-    
+    [Parameter]
+    public EventCallback<int> OnVote { get; set; }
+
     [Parameter]
     public IReadOnlyList<string> AnswerImages { get; set; }
       = Array.Empty<string>();
@@ -152,18 +156,6 @@
             copied = false;
             copyError = "Unable to copy message.";
         }
-    }
-
-    private Task VoteUp()
-    {
-        string? next = Feedback == "up" ? null : "up";
-        return FeedbackChanged.InvokeAsync(next);
-    }
-
-    private Task VoteDown()
-    {
-        string? next = Feedback == "down" ? null : "down";
-        return FeedbackChanged.InvokeAsync(next);
     }
 
     private static MarkupString RenderMessage(string? text)

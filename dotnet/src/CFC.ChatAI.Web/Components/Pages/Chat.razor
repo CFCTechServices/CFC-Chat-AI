@@ -6,20 +6,6 @@
 @inject FastApiClient Api
 @implements IDisposable
 
-<div class="cfc-header">
-    <img src="images/logo-cfc.png"
-         alt="CFC Tech Services Logo"
-         class="cfc-logo"
-         style="width:160px; height:auto;" />
-
-
-    <div class="cfc-header-title">
-        <h3>CFC Chat AI</h3>
-        <p>Your Software Assistant</p>
-    </div>
-    <button type="button" class="chat-sign-out" @onclick="Session.SignOutAsync">Sign Out</button>
-</div>
-
 <div class="chat-layout">
     <div class="chat-sidebar">
         <button type="button" class="sidebar-new-chat" disabled="@(!chat.ListReady || chat.Creating || chat.LoadingList)"
@@ -69,8 +55,9 @@
                 @foreach (var message in active.Messages)
                 {
                     <ChatMessage @key="message" Sender="@(message.Role == "user" ? "You" : "CFC AI")"
-                                 Text="@message.Content" Feedback="@message.Feedback"
-                                 FeedbackChanged="value => message.Feedback = value" />
+                                 Text="@message.Content" Rating="@message.Rating"
+                                 FeedbackDisabled="@(!message.IsSavedAssistant || !chat.CanRate(active))"
+                                 OnVote="thumb => chat.ToggleFeedbackAsync(active, message, thumb)" />
                 }
                 @if (active.Activity == ChatActivity.Loading)
                 {
@@ -96,6 +83,12 @@
         </div>
         @if (chat.Active is { } thread)
         {
+            @if (thread.FeedbackError is not null)
+            {
+                <p role="alert">@thread.FeedbackError</p>
+                <button type="button" disabled="@(thread.Activity != ChatActivity.Idle || !thread.HistoryLoaded || !chat.ListReady)"
+                        @onclick="() => chat.ReloadFeedbackAsync(thread)">Reload feedback</button>
+            }
             @if (thread.Notice is not null)
             {
                 <p role="alert">@thread.Notice</p>

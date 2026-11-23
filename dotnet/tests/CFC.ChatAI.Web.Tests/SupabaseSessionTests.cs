@@ -16,7 +16,7 @@ using Xunit;
 
 namespace CFC.ChatAI.Web.Tests;
 
-public sealed class SupabaseSessionTests : IAsyncDisposable
+public sealed partial class SupabaseSessionTests : IAsyncDisposable
 {
     private readonly TestBackend backend = new();
     private readonly TestBrowser browser = new();
@@ -116,12 +116,118 @@ public sealed class SupabaseSessionTests : IAsyncDisposable
         });
     }
 
+    [Theory]
+    [InlineData(false, "This email has not been invited.")]
+    [InlineData(false, "Your invitation has expired.")]
+    [InlineData(true, "")]
+    public async Task SignupFormChecksTheInvitationBeforeShowingPasswords(bool eligible, string denial)
+    {
+        var check = new TaskCompletionSource<CheckEmailResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        backend.Check = _ => check.Task;
+        using var services = new ServiceCollection().AddLogging().AddSingleton(session)
+            .AddSingleton<IJSRuntime>(browser).AddSingleton<NavigationManager, TestNavigation>().BuildServiceProvider();
+        await using var renderer = new LoginRenderer(services, services.GetRequiredService<ILoggerFactory>());
+        await renderer.Dispatcher.InvokeAsync(async () =>
+        {
+            var page = renderer.BeginRenderingComponent(typeof(SessionRouteView), ParameterView.FromDictionary(
+                new Dictionary<string, object?> { ["RouteData"] = new RouteData(typeof(Login), new Dictionary<string, object?>()) }));
+            await page.QuiescenceTask;
+            await renderer.ClickButtonAsync();
+            await renderer.EnterEmailAsync("invalid");
+            Assert.Contains("<button type=\"submit\" disabled", page.ToHtmlString());
+            await renderer.SubmitAsync();
+            Assert.Empty(backend.InvitationEmails);
+            await renderer.EnterEmailAsync(" invitee@example.test ");
+            Assert.Contains("<button type=\"submit\">", page.ToHtmlString());
+            var pending = renderer.SubmitAsync();
+            Assert.Contains("Checking invitation", page.ToHtmlString());
+            await renderer.SubmitAsync();
+            Assert.Equal(["invitee@example.test"], backend.InvitationEmails);
+            check.SetResult(new(eligible, denial));
+            await pending;
+
+            if (!eligible)
+            {
+                Assert.Contains(denial, page.ToHtmlString());
+                Assert.DoesNotContain("signup-password", page.ToHtmlString());
+                Assert.DoesNotContain("signUp", browser.Calls);
+                return;
+            }
+            Assert.Contains("signup-confirmation", page.ToHtmlString());
+            browser.ConfirmationRequired = true;
+            await renderer.SubmitAsync();
+            Assert.Equal(["invitee@example.test", "invitee@example.test"], backend.InvitationEmails);
+            Assert.Single(browser.Calls, call => call == "signUp");
+            Assert.Contains("Check your inbox", page.ToHtmlString());
+            Assert.Contains("login-password", page.ToHtmlString());
+            Assert.False(session.CanAccessChat);
+            Assert.Empty(backend.CheckedTokens);
+        });
+    }
+
+    [Fact]
+    public async Task RegistrationRechecksInvitationAndSuppressesOverlappingSubmissions()
+    {
+        await session.RestoreAsync();
+        var check = new TaskCompletionSource<CheckEmailResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        Assert.True((await session.CheckInvitationAsync("invitee@example.test")).Eligible);
+        backend.Check = _ => check.Task;
+        var pending = session.SignUpAsync("invitee@example.test", default, default);
+        Assert.Equal(SignUpOutcome.Failed, (await session.SignUpAsync("invitee@example.test", default, default)).Outcome);
+        check.SetResult(new(false, "Your invitation has expired."));
+        Assert.Equal(SignUpOutcome.InvitationDenied, (await pending).Outcome);
+        Assert.Equal(2, backend.InvitationEmails.Count);
+        Assert.DoesNotContain("signUp", browser.Calls);
+        backend.Check = _ => throw new HttpRequestException();
+        Assert.Equal(SignUpOutcome.InvitationDenied, (await session.SignUpAsync("invitee@example.test", default, default)).Outcome);
+        Assert.DoesNotContain("signUp", browser.Calls);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ImmediateSignupSessionRequiresMatchingActiveProfile(bool active)
+    {
+        await session.RestoreAsync();
+        browser.Session = Token();
+        var verification = new TaskCompletionSource<ProfileResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+        backend.Profile = _ => verification.Task;
+        var attempt = session.SignUpAsync("invitee@example.test", default, default);
+        Assert.False(session.CanAccessChat);
+        Assert.Equal(browser.Session, Assert.Single(backend.CheckedTokens));
+        var duplicate = await session.SignUpAsync("invitee@example.test", default, default);
+        Assert.Equal(SignUpOutcome.Failed, duplicate.Outcome);
+        Assert.Single(browser.Calls, call => call == "signUp");
+        verification.SetResult(ActiveProfile() with { Status = active ? "active" : "inactive" });
+        Assert.Equal(SignUpOutcome.SessionReceived, (await attempt).Outcome);
+        Assert.Equal(active, session.CanAccessChat);
+        Assert.Equal(active ? SessionStatus.Active : SessionStatus.SignedOut, session.State.Status);
+    }
+
+    [Theory]
+    [InlineData("existing_account", "already exists")]
+    [InlineData("weak_password", "stronger password")]
+    [InlineData("mismatch", "do not match")]
+    [InlineData("rate_limit", "Too many")]
+    [InlineData("registration_failed", "Could not confirm")]
+    public async Task SignupErrorsGiveSafeFeedbackWithoutGrantingAccess(string error, string expected)
+    {
+        await session.RestoreAsync();
+        browser.Error = error;
+        var result = await session.SignUpAsync("invitee@example.test", default, default);
+        Assert.Equal(SignUpOutcome.Failed, result.Outcome);
+        Assert.Contains(expected, result.Message);
+        Assert.Empty(backend.CheckedTokens);
+        Assert.False(session.CanAccessChat);
+    }
+
     // Acknowledge the render batch as a browser would, then dispatch the form's actual handler ID.
 #pragma warning disable BL0006
     private sealed class LoginRenderer(IServiceProvider services, ILoggerFactory loggerFactory)
         : StaticHtmlRenderer(services, loggerFactory)
     {
         private ulong submitHandler;
+        private ulong buttonHandler, inputHandler;
 
         protected override Task UpdateDisplayAsync(in RenderBatch batch)
         {
@@ -129,11 +235,17 @@ public sealed class SupabaseSessionTests : IAsyncDisposable
             {
                 if (frame.FrameType == RenderTreeFrameType.Attribute && frame.AttributeName == "onsubmit")
                     submitHandler = frame.AttributeEventHandlerId;
+                if (frame.FrameType == RenderTreeFrameType.Attribute && frame.AttributeName == "onclick")
+                    buttonHandler = frame.AttributeEventHandlerId;
+                if (frame.FrameType == RenderTreeFrameType.Attribute && frame.AttributeName == "oninput")
+                    inputHandler = frame.AttributeEventHandlerId;
             }
             return Task.CompletedTask;
         }
 
         public Task SubmitAsync() => DispatchEventAsync(submitHandler, null, EventArgs.Empty);
+        public Task ClickButtonAsync() => DispatchEventAsync(buttonHandler, null, new MouseEventArgs());
+        public Task EnterEmailAsync(string email) => DispatchEventAsync(inputHandler, null, new ChangeEventArgs { Value = email });
     }
 #pragma warning restore BL0006
 
@@ -478,6 +590,13 @@ public sealed class SupabaseSessionTests : IAsyncDisposable
         public AuthConfigResponse Config = new("https://auth.example.test", "sb_publishable_" + Guid.NewGuid());
         public Func<string, Task<ProfileResponse>> Profile = _ => Task.FromResult(ActiveProfile());
         public List<string> CheckedTokens { get; } = [];
+        public List<string> InvitationEmails { get; } = [];
+        public Func<string, Task<CheckEmailResponse>> Check = _ => Task.FromResult(new CheckEmailResponse(true, "Eligible"));
+        public Task<CheckEmailResponse> CheckEmailAsync(EmailRequest request, CancellationToken ct)
+        {
+            InvitationEmails.Add(request.Email);
+            return Check(request.Email);
+        }
         public Task<AuthConfigResponse> GetAuthConfigAsync(CancellationToken ct) => Task.FromResult(Config);
         public Task<ProfileResponse> GetProfileAsync(string token, CancellationToken ct)
         {
@@ -492,6 +611,7 @@ public sealed class SupabaseSessionTests : IAsyncDisposable
         public bool Disconnected;
         public bool InitializeFails;
         public bool HasRecoveryLink, RecoveryVerified;
+        public bool ConfirmationRequired;
         public List<string> Calls { get; } = [];
         public ValueTask<T> InvokeAsync<T>(string method, object?[]? args) => InvokeAsync<T>(method, default, args);
         public ValueTask<T> InvokeAsync<T>(string method, CancellationToken ct, object?[]? args)
@@ -510,6 +630,8 @@ public sealed class SupabaseSessionTests : IAsyncDisposable
                 "discardRecovery" => null,
                 "updatePassword" when RecoveryVerified && args is [ElementReference, ElementReference] => "updated",
                 "readEmail" => "user@example.test",
+                "signUp" when args is [string, ElementReference, ElementReference] =>
+                    new SupabaseSessionService.BrowserSession { AccessToken = Session, Error = Error, ConfirmationRequired = ConfirmationRequired },
                 "restore" or "refresh" or "signIn" => new SupabaseSessionService.BrowserSession { AccessToken = Session, Error = Error },
                 "signOut" => true,
                 "initialize" or "disconnect" => null,

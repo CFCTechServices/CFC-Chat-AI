@@ -35,12 +35,15 @@ public sealed class ChatWorkspaceTests : IDisposable
             using var page = NewPage();
             handler.Expect("GET", "sessions", new[] { Session("newest"), Session("chosen"), Session("foreign", owner: "other") });
             handler.Expect("GET", "sessions/chosen", new[] { Row("chosen", "m1", "user", "Question"), Row("chosen", "m2", "assistant", "Answer") });
+            ExpectRatings("chosen", ("m2", -1), ("m1", 1), ("unknown", 1));
             await page.LoadAsync("chosen");
             Assert.Equal(2, page.Conversations.Count);
             var thread = page.Active!;
             Assert.Equal("chosen", thread.Id);
             Assert.Equal(new[] { "Question", "Answer" }, thread.Messages.Select(m => m.Content));
             var reply = thread.Messages[1];
+            Assert.Equal(-1, reply.Rating);
+            Assert.Null(thread.Messages[0].Rating);
             Assert.Equal("m2", reply.Id);
             Assert.Equal("citation", reply.Metadata!.Citations![0]["source"].GetString());
             Assert.Equal("docs/example.png", reply.Metadata.RelevantImages![0].Path);
@@ -155,6 +158,7 @@ public sealed class ChatWorkspaceTests : IDisposable
         var persisted = new List<object> { Row("a", "m1", "user", "Question") };
         if (savedAnswer) persisted.Add(Row("a", "m2", "assistant", "Recovered answer"));
         handler.Expect("GET", "sessions/a", persisted);
+        if (savedAnswer) ExpectRatings("a");
         handler.Expect("PATCH", "sessions/a", Session("a", "Question"), new { title = "Question" });
         await chat.SendAsync("Question");
         Assert.Equal(savedAnswer ? 2 : 1, chat.Active!.Messages.Count);
@@ -183,18 +187,22 @@ public sealed class ChatWorkspaceTests : IDisposable
     [Fact]
     public async Task FailedHistoryBlocksPostingUntilReloadAndExplicitRetry()
     {
-        await OpenAsync(Row("a", "previous", "assistant", "Earlier answer"));
+        var old = new[] { Row("a", "previous", "assistant", "Earlier answer") };
+        ExpectOpening(old);
+        ExpectRatings("a");
+        await chat.LoadAsync("a");
         handler.Fail("POST", "message", HttpStatusCode.ServiceUnavailable);
         handler.Fail("GET", "sessions/a", HttpStatusCode.ServiceUnavailable);
         await chat.SendAsync("Try again");
         Assert.False(chat.CanSend);
         await chat.SendAsync("Try again");
         Assert.Equal(1, handler.MessagePosts);
-        var old = new[] { Row("a", "previous", "assistant", "Earlier answer") };
         handler.Expect("GET", "sessions/a", old);
+        ExpectRatings("a");
         await chat.SelectAsync(chat.Active!);
         Assert.True(chat.CanSend);
         handler.Expect("GET", "sessions/a", old);
+        ExpectRatings("a");
         handler.Expect("POST", "message", Reply(), new { session_id = "a", content = "Try again" });
         await chat.SendAsync(chat.Draft);
         Assert.Equal(2, handler.MessagePosts);
@@ -260,6 +268,8 @@ public sealed class ChatWorkspaceTests : IDisposable
         handler.Expect("PATCH", "sessions/a", Session("a", "Question"), new { title = "Question" });
         await chat.SendAsync("Question");
         var answer = Assert.Single(chat.Active!.Messages, message => message.Role == "assistant");
+        handler.Expect("POST", "feedback", new { success = true, score = 1 }, Vote("a", "m2", 1));
+        await chat.ToggleFeedbackAsync(chat.Active, answer, 1);
 
         using var services = new ServiceCollection().AddLogging().AddSingleton<IJSRuntime, NoBrowser>().BuildServiceProvider();
         await using var renderer = new HtmlRenderer(services, services.GetRequiredService<ILoggerFactory>());
@@ -268,7 +278,8 @@ public sealed class ChatWorkspaceTests : IDisposable
             var parameters = ParameterView.FromDictionary(new Dictionary<string, object?>
             {
                 [nameof(ChatMessage.Sender)] = "CFC AI",
-                [nameof(ChatMessage.Text)] = answer.Content
+                [nameof(ChatMessage.Text)] = answer.Content,
+                [nameof(ChatMessage.Rating)] = answer.Rating
             });
             var rendered = await renderer.RenderComponentAsync<ChatMessage>(parameters);
             return rendered.ToHtmlString();
@@ -276,14 +287,217 @@ public sealed class ChatWorkspaceTests : IDisposable
         Assert.Contains("chat-message bot", html);
         Assert.Contains("<p>Answer from API</p>", html);
         Assert.Contains("Copy message", html);
+        Assert.Contains("aria-label=\"Mark as helpful\" aria-pressed=\"true\"", html);
+        Assert.Contains("aria-label=\"Mark as not helpful\" aria-pressed=\"false\"", html);
     }
 
-    private async Task OpenAsync(params object[] history)
+    [Theory]
+    [InlineData(1)]
+    [InlineData(-1)]
+    public async Task SavesChangesAndClearsOnlyAfterConfirmation(int thumb)
+    {
+        var history = new[] { Row("a", "reply", "assistant", "Answer") };
+        ExpectOpening(history);
+        ExpectRatings("a");
+        await chat.LoadAsync("a");
+        var thread = chat.Active!;
+        var message = Assert.Single(thread.Messages);
+
+        access.Token = Guid.NewGuid().ToString("N");
+        var first = handler.Hold("POST", "feedback", Vote("a", "reply", thumb));
+        var saving = chat.ToggleFeedbackAsync(thread, message, thumb);
+        await first.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(access.Token, first.Bearer);
+        Assert.Null(message.Rating);
+        Assert.False(chat.CanRate(thread));
+        Assert.True(chat.CanSend);
+        await chat.ToggleFeedbackAsync(thread, message, thumb);
+        first.Return(new { success = true, score = thumb });
+        await saving;
+        Assert.Equal(thumb, message.Rating);
+
+        handler.Expect("POST", "feedback", new { success = true, score = -thumb }, Vote("a", "reply", -thumb));
+        await chat.ToggleFeedbackAsync(thread, message, -thumb);
+        Assert.Equal(-thumb, message.Rating);
+        handler.Expect("POST", "feedback", new { success = true, score = (int?)null }, Vote("a", "reply", null));
+        await chat.ToggleFeedbackAsync(thread, message, -thumb);
+        Assert.Null(message.Rating);
+
+        using var refreshed = NewPage();
+        ExpectOpening(history);
+        ExpectRatings("a");
+        await refreshed.LoadAsync("a");
+        Assert.Null(Assert.Single(refreshed.Active!.Messages).Rating);
+        Assert.True(refreshed.CanRate(refreshed.Active));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.ServiceUnavailable, "unavailable")]
+    [InlineData(HttpStatusCode.Unauthorized, "Access was denied")]
+    public async Task UnavailableRatingsKeepHistoryReadableAndCanBeReloaded(HttpStatusCode status, string reason)
+    {
+        var history = new[] { Row("a", "reply", "assistant", "Saved answer") };
+        ExpectOpening(history);
+        handler.Fail("GET", "feedback?session_id=a", status);
+        await chat.LoadAsync("a");
+        var thread = chat.Active!;
+        var message = Assert.Single(thread.Messages);
+        Assert.Equal("Saved answer", message.Content);
+        Assert.Contains(reason, thread.FeedbackError);
+        Assert.True(chat.CanSend);
+        Assert.False(chat.CanRate(thread));
+        await chat.ToggleFeedbackAsync(thread, message, 1);
+
+        ExpectRatings("a", ("reply", -1));
+        await chat.ReloadFeedbackAsync(thread);
+        Assert.Same(message, Assert.Single(thread.Messages));
+        Assert.Equal(-1, message.Rating);
+        Assert.Null(thread.FeedbackError);
+        Assert.True(chat.CanRate(thread));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Forbidden)]
+    [InlineData(HttpStatusCode.GatewayTimeout)]
+    [InlineData(HttpStatusCode.OK)]
+    public async Task UnconfirmedWriteKeepsPreviousRatingUntilReload(HttpStatusCode status)
+    {
+        var history = new[] { Row("a", "reply", "assistant", "Answer") };
+        ExpectOpening(history);
+        ExpectRatings("a", ("reply", 1));
+        await chat.LoadAsync("a");
+        var thread = chat.Active!;
+        var message = Assert.Single(thread.Messages);
+        if (status == HttpStatusCode.OK)
+            handler.Expect("POST", "feedback", new { success = true, score = 1 }, Vote("a", "reply", -1));
+        else
+            handler.Fail("POST", "feedback", status);
+        await chat.ToggleFeedbackAsync(thread, message, -1);
+        Assert.Equal(1, message.Rating);
+        Assert.Contains("could not be confirmed", thread.FeedbackError);
+        if (status == HttpStatusCode.Forbidden) Assert.Contains("Access was denied", thread.FeedbackError);
+        Assert.False(chat.CanRate(thread));
+
+        // An empty map is authoritative too, e.g. after clearing the rating in another tab.
+        ExpectRatings("a");
+        await chat.ReloadFeedbackAsync(thread);
+        Assert.Null(message.Rating);
+        Assert.Null(thread.FeedbackError);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SwitchingDuringSaveKeepsConversationRatingsSeparate(bool switchBackBeforeWriteCompletes)
+    {
+        var history = new[] { Row("a", "reply", "assistant", "First answer") };
+        handler.Expect("GET", "sessions", new[] { Session("a"), Session("b") });
+        handler.Expect("GET", "sessions/a", history);
+        ExpectRatings("a");
+        await chat.LoadAsync("a");
+        var first = chat.Active!;
+        var second = chat.Conversations[1];
+        var write = handler.Hold("POST", "feedback", Vote("a", "reply", 1));
+        var saving = chat.ToggleFeedbackAsync(first, first.Messages[0], 1);
+        await write.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        handler.Expect("GET", "sessions/b", new[] { Row("b", "reply", "assistant", "Second answer") });
+        ExpectRatings("b", ("reply", -1));
+        await chat.SelectAsync(second);
+        Assert.True(chat.CanRate(second));
+        Assert.Equal(-1, Assert.Single(second.Messages).Rating);
+        await chat.ToggleFeedbackAsync(second, first.Messages[0], 1);
+
+        var reloading = Task.CompletedTask;
+        if (switchBackBeforeWriteCompletes)
+        {
+            handler.Expect("GET", "sessions/a", history);
+            reloading = chat.SelectAsync(first);
+            Assert.False(reloading.IsCompleted);
+            // Only allow the feedback GET after the pending write has been acknowledged.
+            ExpectRatings("a", ("reply", 1));
+        }
+        write.Return(new { success = true, score = 1 });
+        await Task.WhenAll(saving, reloading);
+        Assert.Same(switchBackBeforeWriteCompletes ? first : second, chat.Active);
+        Assert.Equal(1, Assert.Single(first.Messages).Rating);
+        Assert.Equal(-1, Assert.Single(second.Messages).Rating);
+    }
+
+    [Fact]
+    public async Task LateFeedbackLoadOnlyUpdatesTheOriginalConversation()
+    {
+        handler.Expect("GET", "sessions", new[] { Session("a"), Session("b") });
+        handler.Expect("GET", "sessions/a", new[] { Row("a", "reply", "assistant", "First answer") });
+        var read = handler.Hold("GET", "feedback?session_id=a");
+        var opening = chat.LoadAsync("a");
+        await read.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var first = chat.Active!;
+        var second = chat.Conversations[1];
+        handler.Expect("GET", "sessions/b", new[] { Row("b", "reply", "assistant", "Second answer") });
+        ExpectRatings("b", ("reply", -1));
+        await chat.SelectAsync(second);
+        read.Return(new { feedback = new { reply = 1 } });
+        await opening;
+        Assert.Same(second, chat.Active);
+        Assert.Equal(-1, Assert.Single(second.Messages).Rating);
+        Assert.Equal(1, Assert.Single(first.Messages).Rating);
+    }
+
+    [Fact]
+    public async Task PendingFeedbackLoadCannotApplyToAnotherAccountWithMatchingIds()
+    {
+        var history = new[] { Row("a", "reply", "assistant", "Answer"), Row("a", "user", "user", "Question") };
+        ExpectOpening(history);
+        var firstRead = handler.Hold("GET", "feedback?session_id=a");
+        var loading = chat.LoadAsync("a");
+        await firstRead.Started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(access.Token, firstRead.Bearer);
+
+        var otherAccess = new TestAccess("other");
+        using var other = new ChatWorkspace(new FastApiClient(http), otherAccess, otherAccess.Owner);
+        handler.Expect("GET", "sessions", new[] { Session("a", owner: "other") });
+        handler.Expect("GET", "sessions/a", history);
+        var otherRead = handler.Hold("GET", "feedback?session_id=a");
+        otherRead.Return(new { feedback = new { reply = -1 } });
+        await other.LoadAsync("a");
+        Assert.Equal(otherAccess.Token, otherRead.Bearer);
+        firstRead.Return(new { feedback = new { reply = 1 } });
+        await loading;
+        var mine = chat.Active!;
+        var theirs = other.Active!;
+        Assert.Equal(1, mine.Messages[0].Rating);
+        Assert.Equal(-1, theirs.Messages[0].Rating);
+
+        // Foreign references and user messages must never produce a POST.
+        await other.ToggleFeedbackAsync(mine, mine.Messages[0], -1);
+        await other.ToggleFeedbackAsync(theirs, mine.Messages[0], -1);
+        await other.ToggleFeedbackAsync(theirs, theirs.Messages[1], 1);
+        var clear = handler.Hold("POST", "feedback", Vote("a", "reply", null));
+        clear.Return(new { success = true, score = (int?)null });
+        await other.ToggleFeedbackAsync(theirs, theirs.Messages[0], -1);
+        Assert.Equal(otherAccess.Token, clear.Bearer);
+        Assert.Null(theirs.Messages[0].Rating);
+        Assert.Equal(1, mine.Messages[0].Rating);
+    }
+
+    private Task OpenAsync(params object[] history)
+    {
+        ExpectOpening(history);
+        return chat.LoadAsync("a");
+    }
+
+    private void ExpectOpening(params object[] history)
     {
         handler.Expect("GET", "sessions", new[] { Session("a") });
         handler.Expect("GET", "sessions/a", history);
-        await chat.LoadAsync("a");
     }
+
+    private void ExpectRatings(string session, params (string Id, int Score)[] ratings) =>
+        handler.Expect("GET", $"feedback?session_id={session}", new { feedback = ratings.ToDictionary(r => r.Id, r => r.Score) });
+
+    private static object Vote(string session, string message, int? rating) =>
+        new { message_id = message, session_id = session, rating };
 
     private static object Session(string id, string title = "New Chat", string owner = "account") =>
         new { id, title, user_id = owner, created_at = "2026-01-01" };
@@ -310,7 +524,7 @@ public sealed class ChatWorkspaceTests : IDisposable
     private sealed class TestAccess(string owner) : IChatSessionAccess
     {
         public string Owner => owner;
-        public string Token { get; } = Guid.NewGuid().ToString("N");
+        public string Token { get; set; } = Guid.NewGuid().ToString("N");
         public Task<T> WithAccessTokenAsync<T>(string ownerId, Func<string, CancellationToken, Task<T>> request, CancellationToken ct)
         {
             Assert.Equal(owner, ownerId);

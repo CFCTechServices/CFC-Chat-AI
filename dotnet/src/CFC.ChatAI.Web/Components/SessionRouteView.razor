@@ -1,16 +1,19 @@
 @using CFC.ChatAI.Web.Services
 @implements IDisposable
+@using CFC.ChatAI.Web.Models
 @inject SupabaseSessionService Session
 @inject NavigationManager Navigation
 
-@if (RouteData.PageType == typeof(Pages.Chat) && !Session.CanAccessChat)
+@if (destination is not null && !destination.Allows(VerifiedProfile))
 {
-    <p role="status" aria-live="polite">Checking access to chat…</p>
+    <p role="status" aria-live="polite">@(VerifiedProfile is null ? "Checking access…" : "You do not have access to this page.")</p>
 }
 else
 {
     <CascadingValue Value="Session.State">
-        <RouteView @key="PageOwner" RouteData="RouteData" DefaultLayout="typeof(Layout.MainLayout)" />
+        <CascadingValue TValue="ProfileResponse" Value="@(destination is null ? null : VerifiedProfile)">
+            <RouteView @key="PageOwner" RouteData="RouteData" DefaultLayout="typeof(Layout.MainLayout)" />
+        </CascadingValue>
         <FocusOnNavigate RouteData="RouteData" Selector="h1" />
     </CascadingValue>
 }
@@ -19,22 +22,28 @@ else
     [Parameter, EditorRequired] public RouteData RouteData { get; set; } = default!;
     private bool started;
     private bool disposed;
-    private string? PageOwner => RouteData.PageType == typeof(Pages.Chat) ? Session.State.Profile?.Id : null;
+    private AppDestination? destination;
+    private ProfileResponse? VerifiedProfile => Session.CanAccessChat ? Session.State.Profile : null;
+    private string? PageOwner => destination is null ? null : VerifiedProfile?.Id;
 
     protected override void OnInitialized() => Session.Changed += OnSessionChanged;
+    protected override void OnParametersSet() => destination = AppDestination.ForPage(RouteData.PageType);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!started)
         {
-            if (RouteData.PageType != typeof(Pages.Chat) && RouteData.PageType != typeof(Pages.Login)) return;
+            if (destination is null && RouteData.PageType != typeof(Pages.Login)) return;
             started = true;
             await Session.RestoreAsync();
         }
         if (disposed) return;
-        if (RouteData.PageType == typeof(Pages.Login) && Session.CanAccessChat)
-            Navigation.NavigateTo("/chat", replace: true);
-        else if (RouteData.PageType == typeof(Pages.Chat) && Session.State.Status is SessionStatus.SignedOut or SessionStatus.Unavailable or SessionStatus.SignOutPending)
+        if (VerifiedProfile is { } profile)
+        {
+            if (RouteData.PageType == typeof(Pages.Login) || (destination is not null && !destination.Allows(profile)))
+                Navigation.NavigateTo(AppDestination.LandingPage(profile), replace: true);
+        }
+        else if (destination is not null && Session.State.Status is SessionStatus.SignedOut or SessionStatus.Unavailable or SessionStatus.SignOutPending)
             Navigation.NavigateTo("/login", replace: true);
     }
 

@@ -11,6 +11,9 @@ public enum SessionStatus { Checking, SignedOut, Active, Unavailable, SignOutPen
 
 public sealed record SessionState(SessionStatus Status, string? Message = null, ProfileResponse? Profile = null);
 
+public enum SignUpOutcome { Failed, InvitationDenied, ConfirmationRequired, SessionReceived }
+public sealed record SignUpResult(SignUpOutcome Outcome, string? Message = null);
+
 public sealed class SupabaseSessionService(IAuthenticationBackend backend, IJSRuntime js, TimeProvider clock)
     : IChatSessionAccess, IAsyncDisposable
 {
@@ -23,6 +26,7 @@ public sealed class SupabaseSessionService(IAuthenticationBackend backend, IJSRu
     private long revision;
     private bool initialized;
     private bool signingOut;
+    private bool signingUp;
     private bool disposed;
 
     public SessionState State { get; private set; } = new(SessionStatus.Checking);
@@ -63,6 +67,67 @@ public sealed class SupabaseSessionService(IAuthenticationBackend backend, IJSRu
 
     public Task SignInAsync(ElementReference emailInput, ElementReference passwordInput) =>
         ReadAsync("signIn", [emailInput, passwordInput]);
+
+    public async Task<CheckEmailResponse> CheckInvitationAsync(string email)
+    {
+        try { return await backend.CheckEmailAsync(new(email.Trim()), lifetime.Token); }
+        catch (Exception ex) when (IsServiceFailure(ex))
+        {
+            return new(false, "Could not check the invitation. Check your connection and try again.");
+        }
+    }
+
+    public async Task<SignUpResult> SignUpAsync(string invitedEmail, ElementReference password, ElementReference confirmation)
+    {
+        if (disposed || signingOut || signingUp || !initialized || State.Status != SessionStatus.SignedOut)
+            return new(SignUpOutcome.Failed, "Registration is unavailable while another session operation is in progress.");
+
+        signingUp = true;
+        var operation = ++revision;
+        try
+        {
+            // The invitation can expire or be consumed while the password form is open.
+            var email = invitedEmail.Trim();
+            var invitation = await CheckInvitationAsync(email);
+            if (!Current(operation)) return new(SignUpOutcome.Failed, "Your session changed. Please try again.");
+            if (!invitation.Eligible) return new(SignUpOutcome.InvitationDenied, invitation.Message);
+
+            var result = await js.InvokeAsync<BrowserSession>("cfcAuth.signUp", lifetime.Token, email, password, confirmation);
+            if (!Current(operation)) return new(SignUpOutcome.Failed, "Your session changed. Please try signing in.");
+            if (result.Error is not null)
+            {
+                var message = result.Error switch
+                {
+                    "short" => "Enter a password of at least 6 characters.",
+                    "mismatch" => "Passwords do not match.",
+                    "weak_password" => "Choose a stronger password and try again.",
+                    "existing_account" => "An account already exists for this email. Sign in or reset your password.",
+                    "rate_limit" => "Too many registration attempts. Please try again later.",
+                    "signup_disabled" => "Registration is disabled. Contact your administrator.",
+                    _ => "Could not confirm registration. Check your inbox or try signing in before retrying."
+                };
+                return new(SignUpOutcome.Failed, message);
+            }
+            if (!string.IsNullOrEmpty(result.AccessToken))
+            {
+                await VerifyAsync(result, operation, allowRefresh: true);
+                return new(SignUpOutcome.SessionReceived);
+            }
+            if (result.ConfirmationRequired)
+            {
+                SetState(new(SessionStatus.SignedOut));
+                return new(SignUpOutcome.ConfirmationRequired,
+                    "Check your inbox for a confirmation link, then sign in. If you already have an account, sign in or reset your password.");
+            }
+            return new(SignUpOutcome.Failed, "Supabase did not return a registration result. Please try signing in.");
+        }
+        catch (Exception ex) when (IsServiceFailure(ex))
+        {
+            if (Current(operation) && State.Status == SessionStatus.Checking) SetUnavailable();
+            return new(SignUpOutcome.Failed, "Could not confirm registration. Check your inbox or try signing in before retrying.");
+        }
+        finally { signingUp = false; }
+    }
 
     [JSInvokable]
     public Task BrowserSessionChanged(string eventName, string? userId)
@@ -323,5 +388,6 @@ public sealed class SupabaseSessionService(IAuthenticationBackend backend, IJSRu
     {
         public string? AccessToken { get; init; }
         public string? Error { get; init; }
+        public bool ConfirmationRequired { get; init; }
     }
 }

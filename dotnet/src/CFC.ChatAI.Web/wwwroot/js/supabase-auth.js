@@ -8,7 +8,20 @@ window.cfcAuth = (() => {
     let operations = 0;
     let sdkLoad;
     let recoveryAuth;
+    cleanSignupCallback();
     let recoveryLink = takeRecoveryLink();
+
+    // Supabase confirms the email before redirecting here. The user signs in through
+    // the normal verified flow. Remove callback tokens before the Blazor circuit starts.
+    function cleanSignupCallback() {
+        const location = window.location;
+        if (location?.pathname !== "/login") return;
+        const query = new URLSearchParams(location.search);
+        if (query.get("signup") !== "confirm") return;
+        const fragment = new URLSearchParams(location.hash.slice(1));
+        const failed = fragment.has("error") || fragment.has("error_code") || query.has("error") || query.has("error_code");
+        window.history.replaceState(window.history.state, "", failed ? "/login?signup=link-error" : "/login?signup=return");
+    }
 
     // FastAPI's /auth/v1/recover request uses Supabase's implicit recovery redirect.
     // Consume its fragment before Blazor starts. Only status codes cross the circuit.
@@ -141,6 +154,33 @@ window.cfcAuth = (() => {
         return read(() => auth.signInWithPassword({ email, password }));
     }
 
+    async function signUp(email, passwordInput, confirmationInput) {
+        const password = passwordInput.value;
+        if (password.length < 6) return { error: "short" };
+        if (password !== confirmationInput.value) return { error: "mismatch" };
+        passwordInput.value = confirmationInput.value = "";
+        operations++;
+        try {
+            const { data, error } = await auth.signUp({
+                email, password,
+                options: { emailRedirectTo: new URL("login?signup=confirm", document.baseURI).href }
+            });
+            if (error) {
+                if (error.code === "user_already_exists" || error.code === "email_exists") return { error: "existing_account" };
+                if (error.code === "weak_password" || error.code === "signup_disabled") return { error: error.code };
+                return { error: error.status === 429 ? "rate_limit" : "registration_failed" };
+            }
+            if (data?.session?.access_token) return { accessToken: data.session.access_token };
+            // The provider can intentionally obscure whether an account already exists.
+            if (data?.user?.id) return { confirmationRequired: true };
+            return { error: "registration_failed" };
+        } catch {
+            return { error: "registration_failed" };
+        } finally {
+            operations--;
+        }
+    }
+
     async function prepareRecovery(url, publicKey) {
         if (recoveryAuth) return true;
         const link = recoveryLink;
@@ -205,7 +245,7 @@ window.cfcAuth = (() => {
     }
 
     return {
-        initialize, signIn, signOut, disconnect,
+        initialize, signIn, signUp, signOut, disconnect,
         readEmail: input => input.value.trim(),
         hasRecoveryLink: () => Boolean(recoveryLink || recoveryAuth), prepareRecovery, updatePassword, discardRecovery,
         restore: () => checkSession(() => auth.getSession()),
