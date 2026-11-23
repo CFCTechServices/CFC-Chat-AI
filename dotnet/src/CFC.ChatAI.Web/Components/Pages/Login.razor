@@ -1,6 +1,7 @@
 ﻿@page "/login"
-@rendermode InteractiveServer
 @using System.ComponentModel.DataAnnotations
+@using CFC.ChatAI.Web.Services
+@inject SupabaseSessionService Session
 
 <div class="login-page">
 
@@ -68,7 +69,7 @@
 
             <p>Access is restricted to authorized users only.</p>
 
-            <div class="login-form">
+            <form class="login-form" @onsubmit="SignInAsync" @onsubmit:preventDefault>
 
                 <label for="login-email">Email Address</label>
 
@@ -76,15 +77,8 @@
                        type="email"
                        placeholder="Enter your email"
                        autocomplete="email"
-                       @bind="email"
-                       @bind:event="oninput" />
-
-                @if (!string.IsNullOrWhiteSpace(email) && !IsEmailValid)
-                {
-                    <small style="color: #b91c1c;" role="alert">
-                        Please enter a valid email address.
-                    </small>
-                }
+                       required
+                       @ref="emailInput" />
 
                 <label for="login-password">Password</label>
 
@@ -92,18 +86,40 @@
                        type="password"
                        placeholder="Enter your password"
                        autocomplete="current-password"
-                       @bind="password" />
+                       required
+                       @ref="passwordInput" />
 
                 <a href="/reset-password">Forgot Password?</a>
 
-                <button type="button" disabled>
-                    Sign In
+                <button type="submit" disabled="@(!CanSubmit)">
+                    @(busy ? "Signing in…" : "Sign In")
                 </button>
+                @if (State.Status == SessionStatus.Checking && !busy)
+                {
+                    <p role="status">Checking your session…</p>
+                }
+                @if (State.Message is not null)
+                {
+                    <p role="alert">@State.Message</p>
+                }
+                @if (State.Status == SessionStatus.Unavailable)
+                {
+                    <button type="button" @onclick="Session.RestoreAsync">Retry connection</button>
+                    @if (Session.BrowserInitialized)
+                    {
+                        <button type="button" @onclick="Session.SignOutAsync">Sign Out</button>
+                    }
+                }
+                @if (State.Status == SessionStatus.SignOutPending)
+                {
+                    <button type="button" @onclick="Session.SignOutAsync">Retry sign-out</button>
+                }
 
                 <p>
                     Need an account?
                     <button type="button"
                             class="login-switch"
+                            disabled="@busy"
                             @onclick="ShowSignUp">
                         Sign Up
                     </button>
@@ -114,7 +130,7 @@
                     administrator to request access.
                 </p>
 
-            </div>
+            </form>
         }
 
     </div>
@@ -126,20 +142,31 @@
     private bool isSignUp = false;
 
     private string email = string.Empty;
-    private string password = string.Empty;
+    private ElementReference emailInput;
+    private ElementReference passwordInput;
+    private bool busy;
+    [CascadingParameter] public SessionState State { get; set; } = new(SessionStatus.Checking);
+
+    private bool CanSubmit => !busy && State.Status is (SessionStatus.SignedOut or SessionStatus.Unavailable);
+
+    private async Task SignInAsync()
+    {
+        if (!CanSubmit) return;
+        busy = true;
+        try { await Session.SignInAsync(emailInput, passwordInput); }
+        finally { busy = false; }
+    }
 
     private void ShowSignUp()
     {
         isSignUp = true;
         email = string.Empty;
-        password = string.Empty;
     }
 
     private void ShowSignIn()
     {
         isSignUp = false;
         email = string.Empty;
-        password = string.Empty;
     }
 
     private bool IsEmailValid =>

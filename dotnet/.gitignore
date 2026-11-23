@@ -482,6 +482,10 @@ $RECYCLE.BIN/
 *.swp
 
 models/
+!src/CFC.ChatAI.Web/Models/
+src/CFC.ChatAI.Web/Models/*
+!src/CFC.ChatAI.Web/Models/AuthContracts.cs
+!src/CFC.ChatAI.Web/Models/ChatContracts.cs
 
 # Parity test data (root .gitignore ignores *.json)
 !tests/CFC.ChatAI.Rag.Tests/TestData/*.json

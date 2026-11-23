@@ -1,0 +1,47 @@
+@using CFC.ChatAI.Web.Services
+@implements IDisposable
+@inject SupabaseSessionService Session
+@inject NavigationManager Navigation
+
+@if (RouteData.PageType == typeof(Pages.Chat) && !Session.CanAccessChat)
+{
+    <p role="status" aria-live="polite">Checking access to chat…</p>
+}
+else
+{
+    <CascadingValue Value="Session.State">
+        <RouteView @key="PageOwner" RouteData="RouteData" DefaultLayout="typeof(Layout.MainLayout)" />
+        <FocusOnNavigate RouteData="RouteData" Selector="h1" />
+    </CascadingValue>
+}
+
+@code {
+    [Parameter, EditorRequired] public RouteData RouteData { get; set; } = default!;
+    private bool started;
+    private bool disposed;
+    private string? PageOwner => RouteData.PageType == typeof(Pages.Chat) ? Session.State.Profile?.Id : null;
+
+    protected override void OnInitialized() => Session.Changed += OnSessionChanged;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!started)
+        {
+            if (RouteData.PageType != typeof(Pages.Chat) && RouteData.PageType != typeof(Pages.Login)) return;
+            started = true;
+            await Session.RestoreAsync();
+        }
+        if (disposed) return;
+        if (RouteData.PageType == typeof(Pages.Login) && Session.CanAccessChat)
+            Navigation.NavigateTo("/chat", replace: true);
+        else if (RouteData.PageType == typeof(Pages.Chat) && Session.State.Status is SessionStatus.SignedOut or SessionStatus.Unavailable or SessionStatus.SignOutPending)
+            Navigation.NavigateTo("/login", replace: true);
+    }
+
+    private void OnSessionChanged() => _ = InvokeAsync(StateHasChanged);
+    public void Dispose()
+    {
+        disposed = true;
+        Session.Changed -= OnSessionChanged;
+    }
+}
