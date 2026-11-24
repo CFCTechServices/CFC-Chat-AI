@@ -4,11 +4,18 @@ IIS runs the Blazor Interactive Server app (`dotnet/src/CFC.ChatAI.Web`) through
 
 ## Local development
 
-Install the .NET 10 SDK. Run these from the repository root in two PowerShell terminals:
+Install the .NET 10 SDK. For local password recovery, set the following in the repository root `.env` before starting the API (copy `.env.example` to `.env` first if needed; do not overwrite an existing file):
+
+```dotenv
+PASSWORD_RESET_REDIRECT_URL=http://localhost:5077/reset-password
+```
+
+Allow this URL in Supabase's redirect settings. This setting is independent of Python's `FRONTEND_BASE_URL`. Existing environment variables take precedence over `.env`; restart the API after changing `.env`. Existing .NET deployments must migrate their reset URL from `FRONTEND_BASE_URL` to `PASSWORD_RESET_REDIRECT_URL`; the .NET API no longer reads the old name.
+
+Run these from the repository root in two PowerShell terminals:
 
 ```powershell
 # Terminal 1: API (default http://127.0.0.1:5000)
-$env:FRONTEND_BASE_URL = 'http://localhost:5077/reset-password'
 dotnet run --project dotnet/src/CFC.ChatAI.Api/CFC.ChatAI.Api.csproj
 ```
 
@@ -17,7 +24,7 @@ dotnet run --project dotnet/src/CFC.ChatAI.Api/CFC.ChatAI.Api.csproj
 dotnet run --project dotnet/src/CFC.ChatAI.Web/CFC.ChatAI.Web.csproj --launch-profile http
 ```
 
-Open [http://localhost:5077/](http://localhost:5077/) or the old `/ui/` bookmark; both redirect to `/login`. The API loads the repository root `.env` without overriding environment variables. Blazor does not load that file or need provider credentials. If the API is on another port, set `$env:Backend__BaseUrl` in terminal 2 to its root URL before starting Blazor. The URL must be HTTPS or loopback HTTP. To test with local HTTPS, trust the .NET developer certificate (`dotnet dev-certs https --trust`), use the `https` launch profile, and adjust the callback URLs to `https://localhost:7011`.
+Open [http://localhost:5077/](http://localhost:5077/) or the old `/ui/` bookmark; both redirect to `/login`. The API loads the repository root `.env` without overriding environment variables. Blazor does not load that file or need provider credentials. If the API is on another port, set `$env:Backend__BaseUrl` in terminal 2 to its root URL before starting Blazor. The URL must be HTTPS or loopback HTTP. To test with local HTTPS, trust the .NET developer certificate (`dotnet dev-certs https --trust`), use the `https` launch profile, set `PASSWORD_RESET_REDIRECT_URL` to `https://localhost:7011/reset-password` in `.env`, and allow the HTTPS callback URLs in Supabase.
 
 `curl.exe --fail http://127.0.0.1:5000/api/health` checks API liveness without provider credentials. If `/api/auth/config` is 404 on the API, check `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` and restart it. Chat, feedback submission and document writes also require Pinecone and the embedding assets. See [.NET local setup](../README.md#local-development-net-migration) for the provider settings. Use disposable development providers for write tests. Stop each process with Ctrl+C.
 
@@ -60,7 +67,7 @@ SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 SUPABASE_DOCUMENTS_BUCKET=cfc-docs
 SUPABASE_VIDEOS_BUCKET=cfc-videos
-FRONTEND_BASE_URL=https://your-site.example/reset-password
+PASSWORD_RESET_REDIRECT_URL=https://your-site.example/reset-password
 PINECONE_API_KEY=
 PINECONE_INDEX_NAME=
 PINECONE_NAMESPACE=

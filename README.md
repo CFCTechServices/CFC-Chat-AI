@@ -54,7 +54,8 @@ Start with [`.env.example`](.env.example); placeholders are not working credenti
 | `PINECONE_API_KEY`, `PINECONE_INDEX_NAME` | Python and .NET vector search; the index must match the embedding dimensions |
 | `PINECONE_VIDEO_INDEX_NAME`, `PINECONE_NAMESPACE` | Python video index and namespace; inspect the .NET host configuration separately before assuming parity |
 | `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT` | Azure OpenAI answer generation; configure all three together. `AZURE_OPENAI_API_VERSION` is used by Python |
-| `FRONTEND_BASE_URL`, `CORS_ORIGINS` | Python base URL for email links and allowed browser origins. For .NET, set `FRONTEND_BASE_URL` to the full `/reset-password` URL and allow it in Supabase; the Blazor API client does not require CORS |
+| `FRONTEND_BASE_URL`, `CORS_ORIGINS` | Python base URL for email links and allowed browser origins; the Blazor API client does not require CORS |
+| `PASSWORD_RESET_REDIRECT_URL` | .NET full `/reset-password` URL for Supabase recovery links; allow it in Supabase |
 | `RESEND_API_KEY`, `ENABLE_EMAIL_INVITES` | Optional Python invitation email delivery |
 | `SOFFICE_PATH`, `TESSERACT_CMD` | Python executable overrides when LibreOffice or Tesseract is not on PATH |
 
@@ -71,7 +72,7 @@ dotnet test dotnet/CFC.ChatAI.slnx
 dotnet run --project dotnet/src/CFC.ChatAI.Api/CFC.ChatAI.Api.csproj
 ```
 
-In a second terminal, run `dotnet run --project dotnet/src/CFC.ChatAI.Web/CFC.ChatAI.Web.csproj --launch-profile http` and open <http://localhost:5077/>. Blazor calls the API server-to-server at `http://127.0.0.1:5000` by default; no Python, Node or CORS changes are required. The API loads the root `.env` without overwriting existing environment variables. If you change its port (`DOTNET_API_PORT` or `Api__Urls`), set `Backend__BaseUrl` in Blazor's environment to match. For local password reset, set the API's `FRONTEND_BASE_URL` to `http://localhost:5077/reset-password` and allow the URL in Supabase. See the [IIS guide's local steps](deployment/DOTNET-IIS.md#local-development).
+In a second terminal, run `dotnet run --project dotnet/src/CFC.ChatAI.Web/CFC.ChatAI.Web.csproj --launch-profile http` and open <http://localhost:5077/>. Blazor calls the API server-to-server at `http://127.0.0.1:5000` by default; no Python, Node or CORS changes are required. The API loads the root `.env` without overwriting existing environment variables. If you change its port (`DOTNET_API_PORT` or `Api__Urls`), set `Backend__BaseUrl` in Blazor's environment to match. For local password reset, set `PASSWORD_RESET_REDIRECT_URL=http://localhost:5077/reset-password` in the root `.env` and allow the URL in Supabase. Existing environment variables take precedence, and the API must be restarted after changes. Existing .NET deployments must migrate their reset URL from `FRONTEND_BASE_URL`; Python continues to use that variable. See the [IIS guide's local steps](deployment/DOTNET-IIS.md#local-development).
 
 - Health routes are mapped without provider credentials. `/api/health` checks the host, not end-to-end readiness. `/api/health/detailed` checks dependencies, but its Azure OpenAI check only checks configuration, not a live completion.
 - Supabase-backed routes are mapped only when `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are all nonempty. Chat, feedback submission and vector stats additionally require `PINECONE_API_KEY`, `PINECONE_INDEX_NAME`, `Embedding:ModelPath` and `Embedding:VocabularyPath`. Missing configuration means routes are absent (404), not mock successes. Nonempty placeholder values do not prove connectivity.
@@ -158,7 +159,7 @@ Consult the service's configured stdout/stderr destinations and Windows Applicat
 - **No results:** check the selected Pinecone index, dimensions, namespace, credentials and ingestion state; verify the matching backend configuration.
 - **Document/video processing fails:** check service account permissions, disk space, supported file type and FFmpeg, Tesseract, Poppler or LibreOffice availability as appropriate. On Windows set `SOFFICE_PATH` or `TESSERACT_CMD` if needed, then restart the service.
 - **Fallback answers or model errors:** inspect application logs and Azure OpenAI endpoint, key and deployment. If a model is retired, create an approved replacement deployment, update configuration and restart. Health configuration checks do not prove the model is usable.
-- **Login, invitation or reset links fail:** verify Supabase project configuration, email delivery, `FRONTEND_BASE_URL` and the Supabase redirect allowlist. Confirm browser origin and CORS settings for the actual deployment.
+- **Login, invitation or reset links fail:** verify Supabase project configuration, email delivery, the redirect setting (`FRONTEND_BASE_URL` for Python or `PASSWORD_RESET_REDIRECT_URL` for .NET) and the Supabase redirect allowlist. Confirm browser origin and CORS settings for the actual deployment.
 - **IIS health fails while Python is healthy:** check whether .NET is listening on port 5000 and inspect the deployed IIS rewrite rules. Do not interpret the Python script's direct probe as a check of the IIS route.
 - **Domain/HTTPS change:** configure DNS, firewall and an IIS certificate, update frontend origin and Supabase URL settings, restart affected services, and test from the intended network. In a private deployment, obtain the current VPN and site address from client IT.
 

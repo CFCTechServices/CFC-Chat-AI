@@ -56,6 +56,28 @@ public sealed class InternalApiContractTests
         Assert.DoesNotContain("private-service", json.ToString());
     }
 
+    [Theory]
+    [InlineData("http://localhost:5077/reset-password", "http://localhost:5077/reset-password")]
+    [InlineData("https://example.com/reset-password", "https://example.com/reset-password")]
+    [InlineData("not-a-url", null)]
+    [InlineData("ftp://example.com/reset-password", null)]
+    [InlineData("", null)]
+    public async Task ForgotPassword_UsesPasswordResetRedirectUrl(string configured, string? expected)
+    {
+        using var factory = Factory().WithWebHostBuilder(builder => builder.ConfigureAppConfiguration((_, config) =>
+            config.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["PASSWORD_RESET_REDIRECT_URL"] = configured,
+                ["FRONTEND_BASE_URL"] = "http://localhost:8000"
+            })));
+        using var client = Client(factory, null);
+        using var response = await client.PostAsJsonAsync("/api/auth/forgot-password", new { email = "user@example.com" });
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var identity = (Identity)factory.Services.GetRequiredService<IIdentityGateway>();
+        Assert.True(identity.RecoveryRequested);
+        Assert.Equal(expected, identity.RecoveryRedirect?.ToString());
+    }
+
     [Fact]
     public async Task Sessions_WithoutDetail_UseSummaryPage()
     {
@@ -231,7 +253,14 @@ public sealed class InternalApiContractTests
     {
         public Task<IdentityUser?> GetUserAsync(string token, CancellationToken ct = default) =>
             Task.FromResult<IdentityUser?>(token == "valid" ? new IdentityUser(UserId, "user@example.com") : null);
-        public Task RequestPasswordRecoveryAsync(string email, Uri? redirectTo = null, CancellationToken ct = default) => Task.CompletedTask;
+        public bool RecoveryRequested { get; private set; }
+        public Uri? RecoveryRedirect { get; private set; }
+        public Task RequestPasswordRecoveryAsync(string email, Uri? redirectTo = null, CancellationToken ct = default)
+        {
+            RecoveryRequested = true;
+            RecoveryRedirect = redirectTo;
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class Profiles(string role, bool active) : IUserProfileRepository

@@ -58,7 +58,7 @@ public static class InternalApiEndpoints
             IConfiguration config, CancellationToken ct) =>
         {
             if (!ValidEmail(request.Email)) return BadInput("Invalid email");
-            var redirect = config["FRONTEND_BASE_URL"];
+            var redirect = config["PASSWORD_RESET_REDIRECT_URL"];
             var uri = Uri.TryCreate(redirect, UriKind.Absolute, out var parsed) &&
                 parsed.Scheme is "http" or "https" ? parsed : null;
             try { await identity.RequestPasswordRecoveryAsync(request.Email, uri, ct); }
