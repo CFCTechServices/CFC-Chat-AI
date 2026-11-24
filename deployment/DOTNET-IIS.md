@@ -2,6 +2,25 @@
 
 This checklist replaces the existing development site in place. It does not run the Python deployment script or require a scheduled outage for an unused development site. Keep the old site's matching UI, IIS rules and Python service available until the new release has been checked.
 
+## Local development (without IIS)
+
+Install the .NET 10 SDK and Node.js 22+. Run both terminals from the repository root. For provider-backed features, configure the root `.env` as described in [Local Development (.NET migration)](../README.md#local-development-net-migration). Keep credentials out of source control.
+
+In the first PowerShell terminal, start the API on its default address, `http://127.0.0.1:5000`:
+
+```powershell
+dotnet run --project dotnet/src/CFC.ChatAI.Api/CFC.ChatAI.Api.csproj
+```
+
+In a second PowerShell terminal, install the UI build dependencies and start the local proxy:
+
+```powershell
+npm.cmd --prefix ./deployment ci --include=dev
+node deployment/dotnet-edge.mjs
+```
+
+Open [http://127.0.0.1:8080/ui/](http://127.0.0.1:8080/ui/). The proxy builds and serves the UI and forwards allowed API requests to port 5000. No IIS, NSSM, Python service, or CORS changes are needed. Development ingest and delete routes are not exposed through the proxy. Stop both processes with Ctrl+C when finished.
+
 ## 1. Prepare the host and back up the old deployment
 
 - [ ] On the build machine, install the .NET 10 SDK and Node.js 22+. On the Windows x64 server, install IIS Static Content, Default Document, URL Rewrite, ARR and NSSM. A separate .NET runtime or IIS .NET hosting bundle is not required: IIS proxies to a self-contained executable. Enable proxying in IIS Manager → server → Application Request Routing Cache → Server Proxy Settings. Check for server-wide or inherited rules that could still route to Python.
