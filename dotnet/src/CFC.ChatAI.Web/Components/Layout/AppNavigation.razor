@@ -1,0 +1,29 @@
+@using CFC.ChatAI.Web.Models
+@using CFC.ChatAI.Web.Services
+@inject SupabaseSessionService Session
+
+<header class="cfc-header">
+    <img src="images/logo-cfc.png" alt="CFC Tech Services" class="cfc-logo" />
+    <div class="cfc-header-title">
+        <h3>CFC Chat AI</h3>
+        <p>Your Software Assistant</p>
+    </div>
+    <div class="navigation-actions">
+        <nav aria-label="Primary navigation">
+            @foreach (var destination in AppDestination.Toolbar(Profile))
+            {
+                <NavLink href="@destination.Path" class="navigation-link">@destination.Label</NavLink>
+            }
+        </nav>
+        @if (!string.IsNullOrWhiteSpace(Profile.FullName))
+        {
+            <span class="account-greeting">Hi, @Profile.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries)[0]!</span>
+        }
+        <cfc-preferences><button type="button" class="sign-out" data-theme-toggle aria-pressed="false">Dark theme</button></cfc-preferences>
+        <button type="button" class="sign-out" @onclick="Session.SignOutAsync">Sign Out</button>
+    </div>
+</header>
+
+@code {
+    [Parameter, EditorRequired] public ProfileResponse Profile { get; set; } = default!;
+}

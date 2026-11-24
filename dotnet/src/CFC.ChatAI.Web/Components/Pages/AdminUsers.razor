@@ -1,0 +1,108 @@
+@using CFC.ChatAI.Web.Services
+@using CFC.ChatAI.Web.Models
+@inject SupabaseSessionService Session
+@inject FastApiClient Api
+@implements IDisposable
+
+<h2>User management</h2>
+<form class="invite" @onsubmit="InviteAsync" @onsubmit:preventDefault>
+    <label for="invite-email">Invitation email</label>
+    <div class="admin-actions">
+        <input id="invite-email" type="email" required autocomplete="off" disabled="@Locked"
+               @bind="email" @bind:event="oninput" />
+        <button type="submit" disabled="@(Locked || string.IsNullOrWhiteSpace(email))">Create invitation</button>
+    </div>
+</form>
+<div class="admin-heading">
+    <h3>Registered users@(work.Loaded ? $" ({work.Users.Count})" : "")</h3>
+    <button type="button" disabled="@Locked" @onclick="work.LoadAsync">Refresh</button>
+</div>
+@if (work.Notice is { } notice) { <p role="status">@notice</p> }
+@if (work.Error is { } error) { <p role="alert">@error</p> }
+@if (work.Busy) { <p role="status">Waiting for FastAPI…</p> }
+@if (work.Loaded && work.Users.Count == 0) { <p>No registered users.</p> }
+@if (work.Loaded)
+{
+    <ul class="user-list">
+        @foreach (var user in work.Users)
+        {
+            <li @key="user.Id">
+                <div class="user-details">
+                    <strong>@(string.IsNullOrWhiteSpace(user.FullName) ? user.Email : user.FullName)</strong>
+                    @if (!string.IsNullOrWhiteSpace(user.FullName)) { <span>@user.Email</span> }
+                    <span class="account-info">Role: @user.Role · Status: @user.Status</span>
+                    <small>Joined @DateLabel(user.CreatedAt)@if (user.DeletedAt is { } date) { <text> · Deactivated @DateLabel(date)</text> }</small>
+                </div>
+                @if (work.CanManage(user))
+                {
+                    var change = work.Pending;
+                    <div class="admin-actions">
+                        <select aria-label="@($"Role for {user.Email}")" disabled="@Locked"
+                                @bind:get="@(change?.Target.Id == user.Id && change.Action == AdminUserAction.ChangeRole ? change.NewRole : user.Role)"
+                                @bind:set="@((string? role) => work.BeginChange(user, AdminUserAction.ChangeRole, role))">
+                            @if (!AdminUsersWorkspace.AssignableRoles.Contains(user.Role)) { <option disabled>@user.Role</option> }
+                            @foreach (var role in AdminUsersWorkspace.AssignableRoles) { <option value="@role">@role</option> }
+                        </select>
+                        @if (user.Status == "active")
+                        {
+                            <button type="button" disabled="@Locked" @onclick="() => work.BeginChange(user, AdminUserAction.Deactivate)">Deactivate</button>
+                        }
+                        else if (user.Status == "inactive")
+                        {
+                            <button type="button" disabled="@Locked" @onclick="() => work.BeginChange(user, AdminUserAction.Reactivate)">Reactivate</button>
+                        }
+                        <button type="button" class="danger" disabled="@Locked" @onclick="() => work.BeginChange(user, AdminUserAction.Delete)">Delete</button>
+                    </div>
+                    @if (change?.Target.Id == user.Id)
+                    {
+                        <div class="confirmation" role="group" aria-label="Confirm account change">
+                            <p>@Prompt(change)</p>
+                            <div class="admin-actions">
+                                <button type="button" @onclick="work.CancelChange">Cancel</button>
+                                <button type="button" @onclick="() => work.ConfirmAsync(change)">Confirm @ActionLabel(change.Action)</button>
+                            </div>
+                        </div>
+                    }
+                }
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private AdminUsersWorkspace work = default!;
+    private string email = "";
+    private bool Locked => work.Busy || work.Pending is not null;
+
+    protected override Task OnInitializedAsync()
+    {
+        work = new(Api, Session, Session.State.Profile!.Id);
+        return work.LoadAsync();
+    }
+
+    private async Task InviteAsync()
+    {
+        if (Locked) return;
+        await work.InviteAsync(email);
+        if (work.Notice is not null) email = "";
+    }
+
+    private static string DateLabel(string value) =>
+        DateTimeOffset.TryParse(value, out var date) ? date.ToString("d") : "date unavailable";
+
+    private static string ActionLabel(AdminUserAction action) => action switch
+    {
+        AdminUserAction.Delete => "deletion", AdminUserAction.Deactivate => "deactivation",
+        AdminUserAction.Reactivate => "reactivation", _ => "role change"
+    };
+
+    private static string Prompt(AdminUserChange change) => change.Action switch
+    {
+        AdminUserAction.Delete => $"Permanently delete {change.Target.Email} and their chat data? This cannot be undone.",
+        AdminUserAction.Deactivate => $"Deactivate {change.Target.Email} and revoke their access?",
+        AdminUserAction.Reactivate => $"Restore access for {change.Target.Email}?",
+        _ => $"Change {change.Target.Email} from {change.Target.Role} to {change.NewRole}?"
+    };
+
+    public void Dispose() => work.Dispose();
+}

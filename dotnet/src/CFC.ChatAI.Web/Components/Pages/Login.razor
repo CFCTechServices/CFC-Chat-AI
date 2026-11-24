@@ -1,0 +1,246 @@
+﻿@page "/login"
+@using System.ComponentModel.DataAnnotations
+@using CFC.ChatAI.Web.Services
+@inject SupabaseSessionService Session
+
+<div class="login-page">
+
+    <div class="login-hero">
+        <h1>Welcome to CFC AI</h1>
+
+        <p>
+            A focused assistant for Concept5 and CFC knowledge.
+            <br />
+            Ask clear questions and get concise,
+            guided answers in seconds.
+        </p>
+
+        <div class="login-badges">
+            <span>Built for your workflows</span>
+            <span>Instant answers</span>
+            <span>Guided help</span>
+        </div>
+    </div>
+
+    <div class="login-card">
+
+        @if (isSignUp)
+        {
+            <h2>@(invitedEmail is null ? "Sign Up" : "Create Account")</h2>
+
+            <div class="login-form">
+                @if (invitedEmail is null)
+                {
+                    <p>Enter the email address your administrator invited.</p>
+                    <form class="login-form" @onsubmit="CheckInvitationAsync" @onsubmit:preventDefault>
+                        <label for="signup-email">Email Address</label>
+                        <input id="signup-email" type="email" placeholder="Enter your invited email"
+                               autocomplete="email" required disabled="@busy" @bind="email" @bind:event="oninput" />
+                        @if (email.Length > 0 && !IsEmailValid)
+                        {
+                            <small role="alert">Please enter a valid email address.</small>
+                        }
+                        <button type="submit" disabled="@(!CanRegister || !IsEmailValid)">
+                            @(busy ? "Checking invitation…" : "Next")
+                        </button>
+                    </form>
+                }
+                else
+                {
+                    <p>Creating an account for <strong>@invitedEmail</strong>.</p>
+                    <form class="login-form" @onsubmit="RegisterAsync" @onsubmit:preventDefault>
+                        <label for="signup-password">Password</label>
+                        <input id="signup-password" type="password" autocomplete="new-password" required
+                               minlength="6" placeholder="At least 6 characters" @ref="signupPassword" />
+                        <label for="signup-confirmation">Confirm Password</label>
+                        <input id="signup-confirmation" type="password" autocomplete="new-password" required
+                               minlength="6" placeholder="Confirm your password" @ref="signupConfirmation" />
+                        <button type="submit" disabled="@(!CanRegister)">
+                            @(busy ? "Creating account…" : "Create Account")
+                        </button>
+                        <button type="button" class="login-switch" disabled="@busy" @onclick="ShowSignUp">Change email</button>
+                    </form>
+                }
+
+                @if (signupMessage is not null)
+                {
+                    <p role="alert">@signupMessage</p>
+                }
+                @if (State.Status is SessionStatus.Unavailable or SessionStatus.SignOutPending)
+                {
+                    <p role="alert">@State.Message Return to Sign In to reconnect.</p>
+                }
+
+                <p>
+                    Already have an account?
+                    <button type="button"
+                            class="login-switch"
+                            disabled="@busy" @onclick="ShowSignIn">
+                        Sign In
+                    </button>
+                </p>
+
+            </div>
+        }
+        else
+        {
+            <h2>Sign In</h2>
+
+            <p>Access is restricted to authorized users only.</p>
+            @if (signupMessage is not null)
+            {
+                <p role="status">@signupMessage</p>
+            }
+            else if (SignupCallback == "link-error")
+            {
+                <p role="alert">This confirmation link is invalid or expired. Use the latest confirmation email or contact your administrator.</p>
+            }
+            else if (SignupCallback == "return")
+            {
+                <p role="status">Sign in with your invited email to continue.</p>
+            }
+
+            <form class="login-form" @onsubmit="SignInAsync" @onsubmit:preventDefault>
+
+                <label for="login-email">Email Address</label>
+
+                <input id="login-email"
+                       type="email"
+                       placeholder="Enter your email"
+                       autocomplete="email"
+                       required
+                       @ref="emailInput" />
+
+                <label for="login-password">Password</label>
+
+                <input id="login-password"
+                       type="password"
+                       placeholder="Enter your password"
+                       autocomplete="current-password"
+                       required
+                       @ref="passwordInput" />
+
+                <a href="/reset-password">Forgot Password?</a>
+
+                <button type="submit" disabled="@(!CanSubmit)">
+                    @(busy ? "Signing in…" : "Sign In")
+                </button>
+                @if (State.Status == SessionStatus.Checking && !busy)
+                {
+                    <p role="status">Checking your session…</p>
+                }
+                @if (State.Message is not null)
+                {
+                    <p role="alert">@State.Message</p>
+                }
+                @if (State.Status == SessionStatus.Unavailable)
+                {
+                    <button type="button" @onclick="Session.RestoreAsync">Retry connection</button>
+                    @if (Session.BrowserInitialized)
+                    {
+                        <button type="button" @onclick="Session.SignOutAsync">Sign Out</button>
+                    }
+                }
+                @if (State.Status == SessionStatus.SignOutPending)
+                {
+                    <button type="button" @onclick="Session.SignOutAsync">Retry sign-out</button>
+                }
+
+                <p>
+                    Need an account?
+                    <button type="button"
+                            class="login-switch"
+                            disabled="@(!CanRegister)"
+                            @onclick="ShowSignUp">
+                        Sign Up
+                    </button>
+                </p>
+
+                <p>
+                    Don't have access? Contact your
+                    administrator to request access.
+                </p>
+
+            </form>
+        }
+
+    </div>
+
+</div>
+
+@code {
+
+    private bool isSignUp = false;
+
+    private string email = string.Empty;
+    private string? invitedEmail, signupMessage;
+    private ElementReference signupPassword, signupConfirmation;
+    [SupplyParameterFromQuery(Name = "signup")] public string? SignupCallback { get; set; }
+    private ElementReference emailInput;
+    private ElementReference passwordInput;
+    private bool busy;
+    [CascadingParameter] public SessionState State { get; set; } = new(SessionStatus.Checking);
+
+    private bool CanSubmit => !busy && State.Status is (SessionStatus.SignedOut or SessionStatus.Unavailable);
+    private bool CanRegister => !busy && State.Status == SessionStatus.SignedOut;
+
+    private async Task CheckInvitationAsync()
+    {
+        if (!CanRegister || invitedEmail is not null || !IsEmailValid) return;
+        busy = true;
+        signupMessage = null;
+        var candidate = email.Trim();
+        try
+        {
+            var invitation = await Session.CheckInvitationAsync(candidate);
+            if (invitation.Eligible) invitedEmail = candidate;
+            else signupMessage = invitation.Message;
+        }
+        finally { busy = false; }
+    }
+
+    private async Task RegisterAsync()
+    {
+        if (!CanRegister || invitedEmail is null) return;
+        busy = true;
+        signupMessage = null;
+        try
+        {
+            var result = await Session.SignUpAsync(invitedEmail, signupPassword, signupConfirmation);
+            if (result.Outcome is SignUpOutcome.SessionReceived or SignUpOutcome.ConfirmationRequired)
+                ShowSignIn();
+            else if (result.Outcome == SignUpOutcome.InvitationDenied)
+                invitedEmail = null;
+            signupMessage = result.Message;
+        }
+        finally { busy = false; }
+    }
+
+    private async Task SignInAsync()
+    {
+        if (!CanSubmit) return;
+        busy = true;
+        signupMessage = null;
+        try { await Session.SignInAsync(emailInput, passwordInput); }
+        finally { busy = false; }
+    }
+
+    private void ShowSignUp()
+    {
+        isSignUp = true;
+        email = string.Empty;
+        invitedEmail = signupMessage = null;
+    }
+
+    private void ShowSignIn()
+    {
+        isSignUp = false;
+        email = string.Empty;
+        invitedEmail = signupMessage = null;
+    }
+
+    private bool IsEmailValid =>
+        !string.IsNullOrWhiteSpace(email) &&
+        new EmailAddressAttribute().IsValid(email.Trim());
+
+}

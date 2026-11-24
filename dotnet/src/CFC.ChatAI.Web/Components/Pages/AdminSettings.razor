@@ -1,0 +1,65 @@
+@using CFC.ChatAI.Web.Models
+@using CFC.ChatAI.Web.Services
+@inject FastApiClient Api
+@inject SupabaseSessionService Session
+@inject TimeProvider Clock
+@implements IDisposable
+
+<div class="admin-heading">
+    <h2>System Settings</h2>
+    <button type="button" disabled="@work.SettingsBusy" @onclick="work.LoadSettingsAsync">Refresh settings</button>
+</div>
+<p>FastAPI stores these preferences. Automatic upload approval, ingestion emails, and maintenance access controls still require backend implementation.</p>
+@if (work.SettingsBusy) { <p role="status">Checking settings…</p> }
+@if (work.SettingsError is { } error) { <p role="alert">@error</p> }
+@if (work.Notice is { } notice) { <p role="status">@notice</p> }
+@if (work.Settings is { } settings)
+{
+    <ul class="user-list" aria-label="Saved configuration">
+        @foreach (var (label, enabled, change) in Options(settings))
+        {
+            <li>
+                <strong>@label</strong>
+                <button type="button" role="switch" aria-label="@label" aria-checked="@(enabled ? "true" : "false")"
+                        disabled="@work.SettingsBusy" @onclick="() => work.UpdateAsync(change)">@(enabled ? "On" : "Off")</button>
+            </li>
+        }
+    </ul>
+}
+
+<div class="admin-heading">
+    <h2>API Health</h2>
+    <button type="button" disabled="@work.HealthBusy" @onclick="work.CheckHealthAsync">Check health</button>
+</div>
+@if (work.HealthBusy) { <p role="status">Checking API availability…</p> }
+else if (work.Health is { } health)
+{
+    <div role="status">
+        <p>Health endpoint · <strong>@health.Status</strong></p>
+        <p>Response time from Blazor server · @(health.ResponseTime is { } time ? $"{time.TotalMilliseconds:F0} ms" : "Unavailable")</p>
+        @if (!string.IsNullOrWhiteSpace(health.Version)) { <p>API version · @health.Version</p> }
+    </div>
+}
+
+@code {
+    private AdminSettingsWorkspace work = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        work = new(Api, Session, Session.State.Profile!.Id, Clock);
+        var settings = work.LoadSettingsAsync();
+        var health = work.CheckHealthAsync();
+        await Task.WhenAny(settings, health);
+        StateHasChanged();
+        await Task.WhenAll(settings, health);
+    }
+
+    private static IEnumerable<(string Label, bool Enabled, AdminSettingsPatch Change)> Options(AdminSystemSettings settings)
+    {
+        yield return ("Auto-approve uploads", settings.AutoApproveUploads, new(AutoApproveUploads: !settings.AutoApproveUploads));
+        yield return ("Email notifications", settings.EmailNotifications, new(EmailNotifications: !settings.EmailNotifications));
+        yield return ("Maintenance mode", settings.MaintenanceMode, new(MaintenanceMode: !settings.MaintenanceMode));
+    }
+
+    public void Dispose() => work.Dispose();
+}

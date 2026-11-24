@@ -1,0 +1,272 @@
+﻿@page "/chat"
+@page "/chat/{SessionId}"
+@inject CFC.ChatAI.Web.Services.SupabaseSessionService Session
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@using CFC.ChatAI.Web.Services
+@inject FastApiClient Api
+@implements IAsyncDisposable
+
+<div class="chat-layout">
+    <div class="chat-sidebar">
+        <button type="button" class="sidebar-new-chat" disabled="@(!chat.ListReady || chat.Creating || chat.LoadingList)"
+                @onclick="StartNewChat">+ New Chat</button>
+        <h4>Chat History</h4>
+        <div class="sidebar-history">
+            @if (chat.Notice is not null)
+            {
+                <p role="alert">@chat.Notice</p>
+                <button type="button" disabled="@chat.LoadingList" @onclick="ReloadSessions">Reload conversations</button>
+            }
+            @if (chat.LoadingList || (!chat.ListReady && chat.Notice is null))
+            {
+                <p role="status">Loading conversations…</p>
+            }
+            else if (chat.ListReady && chat.Conversations.Count == 0)
+            {
+                <p>Your conversations will appear here.</p>
+            }
+            @foreach (var conversation in chat.Conversations)
+            {
+                <div class="sidebar-chat-row" @key="conversation.Id">
+                    <button type="button" class="sidebar-chat-item @(chat.Active == conversation ? "active" : "")"
+                            disabled="@(!chat.ListReady || chat.Creating)" @onclick="() => SelectChat(conversation)">
+                        @conversation.Title
+                    </button>
+                    <button type="button" class="sidebar-delete-chat" title="Delete chat" aria-label="Delete conversation"
+                            disabled="@(!chat.ListReady || chat.Creating || conversation.Activity != ChatActivity.Idle)"
+                            @onclick="() => DeleteChat(conversation)">&#x2715;</button>
+                </div>
+            }
+        </div>
+        @if (chat.ListReady) { <small>@chat.Conversations.Count @(chat.Conversations.Count == 1 ? "chat" : "chats")</small> }
+    </div>
+
+    <div class="chat-main">
+        <div class="chat-thread" @ref="chatThreadElement">
+            @if (chat.ListReady && chat.Notice is null && (chat.Active is null ||
+                (chat.Active.HistoryLoaded && chat.Active.Messages.Count == 0 && chat.Active.PendingContent is null)))
+            {
+                <div class="chat-empty-state">
+                    <h1>@welcomePhrase</h1>
+                    <p>Ask questions about your software and get quick, informed answers.</p>
+                </div>
+            }
+            @if (chat.Active is { } active)
+            {
+                @foreach (var message in active.Messages)
+                {
+                    <ChatMessage @key="message" Sender="@(message.Role == "user" ? "You" : "CFC AI")"
+                                 Text="@message.Content" Rating="@message.Rating"
+                                 Images="@(Previews?.ForMessage(active.Id, message) ?? [])"
+                                 Metadata="@(message.Role == "assistant" ? message.Metadata : null)" BackendAddress="@Api.BaseAddress"
+                                 FeedbackDisabled="@(!message.IsSavedAssistant || !chat.CanRate(active))"
+                                 OnVote="thumb => chat.ToggleFeedbackAsync(active, message, thumb)" />
+                }
+                @if (active.Activity == ChatActivity.Loading)
+                {
+                    <p role="status">Loading messages…</p>
+                }
+                @if (active.PendingContent is { } pending)
+                {
+                    <ChatMessage Sender="You" Text="@pending" Images="active.PendingImages" />
+                    <div class="chat-message bot"
+                         role="status"
+                         aria-live="polite">
+                        <div class="chat-bubble cfc-thinking">
+                            <span>CFC AI is thinking</span>
+                            <span class="thinking-dots" aria-hidden="true">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </span>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+        @if (chat.Active is { } thread)
+        {
+            @if (thread.FeedbackError is not null)
+            {
+                <p role="alert">@thread.FeedbackError</p>
+                <button type="button" disabled="@(thread.Activity != ChatActivity.Idle || !thread.HistoryLoaded || !chat.ListReady)"
+                        @onclick="() => chat.ReloadFeedbackAsync(thread)">Reload feedback</button>
+            }
+            @if (thread.Notice is not null)
+            {
+                <p role="alert">@thread.Notice</p>
+                <button type="button" disabled="@(thread.Activity != ChatActivity.Idle)" @onclick="() => SelectChat(thread)">Reload history</button>
+            }
+            @if (thread.PendingTitle is not null && thread.Activity == ChatActivity.Idle)
+            {
+                <p role="alert">@thread.TitleError</p>
+                <button type="button" @onclick="() => chat.RetryTitleAsync(thread)">Retry saving title</button>
+            }
+        }
+        <ChatComposer @key="chat.Active?.Id" ThreadId="@chat.Active?.Id" @bind-Value="chat.Draft" OnSend="chat.SendAsync"
+                      Disabled="@(!chat.CanSend)" ShowLongConvoWarning="@(chat.Active?.Messages.Count > 12)"
+                      OnLongConvoInfo="() => showLongConvoInfo = true" />
+    </div>
+</div>
+
+@if (showLongConvoInfo)
+{
+    <div class="cfc-long-convo-overlay"
+         @onclick="CloseLongConvoInfo">
+
+        <div class="cfc-long-convo-dialog"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="long-convo-title"
+             @onclick:stopPropagation="true">
+
+            <button type="button"
+                    class="cfc-long-convo-close"
+                    aria-label="Close notice"
+                    @onclick="CloseLongConvoInfo">
+                ✕
+            </button>
+
+            <h3 id="long-convo-title">
+                Long Conversation Notice
+            </h3>
+
+            <p>
+                This conversation is getting long.
+                CFC AI may begin to lose sight of the
+                original goal in very long conversations.
+            </p>
+
+            <p>
+                For separate questions or new topics,
+                consider starting a new chat to keep
+                responses focused.
+            </p>
+        </div>
+    </div>
+}
+
+@code {
+    [CascadingParameter] public LocalChatPreviews? Previews { get; set; }
+    [Parameter] public string? SessionId { get; set; }
+    public static string PathForSession(string? id) => id is null ? "/chat" : "/chat/" + Uri.EscapeDataString(id);
+
+    private ChatWorkspace chat = default!;
+    private ElementReference chatThreadElement;
+    private string selectionKey = "";
+    private string? rememberedId;
+    private bool storageChecked;
+    private string? handledRouteId;
+    private Conversation? displayed;
+    private int displayedCount;
+    private string? displayedPending;
+    private bool disposed;
+    private bool showLongConvoInfo;
+    private string welcomePhrase = PickWelcomePhrase();
+
+    protected override void OnInitialized()
+    {
+        var ownerId = Session.State.Profile!.Id;
+        chat = new ChatWorkspace(Api, Session, ownerId, Previews);
+        selectionKey = "cfc-chat-session:" + ownerId;
+        chat.Changed += StateHasChanged;
+    }
+
+    private Task ReloadSessions()
+    {
+        handledRouteId = SessionId;
+        return chat.LoadAsync(SessionId ?? chat.Active?.Id ?? rememberedId, requireSelection: SessionId is not null);
+    }
+
+    private async Task StartNewChat()
+    {
+        if (await chat.NewAsync() is not null) ResetWelcome();
+    }
+
+    private Task SelectChat(Conversation conversation)
+    {
+        ResetWelcome();
+        return chat.SelectAsync(conversation);
+    }
+
+    private void CloseLongConvoInfo() => showLongConvoInfo = false;
+
+    private void ResetWelcome()
+    {
+        welcomePhrase = PickWelcomePhrase();
+        showLongConvoInfo = false;
+    }
+
+    private async Task DeleteChat(Conversation conversation)
+    {
+        if (await JS.InvokeAsync<bool>("confirm", $"Are you sure you want to delete '{conversation.Title}'?") && !disposed)
+            await chat.DeleteAsync(conversation);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try { rememberedId = await JS.InvokeAsync<string?>("sessionStorage.getItem", selectionKey); }
+            catch (JSException) { /* Storage is optional. Default to the newest conversation. */ }
+            catch (JSDisconnectedException) { }
+            storageChecked = true;
+            if (!disposed) await ReloadSessions();
+        }
+        if (disposed || !storageChecked || chat.LoadingList || chat.Creating) return;
+        if (handledRouteId != SessionId)
+        {
+            handledRouteId = SessionId;
+            if (chat.Notice is not null || (SessionId is not null && SessionId != chat.Active?.Id))
+            {
+                await ReloadSessions();
+                return;
+            }
+        }
+        var active = chat.Active;
+        // Keep a deep link accurate when the sidebar changes selection or deletes the linked chat.
+        if (chat.ListReady && SessionId is not null && active?.Id != SessionId && chat.Notice is null)
+        {
+            var path = PathForSession(active?.Id);
+            if (Navigation.Uri != Navigation.ToAbsoluteUri(path).AbsoluteUri)
+                Navigation.NavigateTo(path, replace: true);
+        }
+        try
+        {
+            if (chat.ListReady && chat.Notice is null && active?.Id != rememberedId)
+            {
+                rememberedId = active?.Id;
+                if (rememberedId is null) await JS.InvokeVoidAsync("sessionStorage.removeItem", selectionKey);
+                else await JS.InvokeVoidAsync("sessionStorage.setItem", selectionKey, rememberedId);
+            }
+            var count = active?.Messages.Count ?? 0;
+            if (displayed != active || displayedCount != count || displayedPending != active?.PendingContent)
+            {
+                displayed = active;
+                displayedCount = count;
+                displayedPending = active?.PendingContent;
+                await JS.InvokeVoidAsync("cfcChat.scrollToBottom", chatThreadElement);
+            }
+        }
+        catch (JSException) { /* The backend remains the source of saved history. */ }
+        catch (JSDisconnectedException) { }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        disposed = true;
+        chat.Changed -= StateHasChanged;
+        chat.Dispose();
+        if (Previews is not null) await Previews.ClearDraftsAsync();
+    }
+
+    private static readonly string[] WelcomePhrases =
+    [
+        "Chat with CFC AI", "What can CFC AI help with today?", "Ready when you are",
+        "Ask anything about CFC software…", "How can I help you today?"
+    ];
+
+    private static string PickWelcomePhrase() => WelcomePhrases[Random.Shared.Next(WelcomePhrases.Length)];
+}

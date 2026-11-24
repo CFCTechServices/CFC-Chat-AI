@@ -1,0 +1,59 @@
+.cfc-header, .navigation-actions, nav {
+    flex-wrap: wrap;
+}
+
+.navigation-actions, nav {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.navigation-actions {
+    margin-inline-start: auto;
+}
+
+nav ::deep .navigation-link, .sign-out {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    padding: 0.4rem 0.85rem;
+    box-sizing: border-box;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: transparent;
+    color: white;
+    font: inherit;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.sign-out {
+    border-color: #cbd5e1;
+}
+
+nav ::deep .navigation-link.active {
+    border-color: #93c5fd;
+    background: #334155;
+}
+
+nav ::deep .navigation-link:hover, .sign-out:hover {
+    background: #475569;
+}
+
+nav ::deep .navigation-link:focus-visible, .sign-out:focus-visible {
+    outline: 3px solid #bfdbfe;
+    outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+    .cfc-header {
+        padding: 12px;
+        gap: 12px;
+    }
+
+    .navigation-actions {
+        flex-basis: 100%;
+        margin-inline-start: 0;
+        justify-content: space-between;
+    }
+}

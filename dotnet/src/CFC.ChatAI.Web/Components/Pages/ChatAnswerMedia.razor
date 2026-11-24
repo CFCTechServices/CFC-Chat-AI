@@ -1,0 +1,149 @@
+﻿
+@using Microsoft.JSInterop
+@using CFC.ChatAI.Web.Services
+@inject IJSRuntime JS
+
+@if (Image is not null || !string.IsNullOrWhiteSpace(VideoUrl))
+{
+    <div class="chat-answer-media">
+
+        @if (imageFailed)
+        {
+            <small>Image unavailable (@Image?.AltText)</small>
+        }
+        else if (Image is not null)
+        {
+            <button type="button"
+                    class="chat-answer-image-button"
+                    title="Enlarge image"
+                    @onclick="() => imagePreview = true">
+                <img src="@Image.Url.AbsoluteUri"
+                     alt="@Image.AltText"
+                     referrerpolicy="no-referrer"
+                     @onerror="ImageUnavailable"
+                     loading="lazy" />
+            </button>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(VideoUrl))
+        {
+            <div class="chat-answer-video">
+
+                <video @ref="videoElement"
+                       src="@VideoUrl"
+                       class="chat-response-video"
+                       controls
+                       preload="metadata">
+                </video>
+
+                @if (VideoTimestamps.Count > 0)
+                {
+                    <div class="chat-video-timestamps">
+                        @foreach (var moment in VideoTimestamps)
+                        {
+                            <button type="button"
+                                    @onclick="() => SeekTo(moment.Seconds)">
+                                @moment.Label
+                            </button>
+                        }
+                    </div>
+                }
+
+                <button type="button"
+                        class="chat-expand-video"
+                        @onclick="() => videoExpanded = true">
+                    Expand video
+                </button>
+            </div>
+        }
+    </div>
+}
+
+@if (imagePreview && Image is not null)
+{
+    <div class="cfc-media-backdrop"
+         @onclick="CloseImage">
+        <div class="cfc-media-modal"
+             role="dialog"
+             aria-modal="true"
+             aria-label="Image preview"
+             @onclick:stopPropagation="true">
+
+            <button type="button"
+                    class="cfc-media-close"
+                    aria-label="Close image preview"
+                    @onclick="CloseImage">
+                ✕
+            </button>
+
+            <img src="@Image.Url.AbsoluteUri" alt="@Image.AltText" referrerpolicy="no-referrer" @onerror="ImageUnavailable" />
+        </div>
+    </div>
+}
+
+@if (videoExpanded && !string.IsNullOrWhiteSpace(VideoUrl))
+{
+    <div class="cfc-media-backdrop"
+         @onclick="CloseVideo">
+        <div class="cfc-media-modal"
+             role="dialog"
+             aria-modal="true"
+             aria-label="Video preview"
+             @onclick:stopPropagation="true">
+
+            <button type="button"
+                    class="cfc-media-close"
+                    @onclick="CloseVideo">
+                ✕
+            </button>
+
+            <video src="@VideoUrl"
+                   controls
+                   autoplay>
+            </video>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public AnswerImage? Image { get; set; }
+
+    [Parameter]
+    public string? VideoUrl { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<(double Seconds, string Label)> VideoTimestamps
+        { get; set; } =
+        Array.Empty<(double Seconds, string Label)>();
+
+    private bool imagePreview;
+    private bool imageFailed;
+    private Uri? previousUrl;
+    private bool videoExpanded;
+    private ElementReference videoElement;
+
+    protected override void OnParametersSet()
+    {
+        if (previousUrl == Image?.Url) return;
+        previousUrl = Image?.Url;
+        imagePreview = imageFailed = false;
+    }
+
+    private void CloseImage() => imagePreview = false;
+    private void ImageUnavailable() { imageFailed = true; CloseImage(); }
+
+    private void CloseVideo()
+    {
+        videoExpanded = false;
+    }
+
+    private async Task SeekTo(double seconds)
+    {
+        await JS.InvokeVoidAsync(
+            "cfcChat.seekVideo",
+            videoElement,
+            seconds);
+    }
+}
+

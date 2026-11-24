@@ -89,3 +89,12 @@ __pycache__/main.cpython-312.pyc
 
 # Local
 local/
+# Visual Studio temporary files
+.vs/
+*.suo
+*.user
+*.rsuser
+
+# .NET build output
+bin/
+obj/
