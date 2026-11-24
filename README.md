@@ -1,8 +1,8 @@
 # CFC Chat AI
 
-CFC Chat AI is a documentation assistant for CFC Technologies' animal-feed software. It ingests documents and video transcripts, searches relevant content using embeddings and Pinecone, and answers questions using retrieved context and Azure OpenAI. The browser UI uses React, Supabase authentication and the application API.
+CFC Chat AI is a documentation assistant for CFC Technologies' animal-feed software. It ingests documents and video transcripts, searches relevant content using embeddings and Pinecone, and answers questions using retrieved context and Azure OpenAI. The .NET UI uses Blazor Interactive Server and Supabase authentication.
 
-This repository contains the existing **Python/FastAPI application** and an **in-progress .NET migration**. They are not interchangeable yet. The Windows deployment script deploys Python; the checked-in IIS configuration routes only `GET /api/health` and `GET /api/health/detailed` to .NET and sends other `/api/*` requests to Python. It does not install or start the .NET API. Confirm the actual VM configuration before operating it.
+This repository contains the **.NET Blazor app and API** and the legacy **Python/FastAPI and React application**. They are not interchangeable. Use the [.NET/IIS guide](deployment/DOTNET-IIS.md) for the Blazor deployment. `deploy-windows.ps1` remains a legacy Python deployment script; confirm the actual VM configuration before operating it.
 
 > **Migration release gate:** Do not cut all traffic over to .NET yet. The in-scope internal API routes are implemented, but hosting/routing, live provider security and integration checks, and browser validation remain. Profile self-service writes are implemented behind a default-off flag; video upload is deferred. See the [cutover checklist](dotnet/docs/plan/internal-api-cutover.md), [routing and hosting plan](dotnet/docs/plan/routing-and-hosting.md), and [remaining security and integration results](dotnet/docs/complete/internal-api/supabase-completion-remaining-results.md).
 
@@ -11,11 +11,12 @@ This repository contains the existing **Python/FastAPI application** and an **in
 | Path | Purpose |
 | --- | --- |
 | `main.py`, `app/` | Python API, authentication, ingestion, RAG and services |
-| `web/` | Static React UI; `web/index.html` loads components from `web/components/`, `web/js/` and `web/state/` using CDN dependencies |
+| `web/` | Legacy React UI; `web/index.html` loads the JSX components and CDN dependencies |
+| `dotnet/src/CFC.ChatAI.Web/` | Blazor frontend; server-side API client, authentication, chat and admin services |
 | `dotnet/src/` | .NET API and ChatService, DocumentHandler, DocumentProcessor, VideoProcessor, Feedback, Pinecone and Supabase components |
 | `tests/`, `dotnet/tests/` | Python and .NET tests |
 | `data/` | Local documents, videos and processed data |
-| `deployment/iis-web.config`, `deploy-windows.ps1` | Windows IIS routing and Python service deployment |
+| `deployment/` | Blazor and .NET API IIS staging script, config and runbook; separate legacy Python config |
 | `scripts/`, `dotnet/tools/` | Diagnostics, architecture checks and RAG test tools |
 
 ## Local development: Python application
@@ -53,7 +54,7 @@ Start with [`.env.example`](.env.example); placeholders are not working credenti
 | `PINECONE_API_KEY`, `PINECONE_INDEX_NAME` | Python and .NET vector search; the index must match the embedding dimensions |
 | `PINECONE_VIDEO_INDEX_NAME`, `PINECONE_NAMESPACE` | Python video index and namespace; inspect the .NET host configuration separately before assuming parity |
 | `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT` | Azure OpenAI answer generation; configure all three together. `AZURE_OPENAI_API_VERSION` is used by Python |
-| `FRONTEND_BASE_URL`, `CORS_ORIGINS` | Python email links and allowed browser origins; configure actual deployment URLs and Supabase redirect allowlist |
+| `FRONTEND_BASE_URL`, `CORS_ORIGINS` | Python base URL for email links and allowed browser origins. For .NET, set `FRONTEND_BASE_URL` to the full `/reset-password` URL and allow it in Supabase; the Blazor API client does not require CORS |
 | `RESEND_API_KEY`, `ENABLE_EMAIL_INVITES` | Optional Python invitation email delivery |
 | `SOFFICE_PATH`, `TESSERACT_CMD` | Python executable overrides when LibreOffice or Tesseract is not on PATH |
 
@@ -70,7 +71,7 @@ dotnet test dotnet/CFC.ChatAI.slnx
 dotnet run --project dotnet/src/CFC.ChatAI.Api/CFC.ChatAI.Api.csproj
 ```
 
-`dotnet run` starts the API in the repository root so it loads the root `.env` without overwriting existing environment variables. It listens on `http://127.0.0.1:5000` by default; `DOTNET_API_PORT` changes the port, and `Api:Urls` overrides the URL. It does not serve static UI files. With the API on its default port, use Node.js 22+ and run `npm --prefix ./deployment ci --include=dev` (PowerShell: `npm.cmd`), then `node deployment/dotnet-edge.mjs` in a second terminal. Open `http://127.0.0.1:8080/ui/`. The local proxy builds the UI at startup, serves it and forwards only the allowed API methods and paths; no CORS changes or Python service are needed. Development ingest/delete routes are never proxied.
+In a second terminal, run `dotnet run --project dotnet/src/CFC.ChatAI.Web/CFC.ChatAI.Web.csproj --launch-profile http` and open <http://localhost:5077/>. Blazor calls the API server-to-server at `http://127.0.0.1:5000` by default; no Python, Node or CORS changes are required. The API loads the root `.env` without overwriting existing environment variables. If you change its port (`DOTNET_API_PORT` or `Api__Urls`), set `Backend__BaseUrl` in Blazor's environment to match. For local password reset, set the API's `FRONTEND_BASE_URL` to `http://localhost:5077/reset-password` and allow the URL in Supabase. See the [IIS guide's local steps](deployment/DOTNET-IIS.md#local-development).
 
 - Health routes are mapped without provider credentials. `/api/health` checks the host, not end-to-end readiness. `/api/health/detailed` checks dependencies, but its Azure OpenAI check only checks configuration, not a live completion.
 - Supabase-backed routes are mapped only when `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are all nonempty. Chat, feedback submission and vector stats additionally require `PINECONE_API_KEY`, `PINECONE_INDEX_NAME`, `Embedding:ModelPath` and `Embedding:VocabularyPath`. Missing configuration means routes are absent (404), not mock successes. Nonempty placeholder values do not prove connectivity.
@@ -115,18 +116,18 @@ python dotnet/tools/check_supabase_boundary.py
 
 Use a disposable non-production project for provider-backed tests and inspect test requirements before running them: some tests operate on users or other remote state. Local/unit tests do not validate the live database's grants, RLS, RPCs, storage policies or deployed services.
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on push, pull request and manual dispatch (with a path exclusion), installs Python 3.10 dependencies, checks the .NET Supabase architecture boundary and runs `pytest`. It does **not** build or test the .NET solution. The repository contains a deployment plan, but no checked-in automated production deployment workflow; do not assume the VM polls GitHub.
+[CI](.github/workflows/ci.yml) checks the Supabase architecture boundary and runs the Python tests. A separate job runs the Blazor and .NET API tests, browser-bridge unit tests and Windows IIS staging. No workflow switches traffic or updates the VM.
 
 ## Windows deployment and operations
 
-For a Python-free development deployment, follow the [.NET/IIS deployment checklist](deployment/DOTNET-IIS.md). It uses IIS/ARR and a self-contained Windows x64 .NET service managed by NSSM. Validate IIS routing and browser flows on the target host before relying on it. The instructions below describe the legacy Python deployment and are not steps for the .NET target.
+For a Python-free deployment, follow the [.NET/IIS deployment checklist](deployment/DOTNET-IIS.md). IIS hosts the self-contained Blazor app and proxies approved API routes to the loopback .NET service managed by NSSM. Validate IIS routing and browser flows on the target host before relying on it. The instructions below are for legacy Python only.
 
 ### One-time preparation
 
 1. Install Python 3.11, Git, FFmpeg, and NSSM. Install Tesseract/Poppler for scanned PDFs and LibreOffice for `.doc` ingestion where needed. Put binaries on the service's PATH or set the supported paths in `.env`.
 2. Enable IIS, install URL Rewrite and Application Request Routing, and enable ARR proxy. Provision the application and IIS web-root directories and appropriate service/file permissions. Arrange DNS, firewall/NSG rules and HTTPS according to the approved network design; do not expose RDP or HTTP to the internet by default.
 3. Clone the repository, copy `.env.example` to `.env` and supply the actual secrets and URLs securely. Configure the Supabase Site URL and allowed redirect URLs to match the frontend; verify invitation and password-reset links.
-4. Configure an IIS site at `C:\inetpub\cfcchat` with the necessary bindings and certificate. The script copies `web/` to its `ui/` directory and `deployment/iis-web.config` to its root.
+4. Configure an IIS site at `C:\inetpub\cfcchat` with the necessary bindings and certificate. The script copies `web/` to its `ui/` directory and `deployment/legacy-python-iis-web.config` to its root.
 5. **Resolve the split-health dependency before deployment:** the checked-in IIS config sends health GETs to port 5000. Ensure a separately managed .NET API is running there, or make an explicitly reviewed routing change. The Python deploy script alone cannot satisfy those routes. Verify both direct backends and IIS after any change.
 
 ### Deploy/update Python

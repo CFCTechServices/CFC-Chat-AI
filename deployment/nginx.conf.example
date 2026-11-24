@@ -1,4 +1,4 @@
-# nginx.conf.example — Reference nginx configuration for the Azure VM
+# nginx.conf.example — Legacy Python deployment reference. For .NET on IIS, see DOTNET-IIS.md.
 #
 # Copy to /etc/nginx/sites-available/cfcchat, then:
 #   sudo ln -s /etc/nginx/sites-available/cfcchat /etc/nginx/sites-enabled/

@@ -1,65 +1,52 @@
-# Deploy the development UI and .NET API on IIS
+# Deploy Blazor and the .NET API on IIS
 
-This checklist replaces the existing development site in place. It does not run the Python deployment script or require a scheduled outage for an unused development site. Keep the old site's matching UI, IIS rules and Python service available until the new release has been checked.
+IIS runs the Blazor Interactive Server app (`dotnet/src/CFC.ChatAI.Web`) through the ASP.NET Core Module. The Blazor server calls `CFC.ChatAI.Api` directly at `http://127.0.0.1:5000` using the signed-in user's bearer token. IIS/ARR also forwards the previously approved public API routes to that listener; the [IIS config](iis-web.config) is the allowlist. IIS hands page routes, static assets and `/_blazor` (including WebSocket traffic) to Blazor. There is no Python service, Node.js build, React bundle, or CORS change for this deployment.
 
-## Local development (without IIS)
+## Local development
 
-Install the .NET 10 SDK and Node.js 22+. Run both terminals from the repository root. For provider-backed features, configure the root `.env` as described in [Local Development (.NET migration)](../README.md#local-development-net-migration). Keep credentials out of source control.
-
-In the first PowerShell terminal, start the API on its default address, `http://127.0.0.1:5000`:
+Install the .NET 10 SDK. Run these from the repository root in two PowerShell terminals:
 
 ```powershell
+# Terminal 1: API (default http://127.0.0.1:5000)
+$env:FRONTEND_BASE_URL = 'http://localhost:5077/reset-password'
 dotnet run --project dotnet/src/CFC.ChatAI.Api/CFC.ChatAI.Api.csproj
 ```
 
-In a second PowerShell terminal, install the UI build dependencies and start the local proxy:
-
 ```powershell
-npm.cmd --prefix ./deployment ci --include=dev
-node deployment/dotnet-edge.mjs
+# Terminal 2: Blazor (http://localhost:5077)
+dotnet run --project dotnet/src/CFC.ChatAI.Web/CFC.ChatAI.Web.csproj --launch-profile http
 ```
 
-Open [http://127.0.0.1:8080/ui/](http://127.0.0.1:8080/ui/). The proxy builds and serves the UI and forwards allowed API requests to port 5000. No IIS, NSSM, Python service, or CORS changes are needed. Development ingest and delete routes are not exposed through the proxy. Stop both processes with Ctrl+C when finished.
+Open [http://localhost:5077/](http://localhost:5077/) or the old `/ui/` bookmark; both redirect to `/login`. The API loads the repository root `.env` without overriding environment variables. Blazor does not load that file or need provider credentials. If the API is on another port, set `$env:Backend__BaseUrl` in terminal 2 to its root URL before starting Blazor. The URL must be HTTPS or loopback HTTP. To test with local HTTPS, trust the .NET developer certificate (`dotnet dev-certs https --trust`), use the `https` launch profile, and adjust the callback URLs to `https://localhost:7011`.
 
-## 1. Prepare the host and back up the old deployment
+`curl.exe --fail http://127.0.0.1:5000/api/health` checks API liveness without provider credentials. If `/api/auth/config` is 404 on the API, check `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` and restart it. Chat, feedback submission and document writes also require Pinecone and the embedding assets. See [.NET local setup](../README.md#local-development-net-migration) for the provider settings. Use disposable development providers for write tests. Stop each process with Ctrl+C.
 
-- [ ] On the build machine, install the .NET 10 SDK and Node.js 22+. On the Windows x64 server, install IIS Static Content, Default Document, URL Rewrite, ARR and NSSM. A separate .NET runtime or IIS .NET hosting bundle is not required: IIS proxies to a self-contained executable. Enable proxying in IIS Manager → server → Application Request Routing Cache → Server Proxy Settings. Check for server-wide or inherited rules that could still route to Python.
-- [ ] Record the IIS site name, physical path, HTTPS binding/certificate, ARR settings, Python service name/start mode, and any service already using port 5000. Back up the effective IIS configuration (for example, `appcmd add backup`), the old site's physical root, and Python's service config separately. Keep these backups private. Use [the operator worksheet](../dotnet/docs/plan/routing-and-hosting-preflight.md) if helpful.
+## 1. Prepare the Windows x64 host and preserve rollback
 
-## 2. Stage the matching API and UI
+- [ ] Install the **.NET 10 SDK** on the build machine. On the host, install IIS with **WebSocket Protocol**, **.NET 10 Hosting Bundle** (for ASP.NET Core Module V2 even though the apps are self-contained), **URL Rewrite**, **ARR**, and **NSSM**. If the Hosting Bundle was installed before IIS, repair it after installing IIS and restart IIS/WAS after module installation. Enable ARR proxying in IIS Manager → server → Application Request Routing Cache → Server Proxy Settings. Check for global rules, server-level caching, and other inherited settings before the switch.
+- [ ] Record the site's current HTTPS binding/certificate, app pool, physical root, rewrite rules, ARR settings and any service already using port 5000. Back up the effective IIS config (e.g. `appcmd add backup`), prior site files and backend service config/start mode. Keep the old IIS rules and UI together with their matching backend. See the [operator worksheet](../dotnet/docs/plan/routing-and-hosting-preflight.md).
+- [ ] Use a dedicated **64-bit**, **Integrated** app pool with **No Managed Code** and one worker process. Enable Anonymous Authentication; the app and API handle sign-in and authorization. Provision [persistent ASP.NET Core Data Protection keys for the pool](https://learn.microsoft.com/aspnet/core/host-and-deploy/iis/#data-protection) (for example, load the app-pool user profile) and retain them across releases. Plan for Blazor circuits to reconnect or reload when IIS recycles the worker.
 
-From the repository root in PowerShell (adjust the base path as needed):
+## 2. Stage a matching release
+
+From the repository root in PowerShell:
 
 ```powershell
 $base = 'C:\cfcchat-dotnet'
 $revision = git rev-parse --short HEAD
 $release = Join-Path "$base\releases" "$(Get-Date -Format yyyyMMdd-HHmmss)-$revision"
+.\deployment\Publish-DotnetIis.ps1 -ReleasePath $release
 $api = Join-Path $release 'api'
 $site = Join-Path $release 'site'
-New-Item -ItemType Directory -Path $site -ErrorAction Stop | Out-Null
-
-dotnet publish dotnet/src/CFC.ChatAI.Api/CFC.ChatAI.Api.csproj -c Release -r win-x64 --self-contained true -o $api
-if ($LASTEXITCODE -ne 0) { throw 'Publish failed' }
-npm.cmd --prefix ./deployment ci --include=dev
-if ($LASTEXITCODE -ne 0) { throw 'UI dependency install failed' }
-node deployment/build-ui.mjs (Join-Path $site 'ui')
-if ($LASTEXITCODE -ne 0) { throw 'UI build failed' }
-$config = node deployment/dotnet-edge.mjs --iis
-if ($LASTEXITCODE -ne 0) { throw 'IIS configuration generation failed' }
-$xmlText = $config -join "`n"
-[xml]$parsed = $xmlText  # Parse before staging
-[IO.File]::WriteAllText((Join-Path $site 'web.config'), $xmlText)
 ```
 
-The IIS physical path will be `$site`, not `$release` or `$api`. Check that `$site\ui\index.html` references `/ui/app-<hash>.js` and that the file exists alongside it. Do not copy `web/` into the IIS site: the .NET UI is precompiled and does not load Babel or raw JSX in the browser. React, ReactDOM and the Supabase client are still loaded from their CDNs. Transfer the staged release to the host if you built on another machine; Node.js and npm are only needed on the build machine. Give the IIS site identity read access only to its site directory. Do not put API binaries, `.env`, logs, staging files, journals or backups under `$site`.
+The command publishes both projects self-contained for `win-x64` and stages the [IIS config](iis-web.config) as `$site\web.config`. It refuses to reuse an existing release directory and does not modify IIS or services. Confirm `$api\CFC.ChatAI.Api.exe`, `$site\CFC.ChatAI.Web.exe`, `$site\web.config` and `$site\wwwroot\_framework\blazor.web*.js` are present. Transfer both directories to the host if building elsewhere. The IIS site's physical path is **`$site`** (not `$release` or `$site\wwwroot`). Do not copy `web/` into it. Give the app-pool identity read/execute on `$site`, not access to the API's credential files, models, logs or private data.
 
-If an earlier deployment shows a blank page with a Babel warning and `import declarations may only appear at top level of a module`, stage the updated release and switch IIS to its new `$site` as below. Hard-refresh `/ui/` and check the browser's Network tab: the HTML should request `/ui/app-<hash>.js` (HTTP 200), not `babel.min.js` or `.jsx` files. If the old requests persist, check the IIS physical path and site binding.
+## 3. Configure the loopback API service
 
-## 3. Configure the NSSM service
+Use a dedicated Windows service account with **Log on as a service** and read/execute on `$api`. Provision `$base\private` with subdirectories for settings, logs and upload temp; provision a journal directory for lifecycle operations only if needed. Give the service account only the required access to private configuration, model files and persistent data. Set NSSM `AppDirectory` to `$base\private`; the API loads `.env` from there at startup, with explicitly configured service environment variables taking precedence. Store `.env` outside the release and IIS site, and restrict its ACL.
 
-Create a dedicated Windows service account with **Log on as a service**. Give it read/execute on `$api` and only the required access to private configuration, models and persistent directories. Provision `$base\private` and subdirectories for settings, logs, upload temp, and (when testing lifecycle operations) the journal; restrict them to the service account and administrators. Set `AppDirectory` to `$base\private`, and create `$base\private\.env` with restricted ACLs. During service startup the API loads `.env` from that directory; variables already defined in the service environment take precedence.
-
-Example `.env` keys (replace placeholders; no provider credentials should be checked in, logged or placed in a release):
+Example `$base\private\.env` (replace placeholders, never commit real credentials):
 
 ```dotenv
 DOTNET_ENVIRONMENT=Production
@@ -73,7 +60,7 @@ SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 SUPABASE_DOCUMENTS_BUCKET=cfc-docs
 SUPABASE_VIDEOS_BUCKET=cfc-videos
-FRONTEND_BASE_URL=https://your-site.example/ui/
+FRONTEND_BASE_URL=https://your-site.example/reset-password
 PINECONE_API_KEY=
 PINECONE_INDEX_NAME=
 PINECONE_NAMESPACE=
@@ -90,9 +77,9 @@ Api__EnablePermanentAccountDeletion=false
 # Api__AccountLifecycleJournalDirectory=C:/cfcchat-dotnet/private/journal
 ```
 
-Use the actual site URL and configure the matching Supabase email redirect allowlist. See [model setup](../dotnet/docs/rag/embeddings.md) for the ONNX and vocabulary files and the [.NET setup section](../README.md#local-development-net-migration) for configuration-dependent routes. Azure OpenAI takes all three settings or none (extractive fallback). Legacy `.doc` ingestion requires LibreOffice; use `Document__LibreOfficePath` if `soffice` is not on the service account's PATH. Use full paths and keep persistent settings and model files across releases.
+Use the site's actual HTTPS origin. In Supabase, set the site URL and allow the actual password-reset URL (`/reset-password`) and signup confirmation URL (`/login?signup=confirm`). The browser loads the pinned Supabase JS SDK from `cdn.jsdelivr.net` and talks to Supabase Auth and Storage; it must be able to reach those origins. See [embedding setup](../dotnet/docs/rag/embeddings.md) for the model and vocabulary. Azure OpenAI takes all three settings or none (extractive fallback). Legacy `.doc` ingestion requires LibreOffice (`Document__LibreOfficePath` if it is not on the service account's PATH).
 
-From an elevated shell on the host (set `$api` and `$base` to their host paths):
+From an elevated PowerShell on the host, with `$api` and `$base` set to the host paths (first install only):
 
 ```powershell
 nssm install CFCChatApi "$api\CFC.ChatAI.Api.exe"
@@ -108,37 +95,34 @@ nssm set CFCChatApi AppRotateBytes 10485760
 nssm edit CFCChatApi  # Set the dedicated account in the Log on tab before starting
 ```
 
-Do not start under the default LocalSystem identity. Set a retention policy for rotated logs (NSSM rotation does not prune history), and check service health/restart failures and disk space. If another service owns port 5000, record its configuration and stop it before starting the replacement. Run only one .NET writer for shared document/account workflows.
+Do not run as LocalSystem. Prune rotated logs according to a retention policy. If updating an existing `CFCChatApi`, use the update steps below instead of reinstalling. If another service already owns port 5000, record its config and stop it before starting the replacement. Run only one .NET API writer for shared document/account workflows.
 
-Profile editing and reversible account actions are opt-in; permanent deletion also requires the separate delete flag. When opting into account operations, provision the journal directory before enabling the flags. Restart the service and reload the UI after edits. Run the corresponding [profile](../dotnet/docs/plan/supabase-profile-self-service-security.md) and [account checks](../dotnet/docs/complete/internal-api/internal-api-remaining-endpoints-delivery.md) before relying on these operations. Leave development ingest and delete off.
+Leave development ingest and delete off. Profile editing and account lifecycle actions are disabled by default; permanent deletion also requires the separate delete flag. Before enabling them, run the corresponding [profile](../dotnet/docs/plan/supabase-profile-self-service-security.md) or [account checks](../dotnet/docs/complete/internal-api/internal-api-remaining-endpoints-delivery.md). Set the private journal path before enabling lifecycle operations. Restart the API and reload the browser after changing flags.
 
-## 4. Verify, switch IIS, and smoke test
+## 4. Switch IIS and verify
 
-- [ ] Run `Start-Service CFCChatApi`, then `curl.exe --fail http://127.0.0.1:5000/api/health`. Confirm restart works (`Restart-Service CFCChatApi`) and check the listener is bound only to loopback. Check `http://127.0.0.1:5000/api/health/detailed` directly for dependency diagnostics; liveness and configuration checks do not prove provider readiness. Do not publish the detailed endpoint.
-- [ ] Confirm HTTPS and the intended site/app pool. For a shared host, expose only HTTPS or redirect HTTP to HTTPS before serving UI or API traffic. Enable IIS Anonymous Authentication for the site so the .NET API handles bearer authentication. Do not enable ARR response caching for authenticated API traffic. The generated IIS config allows 53,477,376 bytes (50 MiB documents plus 1 MiB HTTP overhead). If changing `Document__MaxUploadBytes`, align this IIS limit. In ARR Server Proxy Settings, pick a suitable timeout (e.g. 300 seconds for development) and verify it; server-level changes can affect other sites. Do not enable forwarded-header processing on the API. Public-auth endpoints deliberately share one rate-limit quota behind IIS. ARR may add forwarding headers, but the API must ignore them when identifying clients.
-- [ ] Stop writes and drain the old backend if the backends share provider data. Change the existing site's physical path to `$site` in IIS Manager → site → Basic Settings. This switches UI and routing together. Stop Python if it is still running; if leaving .NET in place, prevent the old service from restarting automatically. Do not remove the rollback artifacts.
-- [ ] With Python stopped, check `/` redirects to `/ui/`, the compiled JS and CSS load, and refreshing `/chat`, `/admin` or the password-reset page loads the UI. Unknown pages, missing assets and unsupported/wrong-method API calls must not return the UI as HTTP 200. Test both image aliases with a real signed-in browser, including a reopened chat and a URL-encoded image name. Confirm unauthenticated admin reads fail and authenticated reads work. Check effective HTTPS behavior and non-spoofable shared rate limiting.
-- [ ] Confirm POST and DELETE requests to `/api/ingest/dev` and descendants fail, including trailing slash, mixed case, and percent-encoded variants. Use only bodyless requests and confirm they do not appear at the upstream rather than relying solely on the response status. Confirm `/api/videos/upload`, `/api/ingest/document`, and `/api/health/detailed` are unavailable through IIS. Verify direct access to the API port fails from another host.
-- [ ] Browser-smoke sign-in, history, chat, image resolution and admin reads as applicable. Identify the configured provider targets before opting into upload/replace/delete, feedback, invite or account writes. Exercise upload limits and timeouts when doing write tests. Record skipped and unverified workflows rather than silently treating them as passed.
+- [ ] Start `CFCChatApi` and run `curl.exe --fail http://127.0.0.1:5000/api/health`. Confirm `Restart-Service CFCChatApi` works. Use `/api/health/detailed` on loopback only for diagnostics; health is not proof of provider readiness. Verify port 5000 cannot be reached from another host.
+- [ ] Serve the Blazor app at the **root of the HTTPS site**, not as a `/ui` sub-application. Use HTTPS only or redirect HTTP at IIS before serving app/API traffic. Ensure the Web app runs in `Production`. Keep ARR response caching off for authenticated API routes. Allow sufficient ARR proxy timeout (e.g. five minutes, after checking other sites); Blazor's direct API client also times out after five minutes. Do not enable forwarded-header processing on the API. Public auth calls share a loopback rate limit, regardless of client-supplied forwarding headers.
+- [ ] If changing `Document__MaxUploadBytes`, set it for **both** the API service and the Blazor app (app-pool environment or its non-secret configuration) and adjust IIS `maxAllowedContentLength` in the staged `web.config` for direct API multipart requests. Defaults are 50 MiB per file and 51 MiB (53,477,376 bytes) including multipart overhead. Blazor sends browser uploads in chunks over the circuit. If changing the API listener, keep it loopback-only and update both `Backend__BaseUrl` for Blazor and the IIS allowlist's upstream address.
+- [ ] Pause writes and drain in-flight requests if backends share provider data. Switch the site's app pool and physical path to the staged Blazor site in IIS Manager → site → Basic Settings. Stop Python and prevent it from restarting automatically after verifying the switch. Preserve rollback files and config.
+- [ ] With Python stopped, check `/` and `/ui/` redirect to `/login`, the Blazor framework script and CSS load, and refreshing `/chat`, `/chat/{sessionId}`, `/admin`, `/history`, `/settings` and `/reset-password` works. Confirm in the browser Network tab that `POST /_blazor/negotiate` succeeds and `wss://.../_blazor` upgrades (HTTP 101). A missing asset or unknown page should not return HTTP 200. No React/JSX requests should appear.
+- [ ] Through IIS, confirm `GET /api/health` succeeds and unauthenticated admin API calls fail when configured. Verify unsupported methods, `/api/health/detailed`, `/api/ingest/document`, `/api/videos/upload`, and `/api/ingest/dev` plus descendants do not reach the API. Include bodyless POST/DELETE checks for mixed case, trailing slash and encoded forms of the dev routes; confirm at the upstream, not just by response code. See the [route inventory](../dotnet/docs/plan/routing-and-hosting-routes.md).
+- [ ] In a browser, test sign-in and email links, history and chat, reopened answers with signed images, both supported image aliases with a real bearer token, and admin reads. Test an encoded document/image path where applicable. Identify the configured provider targets and opt in explicitly before testing uploads, replacement, deletion, feedback, invitations or account actions. Check file sizes and timeouts. Record skipped checks.
+
+If the old UI still loads, check the IIS binding and physical path. A 500.19 may indicate missing/locked IIS sections; a 500.30 points to Web startup (check the Application event log). If the page loads but sign-in configuration is unavailable, check loopback API health and `/api/auth/config` and confirm `Backend__BaseUrl`. If Blazor stays on “Checking access…” or reconnects repeatedly, check WebSocket Protocol and the `/_blazor` requests before debugging provider credentials.
 
 ## Updates and rollback
 
-For updates stage a new matching release as above. Stop writes and drain requests. Stop the service, set NSSM `Application` to the new full executable path, restart and verify loopback health, then repoint the IIS site at the new site directory. Preserve `AppDirectory`, `.env`, settings, models and journal. Stop the service to uninstall; `nssm remove CFCChatApi confirm` removes the service registration, not its private data.
+Stage a new matching release. Pause writes and drain requests. Stop `CFCChatApi`, set NSSM `Application` to the new full executable path, restart and verify loopback health, then repoint IIS to the new site directory and recycle the pool. Preserve `AppDirectory`, `.env`, settings, model assets, journal, and the app pool's Data Protection keys. `nssm remove CFCChatApi confirm` removes only the service registration.
 
-If the switch fails, stop mutations and drain, stop the new service, and restore the old IIS rules **and matching UI** (normally by pointing the site back at the backed-up prior root). Restore any settings or start modes you changed and restart the matching backend. Check auth, UI and health. Reconcile ambiguous provider writes across Supabase, Storage, Pinecone and the account journal before permitting retries. Do not roll back provider changes blindly or restore global IIS backups over unrelated sites without checking impact.
+On failure, stop mutations and drain requests, stop the new service, restore the prior IIS physical path, rules and app pool, and start the matching backend with its saved configuration. Verify health, UI and sign-in. Reconcile ambiguous writes across Supabase, Storage, Pinecone and the account journal before allowing retries. Do not blindly undo provider writes or restore server-wide IIS backups over other sites.
 
-## Local development
-
-From the repository root, create a local `.env` from [`.env.example`](../.env.example) if needed and set `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` to the intended development project's values. Run `dotnet run --project dotnet/src/CFC.ChatAI.Api/CFC.ChatAI.Api.csproj --no-launch-profile`. The project sets the working directory to the repository root for `dotnet run`, so the API loads that `.env` without overriding existing environment variables. The published service still loads `.env` from its NSSM `AppDirectory`.
-
-Before starting the UI, check the API directly (PowerShell):
+## Automated checks
 
 ```powershell
-curl.exe --fail --silent --show-error --output NUL http://127.0.0.1:5000/api/auth/config
+dotnet test dotnet/CFC.ChatAI.slnx
+# Optional browser-bridge unit tests (Node 22+, no npm install)
+node --test dotnet/tests/CFC.ChatAI.Web.Tests/frontend-browser.test.mjs dotnet/tests/CFC.ChatAI.Web.Tests/supabase-auth.test.mjs
 ```
 
-If `/api/health` works but `/api/auth/config` returns 404, check that all three Supabase settings are nonempty and restart the API. A successful response confirms the route is enabled, not that the credentials work.
-
-In another shell run `npm --prefix ./deployment ci --include=dev` (PowerShell: `npm.cmd`), then `node deployment/dotnet-edge.mjs` and open `http://127.0.0.1:8080/ui/`. The local edge builds the same UI assets in memory at startup; restart it after editing `web/`. Stop both with Ctrl+C. The proxy and generated IIS rules share [`routes-dotnet.manifest`](routes-dotnet.manifest); neither falls back to Python. Named browser routes get the entry page, not arbitrary URLs or missing assets. A provider-dependent route can still return 404 if its prerequisites are missing. A local 502 usually means the API is not listening on port 5000.
-
-After installing the UI dependencies, run `node --test deployment/dotnet-edge.test.mjs` to check the staged UI bundle and the local edge against a fake upstream. These tests do not verify IIS URL normalization, request filtering, headers or ARR. See the [route inventory](../dotnet/docs/plan/routing-and-hosting-routes.md) for what the edge exposes.
+The Web tests cover Blazor entry points, framework assets, SignalR negotiation, the IIS rewrite policy and calls to a real loopback .NET API without live providers. CI also stages the publish outputs. These checks do not validate IIS URL normalization, WebSocket upgrades through IIS, live provider writes or the target site's configuration; run the host checks above.

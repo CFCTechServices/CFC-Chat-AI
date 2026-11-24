@@ -89,7 +89,7 @@ if (-not (Test-Path $uiRoot)) {
 Copy-Item -Path "$ScriptDir\web\*" -Destination $uiRoot -Recurse -Force
 
 # Copy IIS web.config to the site root (one level above ui/)
-Copy-Item -Path "$ScriptDir\deployment\iis-web.config" -Destination "$WebRoot\web.config" -Force
+Copy-Item -Path "$ScriptDir\deployment\legacy-python-iis-web.config" -Destination "$WebRoot\web.config" -Force
 Write-Host "      Done - frontend deployed to $uiRoot"
 
 # ---------------------------------------------------------------------------
@@ -154,5 +154,5 @@ Write-Host "  Service logs:           nssm status $ServiceName"
 Write-Host "  Event logs:             Get-EventLog -LogName Application -Source $ServiceName -Newest 20"
 Write-Host ""
 Write-Host "  Frontend files:         $WebRoot"
-Write-Host "  IIS must be running and configured - see deployment\iis-web.config"
+Write-Host "  IIS must be running and configured - see deployment\legacy-python-iis-web.config"
 Write-Host "============================================================"

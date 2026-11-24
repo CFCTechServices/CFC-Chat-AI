@@ -8,9 +8,17 @@
     <Project Path="src/CFC.ChatAI.Feedback/CFC.ChatAI.Feedback.csproj" />
     <Project Path="src/CFC.ChatAI.Pinecone/CFC.ChatAI.Pinecone.csproj" />
     <Project Path="src/CFC.ChatAI.Supabase/CFC.ChatAI.Supabase.csproj" />
+    <Project Path="src/CFC.ChatAI.Web/CFC.ChatAI.Web.csproj" Id="93f4a4ca-9354-4be7-9733-e4e97bbbc6f7" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/CFC.ChatAI.Rag.Tests/CFC.ChatAI.Rag.Tests.csproj" />
+    <Project Path="tests/CFC.ChatAI.Api.Tests/CFC.ChatAI.Api.Tests.csproj" />
+    <Project Path="tests/CFC.ChatAI.ChatService.Tests/CFC.ChatAI.ChatService.Tests.csproj" />
+    <Project Path="tests/CFC.ChatAI.DocumentHandler.Tests/CFC.ChatAI.DocumentHandler.Tests.csproj" />
+    <Project Path="tests/CFC.ChatAI.DocumentProcessor.Tests/CFC.ChatAI.DocumentProcessor.Tests.csproj" />
+    <Project Path="tests/CFC.ChatAI.Feedback.Tests/CFC.ChatAI.Feedback.Tests.csproj" />
+    <Project Path="tests/CFC.ChatAI.Pinecone.Tests/CFC.ChatAI.Pinecone.Tests.csproj" />
+    <Project Path="tests/CFC.ChatAI.Supabase.Tests/CFC.ChatAI.Supabase.Tests.csproj" />
+    <Project Path="tests/CFC.ChatAI.VideoProcessor.Tests/CFC.ChatAI.VideoProcessor.Tests.csproj" />
     <Project Path="tests/CFC.ChatAI.Web.Tests/CFC.ChatAI.Web.Tests.csproj" />
   </Folder>
   <Folder Name="/tools/">
@@ -18,5 +26,4 @@
     <Project Path="tools/CFC.ChatAI.Rag.PipelineCheck/CFC.ChatAI.Rag.PipelineCheck.csproj" />
     <Project Path="tools/CFC.ChatAI.Rag.VectorStoreCheck/CFC.ChatAI.Rag.VectorStoreCheck.csproj" />
   </Folder>
-  <Project Path="src/CFC.ChatAI.Web/CFC.ChatAI.Web.csproj" Id="93f4a4ca-9354-4be7-9733-e4e97bbbc6f7" />
 </Solution>

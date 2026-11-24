@@ -62,6 +62,3 @@ public sealed record FeedbackRequest(
 public sealed record SessionFeedbackResponse(IReadOnlyDictionary<string, int> Feedback);
 public sealed record SubmitFeedbackResponse(bool Success, int? Score);
 public sealed record DeleteSessionResponse(bool Success);
-
-// HTTPException sends a string detail. Request validation sends an array of error objects.
-public sealed record FastApiErrorResponse(JsonElement Detail);

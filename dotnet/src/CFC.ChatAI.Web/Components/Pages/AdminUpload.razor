@@ -1,14 +1,14 @@
-@using CFC.ChatAI.Web.Services
 @inject SupabaseSessionService Session
+@inject ChatApiClient Api
 @implements IDisposable
 
 <h2>Upload content</h2>
 @if (!work.Available)
 {
-    <p role="status">Submission is disabled until this deployment has an approved, admin-protected upload backend. You can select files for validation.</p>
+    <p role="status">Submission is disabled while document uploads are unavailable from the .NET API. You can still select files for validation.</p>
     <button type="button" disabled="@work.Busy" @onclick="work.CheckAvailabilityAsync">Check upload availability</button>
 }
-<p>Per-file transfer limit: @SizeLabel(work.MaxBytes).</p>
+<p>Per-file transfer limit: @SizeLabel(work.MaxBytes). This deployment does not accept video uploads.</p>
 @if (work.Notice is not null) { <p role="status">@work.Notice</p> }
 <ul class="user-list">
     @foreach (var area in Enum.GetValues<UploadArea>())
@@ -46,7 +46,6 @@
 </ul>
 
 @code {
-    [Inject(Key = FastApiClient.UploadClientKey)] private FastApiClient Api { get; set; } = default!;
     private AdminUploadWorkspace work = default!;
     protected override Task OnInitializedAsync()
     {
@@ -60,7 +59,7 @@
         bytes >= 1024 ? $"{bytes / 1024d:0.##} KiB" : $"{bytes} B";
     private static string Title(UploadArea area) => area switch
     {
-        UploadArea.Single => "Document or video", UploadArea.Bulk => "Bulk upload",
+        UploadArea.Single => "Document", UploadArea.Bulk => "Bulk upload",
         UploadArea.Email => "Email message", _ => "Email PDF"
     };
     public void Dispose()

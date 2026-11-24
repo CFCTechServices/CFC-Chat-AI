@@ -112,5 +112,5 @@ Write-Host "  Health check:           Invoke-RestMethod http://127.0.0.1:8000/ap
 Write-Host "  Container logs:         docker compose logs -f backend"
 Write-Host ""
 Write-Host "  Frontend files:         $WebRoot"
-Write-Host "  IIS must be running and configured - see deployment\iis-web.config"
+Write-Host "  IIS must be running and configured - see deployment\legacy-python-iis-web.config"
 Write-Host "============================================================"

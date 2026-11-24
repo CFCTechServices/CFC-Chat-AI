@@ -1,11 +1,10 @@
 ﻿@page "/chat"
 @page "/chat/{SessionId}"
-@inject CFC.ChatAI.Web.Services.SupabaseSessionService Session
+@inject SupabaseSessionService Session
 @using Microsoft.JSInterop
 @inject IJSRuntime JS
 @inject NavigationManager Navigation
-@using CFC.ChatAI.Web.Services
-@inject FastApiClient Api
+@inject ChatApiClient Api
 @implements IAsyncDisposable
 
 <div class="chat-layout">
@@ -60,7 +59,7 @@
                     <ChatMessage @key="message" Sender="@(message.Role == "user" ? "You" : "CFC AI")"
                                  Text="@message.Content" Rating="@message.Rating"
                                  Images="@(Previews?.ForMessage(active.Id, message) ?? [])"
-                                 Metadata="@(message.Role == "assistant" ? message.Metadata : null)" BackendAddress="@Api.BaseAddress"
+                                 Metadata="@(message.Role == "assistant" ? message.Metadata : null)"
                                  FeedbackDisabled="@(!message.IsSavedAssistant || !chat.CanRate(active))"
                                  OnVote="thumb => chat.ToggleFeedbackAsync(active, message, thumb)" />
                 }

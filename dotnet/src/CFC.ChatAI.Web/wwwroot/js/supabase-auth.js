@@ -24,7 +24,7 @@ window.cfcAuth = (() => {
         window.history.replaceState(window.history.state, "", failed ? "/login?signup=link-error" : "/login?signup=return");
     }
 
-    // FastAPI's /auth/v1/recover request uses Supabase's implicit recovery redirect.
+    // The API's password-reset request uses Supabase's implicit recovery redirect.
     // Consume its fragment before Blazor starts. Only status codes cross the circuit.
     function takeRecoveryLink() {
         if (!window.location?.hash) return null;

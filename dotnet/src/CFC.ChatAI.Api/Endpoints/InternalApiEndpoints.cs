@@ -35,6 +35,7 @@ public static class InternalApiEndpoints
             ["supabaseUrl"] = config["SUPABASE_URL"],
             ["supabaseKey"] = config["SUPABASE_ANON_KEY"],
             ["backend"] = "dotnet",
+            ["documentUploads"] = chatAvailable ? "true" : "false",
             ["profileWrites"] = config.GetValue<bool>("Api:EnableProfileWrites") ? "true" : "false",
             ["accountLifecycle"] = config.GetValue<bool>("Api:EnableAccountLifecycle") ? "true" : "false",
             ["permanentAccountDeletion"] = config.GetValue<bool>("Api:EnableAccountLifecycle") &&

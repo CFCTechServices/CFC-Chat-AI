@@ -1,7 +1,6 @@
-@using CFC.ChatAI.Web.Services
 @using CFC.ChatAI.Web.Models
 @inject SupabaseSessionService Session
-@inject FastApiClient Api
+@inject ChatApiClient Api
 @implements IDisposable
 
 <div class="admin-heading">
@@ -13,7 +12,8 @@
         <button type="button" disabled="@Locked" @onclick="work.LoadAsync">Refresh</button>
     </div>
 </div>
-@if (work.Busy) { <p role="status">Waiting for FastAPI…</p> }
+@if (work.Busy) { <p role="status">Waiting for the API…</p> }
+@if (!Session.DocumentUploadsEnabled) { <p>Document replacement and deletion are unavailable on this deployment.</p> }
 @if (work.Error is { } error) { <p role="alert">@error</p> }
 @if (work.Notice is { } notice) { <p role="status">@notice</p> }
 @if (work.Loaded && work.MatchCount == 0)
@@ -34,10 +34,16 @@ else if (work.Loaded)
                 <div class="admin-actions">
                     <button type="button" disabled="@Locked" aria-label="@($"Prepare download for {doc.Name}")"
                             @onclick="() => work.PrepareDownloadAsync(doc)">Download</button>
-                    <button type="button" disabled="@Locked" aria-label="@($"Replace {doc.Name}")"
-                            @onclick="() => Begin(doc, DocumentAction.Replace)">Replace</button>
-                    <button type="button" class="danger" disabled="@Locked" aria-label="@($"Delete {doc.Name}")"
-                            @onclick="() => Begin(doc, DocumentAction.Delete)">Delete</button>
+                    @if (work.CanReplace(doc))
+                    {
+                        <button type="button" disabled="@Locked" aria-label="@($"Replace {doc.Name}")"
+                                @onclick="() => Begin(doc, DocumentAction.Replace)">Replace</button>
+                    }
+                    @if (work.CanDelete(doc))
+                    {
+                        <button type="button" class="danger" disabled="@Locked" aria-label="@($"Delete {doc.Name}")"
+                                @onclick="() => Begin(doc, DocumentAction.Delete)">Delete</button>
+                    }
                 </div>
                 @if (work.DownloadId == doc.Id && work.Download is { } download)
                 {
@@ -56,9 +62,10 @@ else if (work.Loaded)
                         }
                         else
                         {
-                            <p>Replace <strong>@doc.Name</strong> (@doc.Id)? FastAPI removes the current index before ingesting the replacement.</p>
-                            <label>Replacement Word document (.doc or .docx, up to 50 MiB)
-                                <InputFile OnChange="SelectFile" accept=".doc,.docx" disabled="@work.Busy" />
+                            var extension = Path.GetExtension(doc.Name);
+                            <p>Replace <strong>@doc.Name</strong> (@doc.Id)? Use the original filename and format to keep the same document ID.</p>
+                            <label>Replacement file (@extension, up to @($"{work.MaxReplacementBytes:N0}") bytes)
+                                <InputFile OnChange="SelectFile" accept="@extension" disabled="@work.Busy" />
                             </label>
                         }
                         <div class="admin-actions">

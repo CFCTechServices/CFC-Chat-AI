@@ -1,6 +1,5 @@
 @page "/settings"
 @using CFC.ChatAI.Web.Models
-@using CFC.ChatAI.Web.Services
 @inject SupabaseSessionService Session
 @implements IDisposable
 
@@ -11,7 +10,8 @@
         <h1 id="settings-title">Settings</h1>
         <form class="settings-card" aria-labelledby="profile-heading" @onsubmit="SaveProfileAsync" @onsubmit:preventDefault>
             <h2 id="profile-heading">Profile</h2>
-            <fieldset disabled="@busy" aria-labelledby="profile-heading">
+            @if (!Session.ProfileWritesEnabled) { <p role="status">Profile editing is disabled on this deployment.</p> }
+            <fieldset disabled="@(busy || !Session.ProfileWritesEnabled)" aria-labelledby="profile-heading">
                 <dl class="account-details">
                     <dt>Email address</dt><dd>@account.Email</dd>
                     <dt>Account role</dt><dd>@account.Role</dd>
@@ -133,7 +133,7 @@
 
     private async Task SelectAvatarAsync(InputFileChangeEventArgs args)
     {
-        if (busy || Profile is null) return;
+        if (busy || Profile is null || !Session.ProfileWritesEnabled) return;
         busy = true;
         profileResult = null;
         avatar = null;
@@ -172,7 +172,7 @@
 
     private async Task SaveProfileAsync()
     {
-        if (busy || invalidFile || Profile is null || !HasProfileChange) return;
+        if (busy || invalidFile || Profile is null || !HasProfileChange || !Session.ProfileWritesEnabled) return;
         var owner = Profile.Id;
         busy = true;
         profileResult = null;

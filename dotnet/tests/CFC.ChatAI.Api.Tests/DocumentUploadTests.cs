@@ -72,7 +72,10 @@ public sealed class DocumentUploadTests
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("test-name", body.GetProperty("document_id").GetString());
         Assert.Equal(1, body.GetProperty("chunk_count").GetInt32());
+        Assert.Equal(1, body.GetProperty("vector_count").GetInt32());
         Assert.False(body.TryGetProperty("source_object", out _));
+        var config = await client.GetFromJsonAsync<JsonElement>("/api/auth/config");
+        Assert.Equal("true", config.GetProperty("documentUploads").GetString());
         Assert.True(((Handler)factory.Services.GetRequiredService<IDocumentHandler>()).ReceivedCancellationToken);
     }
 
@@ -247,6 +250,8 @@ public sealed class DocumentUploadTests
     {
         using var factory = Factory(dev: true).WithWebHostBuilder(builder => builder.UseSetting("PINECONE_API_KEY", ""));
         using var client = Client(factory);
+        var config = await client.GetFromJsonAsync<JsonElement>("/api/auth/config");
+        Assert.Equal("false", config.GetProperty("documentUploads").GetString());
         Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync("/api/files/upload", Form())).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await client.PostAsync("/api/ingest/dev", Form())).StatusCode);
     }

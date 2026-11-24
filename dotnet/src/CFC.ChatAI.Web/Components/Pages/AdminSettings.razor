@@ -1,6 +1,5 @@
 @using CFC.ChatAI.Web.Models
-@using CFC.ChatAI.Web.Services
-@inject FastApiClient Api
+@inject ChatApiClient Api
 @inject SupabaseSessionService Session
 @inject TimeProvider Clock
 @implements IDisposable
@@ -9,7 +8,7 @@
     <h2>System Settings</h2>
     <button type="button" disabled="@work.SettingsBusy" @onclick="work.LoadSettingsAsync">Refresh settings</button>
 </div>
-<p>FastAPI stores these preferences. Automatic upload approval, ingestion emails, and maintenance access controls still require backend implementation.</p>
+<p>The API stores these preferences. Automatic upload approval, ingestion emails, and maintenance access controls still require backend implementation.</p>
 @if (work.SettingsBusy) { <p role="status">Checking settings…</p> }
 @if (work.SettingsError is { } error) { <p role="alert">@error</p> }
 @if (work.Notice is { } notice) { <p role="status">@notice</p> }

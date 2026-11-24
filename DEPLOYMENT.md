@@ -124,7 +124,7 @@ This script:
 2. Installs CPU-only PyTorch (avoids the 2.5 GB CUDA download)
 3. Installs all application dependencies from `requirements.txt`
 4. Copies frontend files to `C:\inetpub\cfcchat\ui\`
-5. Copies `deployment\iis-web.config` to `C:\inetpub\cfcchat\web.config`
+5. Copies `deployment\legacy-python-iis-web.config` to `C:\inetpub\cfcchat\web.config`
 6. Installs and starts the **CFC-ChatAI** Windows Service via NSSM
 7. Runs a health check to confirm the backend is responding
 

@@ -4,7 +4,12 @@ namespace CFC.ChatAI.Web.Models;
 
 public sealed record AuthConfigResponse(
     [property: JsonPropertyName("supabaseUrl")] string? SupabaseUrl,
-    [property: JsonPropertyName("supabaseKey")] string? SupabaseKey);
+    [property: JsonPropertyName("supabaseKey")] string? SupabaseKey,
+    string? Backend = null,
+    string? ProfileWrites = null,
+    string? AccountLifecycle = null,
+    string? PermanentAccountDeletion = null,
+    string? DocumentUploads = null);
 
 public sealed record EmailRequest(string Email);
 

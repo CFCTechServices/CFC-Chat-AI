@@ -1,7 +1,6 @@
-@using CFC.ChatAI.Web.Services
 @using CFC.ChatAI.Web.Models
 @inject SupabaseSessionService Session
-@inject FastApiClient Api
+@inject ChatApiClient Api
 @implements IDisposable
 
 <h2>User management</h2>
@@ -19,7 +18,9 @@
 </div>
 @if (work.Notice is { } notice) { <p role="status">@notice</p> }
 @if (work.Error is { } error) { <p role="alert">@error</p> }
-@if (work.Busy) { <p role="status">Waiting for FastAPI…</p> }
+@if (work.Busy) { <p role="status">Waiting for the API…</p> }
+@if (!Session.AccountLifecycleEnabled) { <p>Account deactivation, reactivation, and permanent deletion are disabled on this deployment.</p> }
+else if (!Session.PermanentAccountDeletionEnabled) { <p>Permanent account deletion is disabled on this deployment.</p> }
 @if (work.Loaded && work.Users.Count == 0) { <p>No registered users.</p> }
 @if (work.Loaded)
 {
@@ -43,15 +44,18 @@
                             @if (!AdminUsersWorkspace.AssignableRoles.Contains(user.Role)) { <option disabled>@user.Role</option> }
                             @foreach (var role in AdminUsersWorkspace.AssignableRoles) { <option value="@role">@role</option> }
                         </select>
-                        @if (user.Status == "active")
+                        @if (work.CanTakeAction(user, AdminUserAction.Deactivate))
                         {
                             <button type="button" disabled="@Locked" @onclick="() => work.BeginChange(user, AdminUserAction.Deactivate)">Deactivate</button>
                         }
-                        else if (user.Status == "inactive")
+                        else if (work.CanTakeAction(user, AdminUserAction.Reactivate))
                         {
                             <button type="button" disabled="@Locked" @onclick="() => work.BeginChange(user, AdminUserAction.Reactivate)">Reactivate</button>
                         }
-                        <button type="button" class="danger" disabled="@Locked" @onclick="() => work.BeginChange(user, AdminUserAction.Delete)">Delete</button>
+                        @if (work.CanTakeAction(user, AdminUserAction.Delete))
+                        {
+                            <button type="button" class="danger" disabled="@Locked" @onclick="() => work.BeginChange(user, AdminUserAction.Delete)">Delete</button>
+                        }
                     </div>
                     @if (change?.Target.Id == user.Id)
                     {

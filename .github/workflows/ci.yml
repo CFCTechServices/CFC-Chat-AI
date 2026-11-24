@@ -8,17 +8,20 @@ on:
       - 'tests/test_admin_change_role.py'
   workflow_dispatch:
 jobs:
-  dotnet-edge:
-    runs-on: ubuntu-latest
+  dotnet-frontend:
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
-          cache-dependency-path: deployment/package-lock.json
-      - run: npm --prefix ./deployment ci --include=dev
-      - run: node --test deployment/dotnet-edge.test.mjs
+      - run: dotnet test dotnet/tests/CFC.ChatAI.Web.Tests/CFC.ChatAI.Web.Tests.csproj -c Release
+      - run: dotnet test dotnet/tests/CFC.ChatAI.Api.Tests/CFC.ChatAI.Api.Tests.csproj -c Release
+      - run: node --test dotnet/tests/CFC.ChatAI.Web.Tests/frontend-browser.test.mjs dotnet/tests/CFC.ChatAI.Web.Tests/supabase-auth.test.mjs
+      - run: ./deployment/Publish-DotnetIis.ps1 -ReleasePath (Join-Path $env:RUNNER_TEMP 'cfcchat-iis')
   build:
     runs-on: ubuntu-latest
     env: 

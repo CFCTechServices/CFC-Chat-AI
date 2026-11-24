@@ -1,7 +1,0 @@
-{
-  "GET": ["api/health", "api/auth/config", "api/profile/me", "api/chat/sessions(?:/[^/]+)?", "api/chat/feedback", "(?:api/chat/)?content/images/.+", "api/admin/(?:documents(?:/[^/]+/download)?|users|settings)"],
-  "POST": ["api/auth/(?:check-email|forgot-password)", "api/chat/(?:sessions|feedback|message)", "api/files/upload", "api/admin/(?:invite|change-role|users/[^/]+/(?:deactivate|reactivate))"],
-  "PATCH": ["api/profile/me", "api/chat/sessions/[^/]+", "api/admin/settings"],
-  "PUT": ["api/admin/documents/[^/]+/replace"],
-  "DELETE": ["api/chat/sessions/[^/]+", "api/admin/(?:documents|users)/[^/]+"]
-}

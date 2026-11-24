@@ -1,7 +1,11 @@
 ﻿
 @using Microsoft.JSInterop
-@using CFC.ChatAI.Web.Services
+@using System.Text.Json
+@using CFC.ChatAI.Web.Models
 @inject IJSRuntime JS
+@inject ChatApiClient Api
+@inject SupabaseSessionService Session
+@implements IDisposable
 
 @if (Image is not null || !string.IsNullOrWhiteSpace(VideoUrl))
 {
@@ -13,16 +17,18 @@
         }
         else if (Image is not null)
         {
-            <button type="button"
-                    class="chat-answer-image-button"
-                    title="Enlarge image"
-                    @onclick="() => imagePreview = true">
-                <img src="@Image.Url.AbsoluteUri"
-                     alt="@Image.AltText"
-                     referrerpolicy="no-referrer"
-                     @onerror="ImageUnavailable"
-                     loading="lazy" />
-            </button>
+            @if (displayUrl is { } url)
+            {
+                <button type="button" class="chat-answer-image-button" title="Enlarge image"
+                        @onclick="() => imagePreview = true">
+                    <img @key="url" src="@url" alt="@Image.AltText" referrerpolicy="no-referrer"
+                         @onerror="() => ImageUnavailableAsync(url)" loading="lazy" />
+                </button>
+            }
+            else
+            {
+                <small role="status">Loading image…</small>
+            }
         }
 
         @if (!string.IsNullOrWhiteSpace(VideoUrl))
@@ -59,7 +65,7 @@
     </div>
 }
 
-@if (imagePreview && Image is not null)
+@if (imagePreview && Image is not null && displayUrl is { } previewUrl)
 {
     <div class="cfc-media-backdrop"
          @onclick="CloseImage">
@@ -76,7 +82,7 @@
                 ✕
             </button>
 
-            <img src="@Image.Url.AbsoluteUri" alt="@Image.AltText" referrerpolicy="no-referrer" @onerror="ImageUnavailable" />
+            <img src="@previewUrl" alt="@Image.AltText" referrerpolicy="no-referrer" @onerror="() => ImageUnavailableAsync(previewUrl)" />
         </div>
     </div>
 }
@@ -106,6 +112,8 @@
 }
 
 @code {
+    [CascadingParameter] public ProfileResponse? Profile { get; set; }
+
     [Parameter]
     public AnswerImage? Image { get; set; }
 
@@ -119,19 +127,70 @@
 
     private bool imagePreview;
     private bool imageFailed;
+    private bool retried;
     private Uri? previousUrl;
+    private string? previousOwner;
+    private string? displayUrl;
+    private CancellationTokenSource? lookup;
     private bool videoExpanded;
     private ElementReference videoElement;
 
-    protected override void OnParametersSet()
+    protected override Task OnParametersSetAsync()
     {
-        if (previousUrl == Image?.Url) return;
-        previousUrl = Image?.Url;
-        imagePreview = imageFailed = false;
+        var url = Image?.Url;
+        var owner = Profile?.Id;
+        if (previousUrl == url && previousOwner == owner) return Task.CompletedTask;
+        CancelLookup();
+        previousUrl = url;
+        previousOwner = owner;
+        imagePreview = imageFailed = retried = false;
+        displayUrl = url is { IsAbsoluteUri: true } ? url.AbsoluteUri : null;
+        return url is { IsAbsoluteUri: false } ? ResolveAsync(url, owner) : Task.CompletedTask;
+    }
+
+    private async Task ResolveAsync(Uri route, string? owner)
+    {
+        if (owner is null) { imageFailed = true; return; }
+        using var pending = new CancellationTokenSource();
+        lookup = pending;
+        try
+        {
+            var signed = await Session.WithAccessTokenAsync(owner, (token, ct) => Api.ResolveImageAsync(token, route, ct), pending.Token);
+            if (lookup != pending) return;
+            displayUrl = signed?.AbsoluteUri;
+            imageFailed = displayUrl is null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or JsonException or OperationCanceledException)
+        {
+            if (lookup == pending) imageFailed = true;
+        }
+        finally { if (lookup == pending) lookup = null; }
     }
 
     private void CloseImage() => imagePreview = false;
-    private void ImageUnavailable() { imageFailed = true; CloseImage(); }
+
+    private Task ImageUnavailableAsync(string url)
+    {
+        if (displayUrl != url) return Task.CompletedTask;
+        displayUrl = null;
+        CloseImage();
+        if (!retried && previousUrl is { IsAbsoluteUri: false } route)
+        {
+            retried = true;
+            return ResolveAsync(route, previousOwner);
+        }
+        imageFailed = true;
+        return Task.CompletedTask;
+    }
+
+    private void CancelLookup()
+    {
+        var pending = lookup;
+        lookup = null;
+        pending?.Cancel();
+    }
+
+    public void Dispose() => CancelLookup();
 
     private void CloseVideo()
     {
