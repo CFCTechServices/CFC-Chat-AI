@@ -22,8 +22,8 @@ function Publish-Project($Project, $Destination) {
 }
 
 New-Item -ItemType Directory -Path $release | Out-Null
-Publish-Project 'dotnet/src/CFC.ChatAI.Api/CFC.ChatAI.Api.csproj' $api
-Publish-Project 'dotnet/src/CFC.ChatAI.Web/CFC.ChatAI.Web.csproj' $site
+Publish-Project 'src/CFC.ChatAI.Api/CFC.ChatAI.Api.csproj' $api
+Publish-Project 'src/CFC.ChatAI.Web/CFC.ChatAI.Web.csproj' $site
 foreach ($file in @((Join-Path $api 'CFC.ChatAI.Api.exe'), (Join-Path $site 'CFC.ChatAI.Web.exe'))) {
     if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "Publish did not produce $file" }
 }
@@ -32,4 +32,4 @@ if (-not (Get-ChildItem -LiteralPath $framework -Filter 'blazor.web*.js' -File))
     throw 'Publish did not produce the Blazor browser script.'
 }
 Copy-Item -LiteralPath $config -Destination (Join-Path $site 'web.config') -Force
-Write-Host "Stage complete. NSSM application directory: $api; IIS physical path: $site"
+Write-Host "Stage complete. API executable: $api\CFC.ChatAI.Api.exe; IIS physical path: $site"

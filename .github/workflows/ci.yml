@@ -1,14 +1,11 @@
-name: implement CI
-on:
-  push:
-    paths-ignore:
-      - 'tests/test_admin_change_role.py'
-  pull_request:
-    paths-ignore:
-      - 'tests/test_admin_change_role.py'
-  workflow_dispatch:
+name: CI
+on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
 jobs:
-  dotnet-frontend:
+  dotnet:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,32 +15,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: dotnet test dotnet/tests/CFC.ChatAI.Web.Tests/CFC.ChatAI.Web.Tests.csproj -c Release
-      - run: dotnet test dotnet/tests/CFC.ChatAI.Api.Tests/CFC.ChatAI.Api.Tests.csproj -c Release
-      - run: node --test dotnet/tests/CFC.ChatAI.Web.Tests/frontend-browser.test.mjs dotnet/tests/CFC.ChatAI.Web.Tests/supabase-auth.test.mjs
+      - run: dotnet test CFC.ChatAI.slnx -c Release
+      - run: node --test tests/CFC.ChatAI.Web.Tests/frontend-browser.test.mjs tests/CFC.ChatAI.Web.Tests/supabase-auth.test.mjs
       - run: ./deployment/Publish-DotnetIis.ps1 -ReleasePath (Join-Path $env:RUNNER_TEMP 'cfcchat-iis')
-  build:
+
+  supabase-boundary:
     runs-on: ubuntu-latest
-    env: 
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-      FRONTEND_BASE_URL: ${{ secrets.FRONTEND_BASE_URL }}
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-          cache: 'pip'
-          cache-dependency-path: requirements.txt
-      - name: Check .NET Supabase architecture boundary
-        run: python dotnet/tools/check_supabase_boundary.py
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      - name: Run tests
-        run: |
-          pytest tests/ -q
-    
+      - run: python tools/check_supabase_boundary.py

@@ -1,69 +1,20 @@
-# Continuous Integration & Continuous Deployment (CI/CD) Plan
+# CI and deployment plan
 
-## 1. Introduction
+## What runs today
 
-**What is CI/CD?**
-CI/CD stands for **Continuous Integration** and **Continuous Deployment**. It is a modern software engineering practice that allows teams to deliver code changes more frequently, safely, and reliably. 
-- **Continuous Integration (CI):** The practice of automating the testing of new code changes. Every time a developer makes a change, the system automatically checks if the new code breaks anything.
-- **Continuous Deployment (CD):** The practice of automatically releasing those tested changes to the live, production environment so that end-users can access the new features immediately.
+The [CI workflow](../.github/workflows/ci.yml) runs on pushes, pull requests and manual dispatch. It does not need provider credentials.
 
-Together, CI/CD ensures that the software is always in a working state and that new features or bug fixes reach users as quickly as possible without requiring manual, error-prone deployment steps.
+| Job | Checks |
+| --- | --- |
+| `dotnet` (Windows, .NET 10 SDK, Node.js 22) | Tests the root `CFC.ChatAI.slnx` in Release, runs the Blazor browser-bridge unit tests, and stages the matching self-contained `win-x64` API and IIS site in the runner's temporary directory. |
+| `supabase-boundary` (Ubuntu, Python 3.10) | Runs `python tools/check_supabase_boundary.py` with the standard library to check that the Supabase adapter has no application or provider project references or foreign `CFC.ChatAI.*` namespaces. |
 
-## 2. Project Context & Infrastructure Setup
+The FastAPI/React test suite is archived and is not a CI gate. The .NET tests can skip cases requiring local model or private fixture assets. The publish step exercises the package layout and IIS config, not a running IIS site. CI does not upload a release, deploy to a VM, or switch traffic. Run the [README checks](../README.md#testing-and-ci) locally before opening a pull request. Repository branch-protection rules are managed on GitHub outside this workflow.
 
-**What project/code is being updated?**
-This CI/CD pipeline manages updates for the **CFC Chat-AI Application**. This includes:
-- The backend logic (handling the AI chatbot, database interactions, and secure APIs).
-- The frontend user interface (what users see and interact with in their web browser).
+## Releasing today
 
-**Where is this code residing?**
-- **Source Code Repository:** The original, central copy of the code lives securely on **GitHub**. This is where developers collaborate, review, and approve all new changes.
-- **Production Environment:** The live, running version of the application resides on a **Microsoft Azure Virtual Machine (Windows VM)** hosted in your cloud infrastructure.
+An authorized operator stages a versioned release, runs the [.NET/IIS checklist](../deployment/DOTNET-IIS.md), and verifies routing, sign-in and provider behavior before switching traffic. Record the deployed revision, provider targets, health/smoke results, and rollback release. Keep secrets and persistent data outside publish directories. The [cutover plan](plan/internal-api-cutover.md) still governs release acceptance.
 
-The goal of this CI/CD pipeline is to safely and automatically move approved code from the **GitHub repository** directly to the **Azure VM** where the live application runs.
+## Possible automation (not implemented)
 
----
-
-## 3. Current State: Continuous Integration (CI)
-
-Our current CI implementation ensures that all code added to the main GitHub repository meets strict quality and reliability standards before it can even be considered for deployment.
-
-*   **Automated Testing:** Whenever a developer proposes a change (via a "Pull Request"), an automated system runs our test suite. This verifies that the new code functions correctly and doesn't introduce bugs.
-*   **Quality Controls:** Only code that passes all tests and receives approval from another developer can be merged into the "main" version of the code.
-*   **Outcome:** We have high confidence that the code in our central repository is always stable. However, currently, the process of deploying this stable code to the live server on Azure remains a manual task.
-
----
-
-## 4. Proposed State: Continuous Deployment (CD)
-
-Currently, an administrator must manually log into the Windows VM, download the latest code, and restart the application. To modernize this, we propose an automated **Pull-Based Deployment Strategy**.
-
-### 4.1 Architecture Model: "Pull-Based Polling"
-
-Instead of an external service trying to push code into the secure Azure VM (which could create security vulnerabilities by requiring us to open inbound pathways), the VM will proactively "poll" (or check) GitHub for approved updates. 
-
-#### **Mechanism:**
-1.  **Scheduled Polling:** A small, automated background task will run directly on the VM on a regular schedule (e.g., every 5 minutes).
-2.  **Version Checking:** The script looks at GitHub to see if there are any new, approved updates compared to what is currently running on the server.
-3.  **Automated Execution:** 
-    *   If no changes are detected, the system does nothing.
-    *   If a new version is found, the system begins the update process automatically.
-
-### 4.2 The Deployment Sequence
-
-Upon detecting a new, approved update on GitHub, the automated script on the VM executes the following steps:
-
-1.  **Secure Download:** The server securely pulls the latest, approved code from GitHub.
-2.  **Execute Deployment Script:** The system runs our standard installation process automatically. It updates the frontend screens, installs any necessary background dependencies, and restarts the backend services to apply the changes.
-3.  **Notification:** The pipeline sends an automated message to the development team (e.g., via Discord or email) confirming that the live application has been successfully updated.
-
----
-
-## 5. Advantages of this Strategy
-
-*   **Enhanced Security:** By having the VM "pull" updates instead of accepting inbound "pushes", we don't need to open any extra firewall ports to the internet. The server remains highly secure behind your existing network defenses.
-*   **Faster Rollouts:** Developers can fix bugs or launch features, and those changes will appear in production within minutes without human intervention.
-*   **Reduced Human Error:** Automating the deployment removes the risk of a person missing a step during manual server updates.
-*   **Auditability & Trackability:** Every update on the live server can be traced directly back to a specific set of changes approved on GitHub.
-
-
+A future Windows deployment runner could **pull** an explicitly approved, immutable release using read-only credentials; it would not require inbound management access from GitHub. Before enabling it, agree on approvers, release integrity checks, a deployment lock and maintenance policy, health and smoke gates, rollback and reconciliation procedures, and notifications. Do not automatically deploy the newest branch commit or scripts from pull requests.

@@ -1,0 +1,9 @@
+# Blazor admin document upload
+
+The Blazor app under `src/CFC.ChatAI.Web` submits documents to `CFC.ChatAI.Api`. Follow the [IIS guide](../deployment/DOTNET-IIS.md) for deployment. `Backend__BaseUrl` defaults to `http://127.0.0.1:5000` and may only use loopback HTTP or HTTPS. The Web host does not follow API redirects or store cookies on its API client.
+
+The Upload tab checks `/api/auth/config` for `backend: "dotnet"` and `documentUploads: "true"` before allowing submission and before opening each file. The capability means the .NET upload route is mapped (Supabase and Pinecone settings are present), not that provider writes will succeed. Each file goes to the admin-protected `POST /api/files/upload` with the verified account's bearer token and one multipart `file` using the original UTF-8 filename. Bulk uploads send these requests sequentially. FastAPI OpenAPI, Python bulk uploads and video uploads are not used.
+
+The picker accepts `.doc`, `.docx`, `.pdf`, `.txt`, `.md` and `.eml` (case-insensitive), with separate `.eml` and `.pdf` selectors for email documents. The transfer indicator tracks bytes sent, not indexing progress. The UI verifies the .NET `document_id`, `chunk_count` and `vector_count` receipt and checks for the ID in a refreshed content list. For ambiguous outcomes, inspect the index and provider data before retrying. Replacement is a separate action that must preserve the existing document ID and file format.
+
+`Document__MaxUploadBytes` defaults to 50 MiB; if changed, match the setting on both the API and Web apps and align the IIS limit for direct API requests. LibreOffice is required to convert legacy `.doc` input. PDF extraction uses embedded text, not OCR. For operator checks use disposable development data and verify that the target API rejects anonymous and non-admin uploads.

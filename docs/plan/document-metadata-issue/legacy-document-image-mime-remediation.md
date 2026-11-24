@@ -4,13 +4,13 @@
 
 ## Problem
 
-In the [local .NET development setup](../../deployment/DOTNET-IIS.md#local-development), a chat reply showed `Untitled (unavailable)` for an image from the Concept 5 Getting Started Guide. The API successfully listed `cfc-docs` but returned 404 without requesting a signed URL. Supabase Storage showed the exact object as `text/plain`:
+In the [local .NET development setup](../../../README.md#local-development), a chat reply showed `Untitled (unavailable)` for an image from the Concept 5 Getting Started Guide. The API successfully listed `cfc-docs` but returned 404 without requesting a signed URL. Supabase Storage showed the exact object as `text/plain`:
 
 ```text
 cfc-docs / docs/concept-5-getting-started-guide/images/concept-5-getting-started-guide__img001.jpg
 ```
 
-The [.NET image resolver](../../dotnet/src/CFC.ChatAI.Api/Endpoints/DocumentImageEndpoints.cs) requires the stored MIME type to match the file extension (`image/jpeg` for `.jpg`). The [old Python endpoint](../../app/api/endpoints/chat.py) inferred MIME type from the extension and streamed the bytes, masking incorrect metadata. The likely source is Python [`store_image()`](../../app/services/supabase_content_repository.py), which supplies `contentType` instead of the Storage SDK's `content-type` option. Confirm this with the SDK version used by the uploader.
+The [.NET image resolver](../../../src/CFC.ChatAI.Api/Endpoints/DocumentImageEndpoints.cs) requires the stored MIME type to match the file extension (`image/jpeg` for `.jpg`). The [old Python endpoint](../../../.archive/app/api/endpoints/chat.py) inferred MIME type from the extension and streamed the bytes, masking incorrect metadata. The likely source is Python [`store_image()`](../../../.archive/app/services/supabase_content_repository.py), which supplies `contentType` instead of the Storage SDK's `content-type` option. Confirm this with the SDK version used by the uploader.
 
 The image was not found in current `document_chunks.image_paths`. That does not cause the 404: the resolver does not read chunk rows. A reopened chat can use a saved image reference, and a fresh reply can fall back to Pinecone metadata. Investigate missing chunk links separately only if fresh replies cannot retrieve the intended images.
 
