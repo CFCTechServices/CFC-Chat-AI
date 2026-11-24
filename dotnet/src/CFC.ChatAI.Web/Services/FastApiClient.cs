@@ -5,13 +5,47 @@ using CFC.ChatAI.Web.Models;
 
 namespace CFC.ChatAI.Web.Services;
 
-public sealed class FastApiClient(HttpClient httpClient) : IAuthenticationBackend
+public sealed partial class FastApiClient(HttpClient httpClient, AdminUploadPolicy? uploadPolicy = null) : IAuthenticationBackend
 {
     public Uri? BaseAddress => httpClient.BaseAddress;
+    public Uri? DocsAddress => BaseAddress is null ? null : new Uri(BaseAddress, "docs");
+
+    public async Task<bool> CanEmbedDocsAsync(Uri frontend, CancellationToken ct)
+    {
+        if (DocsAddress is not { } docs || docs.GetLeftPart(UriPartial.Path) == frontend.GetLeftPart(UriPartial.Path)) return false;
+        if (frontend.Scheme == "https" && docs.Scheme == "http" && !docs.IsLoopback) return false;
+        var origin = frontend.GetLeftPart(UriPartial.Authority);
+        var sameOrigin = origin == docs.GetLeftPart(UriPartial.Authority);
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(5));
+        try
+        {
+            using var response = await httpClient.GetAsync(docs, HttpCompletionOption.ResponseHeadersRead, timeout.Token);
+            if (!response.IsSuccessStatusCode || response.Content.Headers.ContentType?.MediaType != "text/html") return false;
+            if (response.Headers.TryGetValues("X-Frame-Options", out var restrictions) &&
+                restrictions.Any(v => !sameOrigin || !string.Equals(v.Trim(), "SAMEORIGIN", StringComparison.OrdinalIgnoreCase))) return false;
+            if (response.Headers.TryGetValues("Content-Security-Policy", out var policies))
+            {
+                foreach (var directive in policies.SelectMany(p => p.Split(';')))
+                {
+                    var parts = directive.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+                    if (parts.Length > 0 && parts[0].Equals("frame-ancestors", StringComparison.OrdinalIgnoreCase) &&
+                        !parts.Skip(1).Any(v => v == "*" || (sameOrigin && v == "'self'") || v.TrimEnd('/') == origin)) return false;
+                }
+            }
+            return true;
+        }
+        catch (Exception ex) when (!ct.IsCancellationRequested && ex is HttpRequestException or OperationCanceledException)
+        {
+            return false;
+        }
+    }
 
     private const string SessionsPath = "api/chat/sessions";
     private const string FeedbackPath = "api/chat/feedback";
     private const string AdminUsersPath = "api/admin/users";
+    private const string DocumentsPath = "api/admin/documents";
+    private const string AdminSettingsPath = "api/admin/settings";
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         RespectRequiredConstructorParameters = true,
@@ -36,6 +70,15 @@ public sealed class FastApiClient(HttpClient httpClient) : IAuthenticationBacken
     public Task<AdminUserList> GetAdminUsersAsync(string token, CancellationToken ct) =>
         SendAsync<AdminUserList>(HttpMethod.Get, AdminUsersPath, ct, Bearer(token));
 
+    public Task<AdminSystemSettings> GetAdminSettingsAsync(string token, CancellationToken ct) =>
+        SendAsync<AdminSystemSettings>(HttpMethod.Get, AdminSettingsPath, ct, Bearer(token));
+
+    public Task<AdminSystemSettings> UpdateAdminSettingsAsync(string token, AdminSettingsPatch patch, CancellationToken ct) =>
+        SendAsync<AdminSystemSettings>(HttpMethod.Patch, AdminSettingsPath, ct, Bearer(token), patch);
+
+    public Task<ApiHealthResponse> GetHealthAsync(CancellationToken ct) =>
+        SendAsync<ApiHealthResponse>(HttpMethod.Get, "api/health", ct);
+
     public Task<AdminInvitation> InviteUserAsync(string token, EmailRequest request, CancellationToken ct) =>
         SendAsync<AdminInvitation>(HttpMethod.Post, "api/admin/invite", ct, Bearer(token), request);
 
@@ -56,6 +99,40 @@ public sealed class FastApiClient(HttpClient httpClient) : IAuthenticationBacken
         ArgumentException.ThrowIfNullOrWhiteSpace(userId);
         if (userId is "." or "..") throw new ArgumentException("Invalid user ID.", nameof(userId));
         return $"{AdminUsersPath}/{Uri.EscapeDataString(userId)}";
+    }
+
+    public Task<AdminDocumentList> GetDocumentsAsync(string token, CancellationToken ct) =>
+        SendAsync<AdminDocumentList>(HttpMethod.Get, DocumentsPath, ct, Bearer(token));
+
+    public Task<DocumentDownload> GetDocumentDownloadAsync(string token, string id, CancellationToken ct) =>
+        SendAsync<DocumentDownload>(HttpMethod.Get, DocumentPath(id) + "/download", ct, Bearer(token));
+
+    public Task<DocumentDeletion> DeleteDocumentAsync(string token, string id, CancellationToken ct) =>
+        SendAsync<DocumentDeletion>(HttpMethod.Delete, DocumentPath(id), ct, Bearer(token));
+
+    public async Task<DocumentReplacement> ReplaceDocumentAsync(string token, string id, string filename,
+        Stream file, CancellationToken ct)
+    {
+        if (!IsWordFilename(filename)) throw new ArgumentException("Choose a .doc or .docx filename.", nameof(filename));
+        using var multipart = new MultipartFormDataContent { HeaderEncodingSelector = (_, _) => System.Text.Encoding.UTF8 };
+        var part = new StreamContent(file);
+        part.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        // Send the same UTF-8 filename as browser FormData. Python uses this value for ingestion.
+        part.Headers.TryAddWithoutValidation("Content-Disposition", $"form-data; name=\"file\"; filename=\"{filename}\"");
+        multipart.Add(part);
+        return await SendAsync<DocumentReplacement>(HttpMethod.Put, DocumentPath(id) + "/replace", ct, Bearer(token), multipart);
+    }
+
+    internal static bool IsWordFilename(string name) => !string.IsNullOrWhiteSpace(name) && !name.Any(char.IsControl) &&
+        name.IndexOfAny(['/', '\\', ':', '"', '<', '>', '|', '?', '*']) < 0 &&
+        !string.IsNullOrWhiteSpace(Path.GetFileNameWithoutExtension(name)) &&
+        (name.EndsWith(".doc", StringComparison.OrdinalIgnoreCase) || name.EndsWith(".docx", StringComparison.OrdinalIgnoreCase));
+
+    private static string DocumentPath(string id)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(id);
+        if (id is "." or "..") throw new ArgumentException("Invalid document ID.", nameof(id));
+        return $"{DocumentsPath}/{Uri.EscapeDataString(id)}";
     }
 
     public Task<IReadOnlyList<ChatSession>> GetSessionsAsync(
@@ -117,7 +194,9 @@ public sealed class FastApiClient(HttpClient httpClient) : IAuthenticationBacken
     {
         using var request = new HttpRequestMessage(method, path);
         request.Headers.Authorization = authorization;
-        if (body is not null)
+        if (body is HttpContent content)
+            request.Content = content;
+        else if (body is not null)
             request.Content = JsonContent.Create(body, options: JsonOptions);
 
         using var response = await httpClient.SendAsync(request, cancellationToken);

@@ -238,21 +238,33 @@ window.cfcAuth = (() => {
         return "updated";
     }
 
+    function passwordStrength(password) {
+        const score = Math.min(30, password.length * 3) + (/[a-z]/.test(password) ? 10 : 0) +
+            (/[A-Z]/.test(password) ? 10 : 0) + (/\d/.test(password) ? 10 : 0) +
+            (/[^A-Za-z0-9]/.test(password) ? 20 : 0) + (password.length >= 12 ? 20 : 0);
+        return Math.min(100, score);
+    }
+
+    function updateStrengthMeter(input) {
+        const meter = input.form?.querySelector("#settings-strength");
+        if (meter) meter.value = passwordStrength(input.value);
+    }
+    document.addEventListener?.("input", event => {
+        if (event.target.id === "settings-password") updateStrengthMeter(event.target);
+    });
+
     async function changePassword(ownerId, connectionId, passwordInput, confirmationInput) {
         if (!listener || connection !== connectionId) return "changed";
         if (passwordChange) return "busy";
         const password = passwordInput.value;
         if (password.length < 6) return "short";
         if (password !== confirmationInput.value) return "mismatch";
-        // Match the active React Settings form's minimum strength.
-        const score = Math.min(30, password.length * 3) + (/[a-z]/.test(password) ? 10 : 0) +
-            (/[A-Z]/.test(password) ? 10 : 0) + (/\d/.test(password) ? 10 : 0) +
-            (/[^A-Za-z0-9]/.test(password) ? 20 : 0) + (password.length >= 12 ? 20 : 0);
-        if (score < 60) return "weak_password";
+        if (passwordStrength(password) < 60) return "weak_password";
 
         const change = { connection: connectionId };
         passwordChange = change;
         passwordInput.value = confirmationInput.value = "";
+        updateStrengthMeter(passwordInput);
         try {
             const current = await auth.getSession();
             if (current.error) return classify(current.error);

@@ -11,8 +11,17 @@ if (!Uri.TryCreate(fastApiBaseUrl.TrimEnd('/') + "/", UriKind.Absolute, out var 
     throw new InvalidOperationException("FastApi:BaseUrl must be an absolute HTTP(S) base URL without credentials, query, or fragment.");
 }
 
+builder.Services.AddSingleton(new AdminUploadPolicy(builder.Configuration["AdminUploads:VerifiedBackendUrl"],
+    builder.Configuration.GetValue<long?>("AdminUploads:MaxFileBytes") ?? AdminUploadPolicy.DefaultMaxBytes));
 builder.Services.AddHttpClient<FastApiClient>(client => client.BaseAddress = fastApiBaseUri)
     .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { UseCookies = false, AllowAutoRedirect = false });
+builder.Services.AddKeyedTransient<FastApiClient>(FastApiClient.UploadClientKey, (services, _) =>
+{
+    // Reuse the typed client's base URL and non-redirecting handler. Video transcription can take minutes.
+    var http = services.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(FastApiClient));
+    http.Timeout = TimeSpan.FromMinutes(30);
+    return new FastApiClient(http, services.GetRequiredService<AdminUploadPolicy>());
+});
 builder.Services.AddScoped<IAuthenticationBackend>(services => services.GetRequiredService<FastApiClient>());
 builder.Services.AddScoped<SupabaseSessionService>();
 builder.Services.AddSingleton(TimeProvider.System);
@@ -36,6 +45,7 @@ app.UseHttpsRedirection();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+app.MapGet("/docs", () => Results.LocalRedirect("~/chat"));
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 

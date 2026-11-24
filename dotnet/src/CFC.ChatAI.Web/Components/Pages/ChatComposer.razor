@@ -1,4 +1,5 @@
 ﻿
+@using CFC.ChatAI.Web.Services
 <div class="chat-composer">
     @if (ShowLongConvoWarning)
     {
@@ -10,8 +11,10 @@
            @bind:get="Value" @bind:set="UpdateValue" @bind:event="oninput"
            disabled="@Disabled" @onkeydown="HandleKeyDown" />
 
-    <button type="button" class="chat-attach-button" disabled
-            title="This chat accepts text only. Image attachments are unavailable.">
+    <input id="chat-local-images" type="file" class="chat-hidden-file-input" @ref="picker"
+           multiple accept="image/png,image/jpeg,image/gif,image/webp" aria-describedby="chat-preview-summary chat-preview-limits"
+           disabled="@(Disabled || selecting)" @onchange="SelectImagesAsync" />
+    <label for="chat-local-images" class="chat-attach-button">
         <svg width="18" height="18"
              viewBox="0 0 24 24"
              fill="none"
@@ -22,23 +25,53 @@
              aria-hidden="true">
             <path d="M21.44 11.05 12.25 20.24a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.82-2.82l8.49-8.48" />
         </svg>
-        Images unavailable
-    </button>
-    <button type="button" disabled="@(Disabled || string.IsNullOrWhiteSpace(Value))" @onclick="SendMessageAsync">Send</button>
+        Add images
+    </label>
+    <button type="button" disabled="@(Disabled || selecting || string.IsNullOrWhiteSpace(Value))" @onclick="SendMessageAsync">Send</button>
 </div>
+<details id="chat-preview-help">
+    <summary id="chat-preview-summary">Images are previews only and aren't sent to the AI.</summary>
+    <span id="chat-preview-limits">Choose up to four PNG, JPEG, GIF or WebP images, up to 5 MiB each. Refreshing the page clears previews.</span>
+</details>
+@if (Previews?.Draft(ThreadId) is { Count: > 0 } images)
+{
+    <div class="chat-upload-previews">
+        @foreach (var image in images)
+        {
+            <div class="chat-upload-preview" @key="image.Url">
+                <ChatAnswerMedia Image="@image.Thumbnail" />
+                <button type="button" class="remove-preview" disabled="@(Disabled || selecting)" aria-label="Remove @image.Name"
+                        @onclick="() => Previews.RemoveAsync(ThreadId, image)">×</button>
+            </div>
+        }
+    </div>
+}
+@if (error is not null) { <small role="alert">@error</small> }
 
 @code {
     [Parameter] public string Value { get; set; } = "";
     [Parameter] public EventCallback<string> ValueChanged { get; set; }
     [Parameter] public EventCallback<string> OnSend { get; set; }
     [Parameter] public bool Disabled { get; set; }
+    [Parameter] public string? ThreadId { get; set; }
+    [CascadingParameter] public LocalChatPreviews? Previews { get; set; }
     [Parameter] public bool ShowLongConvoWarning { get; set; }
     [Parameter] public EventCallback OnLongConvoInfo { get; set; }
 
     private ElementReference messageInput;
+    private ElementReference picker;
+    private bool selecting;
+    private string? error;
+    private async Task SelectImagesAsync()
+    {
+        if (Disabled || selecting || Previews is null) return;
+        selecting = true;
+        try { error = await Previews.SelectAsync(ThreadId, picker); }
+        finally { selecting = false; }
+    }
     private bool focusWhenEnabled = true;
     private Task UpdateValue(string value) => ValueChanged.InvokeAsync(value);
-    private Task SendMessageAsync() => Disabled || string.IsNullOrWhiteSpace(Value)
+    private Task SendMessageAsync() => Disabled || selecting || string.IsNullOrWhiteSpace(Value)
         ? Task.CompletedTask : OnSend.InvokeAsync(Value);
     private Task HandleKeyDown(KeyboardEventArgs e) => e.Key == "Enter" && !e.Repeat ? SendMessageAsync() : Task.CompletedTask;
 

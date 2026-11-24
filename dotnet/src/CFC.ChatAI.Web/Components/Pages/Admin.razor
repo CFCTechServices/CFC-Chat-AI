@@ -4,13 +4,44 @@
 <section class="admin-console" aria-labelledby="console-title">
     <h1 id="console-title">Admin Console</h1>
     <div class="admin-tabs" role="tablist" aria-label="Admin sections">
-        <button type="button" role="tab" id="users-tab" aria-controls="users-panel" aria-selected="true">Users</button>
-        @foreach (var label in new[] { "Upload", "Content", "Settings" })
+        @foreach (var tab in tabs)
         {
-            <button type="button" role="tab" aria-selected="false" disabled title="Not available yet">@label</button>
+            var id = TabId(tab);
+            <button type="button" role="tab" id="@(id + "-tab")" aria-controls="@(id + "-panel")" @ref="buttons[(int)tab]"
+                    aria-selected="@(tab == active ? "true" : "false")" tabindex="@(tab == active ? 0 : -1)"
+                    @onclick="() => active = tab" @onkeydown="TabKeyAsync">@tab</button>
         }
     </div>
-    <section id="users-panel" role="tabpanel" aria-labelledby="users-tab">
-        <AdminUsers />
+    <section id="@(TabId(active) + "-panel")" role="tabpanel" aria-labelledby="@(TabId(active) + "-tab")">
+        @switch (active)
+        {
+            case Tab.Users: <AdminUsers /> break;
+            case Tab.Upload: <AdminUpload /> break;
+            case Tab.Content: <AdminContent /> break;
+            case Tab.Settings: <AdminSettings /> break;
+        }
     </section>
 </section>
+
+@code {
+    private enum Tab { Users, Upload, Content, Settings }
+    private static readonly Tab[] tabs = Enum.GetValues<Tab>();
+    private readonly ElementReference[] buttons = new ElementReference[tabs.Length];
+    private Tab active = Tab.Users;
+    private static string TabId(Tab tab) => tab.ToString().ToLowerInvariant();
+
+    private async Task TabKeyAsync(KeyboardEventArgs e)
+    {
+        var index = (int)active;
+        switch (e.Key)
+        {
+            case "ArrowLeft": index = (index + tabs.Length - 1) % tabs.Length; break;
+            case "ArrowRight": index = (index + 1) % tabs.Length; break;
+            case "Home": index = 0; break;
+            case "End": index = tabs.Length - 1; break;
+            default: return;
+        }
+        active = tabs[index];
+        await buttons[index].FocusAsync();
+    }
+}

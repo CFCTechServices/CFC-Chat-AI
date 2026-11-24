@@ -1,0 +1,43 @@
+.developer-docs { max-width: 68rem; margin: 1.5rem auto; padding: 0 1rem 2rem; font-family: "Segoe UI", Arial, sans-serif; }
+.developer-docs iframe { width: 100%; height: 65vh; border: 1px solid #94a3b8; border-radius: .5rem; background: white; }
+.workspace-transition { min-height: 60vh; display: grid; align-content: center; justify-items: center; }
+.public-theme { display: flex; justify-content: flex-end; padding: .5rem 1rem; }
+.public-theme button { padding: .5rem .8rem; border: 1px solid #94a3b8; border-radius: .4rem; font: inherit; cursor: pointer; }
+.account-greeting { color: #e2e8f0; }
+.cfc-header [data-theme-toggle][aria-pressed="true"] { background: #334155; border-color: #9dc6ff; }
+#chat-preview-help { margin-block: .4rem; color: var(--muted, #475569); font-size: .875rem; line-height: 1.4; }
+#chat-preview-help summary { width: fit-content; max-width: 100%; cursor: pointer; }
+#chat-preview-help summary:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.chat-upload-previews { max-height: 6rem; overflow-y: auto; }
+.chat-upload-preview .chat-answer-media { margin: 0; }
+.chat-upload-preview .chat-answer-image-button img { width: 4.5rem; height: 4.5rem; }
+.chat-sent-images .chat-answer-image-button img { max-width: 7.5rem; max-height: 7.5rem; }
+html[data-text-size="small"] { font-size: 87.5%; }
+html[data-text-size="large"] { font-size: 118.75%; }
+.chat-composer input, .chat-composer button { font-size: 1rem; }
+
+/* Scoped screens keep their light palette. Apply the shared dark palette to their surfaces and controls. */
+html[data-theme="dark"] { color-scheme: dark; --page: #15191f; --panel: #232933; --raised: #303946; --ink: #edf1f6; --muted: #b8c3d2; --edge: #566171; }
+html[data-theme="dark"] body, html[data-theme="dark"] body:has(.login-page) { background: var(--page); color: var(--ink); }
+html[data-theme="dark"] :is(.settings, .history, .admin-console, .developer-docs, .login-page, .chat-empty-state) { color: var(--ink); }
+html[data-theme="dark"] :is(.cfc-header, .chat-sidebar, .login-card, .settings form, .settings .preference-card,
+    .admin-console .user-list li, .admin-console .confirmation, .cfc-long-convo-dialog, .cfc-media-modal,
+    .chat-message.bot .chat-bubble, .history-list, .chat-layout, .chat-main) { background: var(--panel); color: var(--ink); border-color: var(--edge); }
+html[data-theme="dark"] :is(.chat-message.user .chat-bubble, .sidebar-chat-item.active, .history-item:hover,
+    .login-badges span, .admin-tabs [aria-selected="true"]) { background: var(--raised); color: var(--ink); }
+html[data-theme="dark"] :is(.settings, .history, .admin-console, .developer-docs, .login-card, .chat-main)
+    :is(input, select, button:not(.chat-answer-image-button), .chat-attach-button) { background: var(--raised); color: var(--ink); border-color: var(--edge); }
+html[data-theme="dark"] :is(.chat-sidebar h4, .sidebar-chat-item, .login-hero h1, .login-card h2, .login-form label,
+    .history-item, .chat-empty-state h1, .chat-main h4) { color: var(--ink); }
+html[data-theme="dark"] :is(.sidebar-chat-item:hover, .sidebar-delete-chat:hover) { background: var(--raised); }
+html[data-theme="dark"] :is(.chat-sidebar p, .sidebar-delete-chat, .answer-sources, .login-card p, .login-hero p, .chat-empty-state p,
+    .login-options, .chat-main > p, .settings dt, .settings small, .history-item small, .admin-console small,
+    .admin-console .account-info, .cfc-thinking) { color: var(--muted); }
+html[data-theme="dark"] :is(.developer-docs a, .settings [role="status"], .history-item:hover strong, .login-form a,
+    .admin-console a, .chat-main .msg-action-btn.active) { color: #9dc6ff; }
+html[data-theme="dark"] :is(.admin-console, .settings, .history, .login-page, .chat-main) [role="alert"] { color: #ffb4b4 !important; }
+html[data-theme="dark"] .admin-console .admin-tabs [aria-selected="true"] { border-color: #9dc6ff; color: #bcd9ff; }
+@media (max-width: 640px) {
+    .chat-composer { flex-wrap: wrap; }
+    .chat-composer input[type=text] { flex-basis: 100%; }
+}

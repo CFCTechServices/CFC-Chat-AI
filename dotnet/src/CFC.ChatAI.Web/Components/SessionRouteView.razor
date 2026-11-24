@@ -1,5 +1,6 @@
 @using CFC.ChatAI.Web.Services
-@implements IDisposable
+@implements IAsyncDisposable
+@inject IJSRuntime JS
 @using CFC.ChatAI.Web.Models
 @inject SupabaseSessionService Session
 @inject NavigationManager Navigation
@@ -12,7 +13,9 @@ else
 {
     <CascadingValue Value="Session.State">
         <CascadingValue TValue="ProfileResponse" Value="@(destination is null ? null : VerifiedProfile)">
-            <RouteView @key="PageOwner" RouteData="RouteData" DefaultLayout="typeof(Layout.MainLayout)" />
+            <CascadingValue Value="previews">
+                <RouteView @key="PageOwner" RouteData="RouteData" DefaultLayout="typeof(Layout.MainLayout)" />
+            </CascadingValue>
         </CascadingValue>
         <FocusOnNavigate RouteData="RouteData" Selector="h1" />
     </CascadingValue>
@@ -22,35 +25,69 @@ else
     [Parameter, EditorRequired] public RouteData RouteData { get; set; } = default!;
     private bool started;
     private bool disposed;
+    private bool resolvingLanding;
+    private LocalChatPreviews? previews;
+    private string? previewOwner;
     private AppDestination? destination;
     private ProfileResponse? VerifiedProfile => Session.CanAccessChat ? Session.State.Profile : null;
     private string? PageOwner => destination is null ? null : VerifiedProfile?.Id;
 
-    protected override void OnInitialized() => Session.Changed += OnSessionChanged;
+    private bool IsEntry => RouteData.PageType == typeof(Pages.Login) || RouteData.PageType == typeof(Pages.Transition);
+    protected override void OnInitialized()
+    {
+        Session.Changed += OnSessionChanged;
+        UpdatePreviewOwner();
+    }
     protected override void OnParametersSet() => destination = AppDestination.ForPage(RouteData.PageType);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!started)
         {
-            if (destination is null && RouteData.PageType != typeof(Pages.Login)) return;
+            if (destination is null && !IsEntry) return;
             started = true;
             await Session.RestoreAsync();
         }
         if (disposed) return;
         if (VerifiedProfile is { } profile)
         {
-            if (RouteData.PageType == typeof(Pages.Login) || (destination is not null && !destination.Allows(profile)))
+            if (IsEntry && !resolvingLanding)
+            {
+                resolvingLanding = true;
+                var entryUri = Navigation.Uri;
+                try
+                {
+                    string? preference = null;
+                    try { preference = await JS.InvokeAsync<string?>("cfcPreferences.startingPage"); }
+                    catch (Exception ex) when (ex is JSException or JSDisconnectedException or OperationCanceledException) { }
+                    if (!disposed && IsEntry && Navigation.Uri == entryUri && VerifiedProfile is { } current && current.Id == profile.Id)
+                        Navigation.NavigateTo(AppDestination.LandingPage(current, preference), replace: true);
+                }
+                finally { resolvingLanding = false; }
+            }
+            else if (destination is not null && !destination.Allows(profile))
                 Navigation.NavigateTo(AppDestination.LandingPage(profile), replace: true);
         }
-        else if (destination is not null && Session.State.Status is SessionStatus.SignedOut or SessionStatus.Unavailable or SessionStatus.SignOutPending)
+        else if ((destination is not null || RouteData.PageType == typeof(Pages.Transition)) &&
+            Session.State.Status is SessionStatus.SignedOut or SessionStatus.Unavailable or SessionStatus.SignOutPending)
             Navigation.NavigateTo("/login", replace: true);
     }
 
-    private void OnSessionChanged() => _ = InvokeAsync(StateHasChanged);
-    public void Dispose()
+    private void UpdatePreviewOwner()
+    {
+        var owner = VerifiedProfile?.Id;
+        if (owner == previewOwner) return;
+        var previous = previews;
+        previewOwner = owner;
+        previews = owner is null ? null : new LocalChatPreviews(JS);
+        if (previous is not null) _ = previous.DisposeAsync();
+    }
+
+    private void OnSessionChanged() => _ = InvokeAsync(() => { UpdatePreviewOwner(); StateHasChanged(); });
+    public async ValueTask DisposeAsync()
     {
         disposed = true;
         Session.Changed -= OnSessionChanged;
+        if (previews is not null) await previews.DisposeAsync();
     }
 }

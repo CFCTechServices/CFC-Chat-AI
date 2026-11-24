@@ -9,55 +9,101 @@
 {
     <section class="settings" aria-labelledby="settings-title">
         <h1 id="settings-title">Settings</h1>
-        <form @onsubmit="SaveProfileAsync" @onsubmit:preventDefault>
-            <fieldset disabled="@busy">
-                <legend>Profile</legend>
-                <dl>
+        <form class="settings-card" aria-labelledby="profile-heading" @onsubmit="SaveProfileAsync" @onsubmit:preventDefault>
+            <h2 id="profile-heading">Profile</h2>
+            <fieldset disabled="@busy" aria-labelledby="profile-heading">
+                <dl class="account-details">
                     <dt>Email address</dt><dd>@account.Email</dd>
                     <dt>Account role</dt><dd>@account.Role</dd>
                 </dl>
-                <label for="settings-name">Full name</label>
-                <input id="settings-name" type="text" autocomplete="name" @bind="name" @bind:event="oninput" />
-                <div class="avatar-row">
-                    @if (AvatarUrl is { } url && url != failedImage)
-                    {
-                        <img @key="url" src="@url" alt="Profile avatar" width="60" height="60" referrerpolicy="no-referrer"
-                             @onerror="() => ImageFailed(url)" />
-                    }
-                    <div>
-                        <label for="settings-avatar">Profile image</label>
-                        <small id="avatar-help">PNG, JPEG, WebP or GIF, up to 512 KiB.</small>
-                        <InputFile @key="fileVersion" id="settings-avatar" accept="@ProfileAvatar.AcceptedTypes"
-                                   aria-describedby="avatar-help" OnChange="SelectAvatarAsync" />
+                <div class="field-row">
+                    <label for="settings-name">Full name</label>
+                    <input id="settings-name" type="text" autocomplete="name" @bind="name" @bind:event="oninput" />
+                </div>
+                <div class="field-row">
+                    <label for="settings-avatar">Profile image</label>
+                    <div class="avatar-row">
+                        @if (AvatarUrl is { } url && url != failedImage)
+                        {
+                            <img @key="url" src="@url" alt="Profile avatar" width="44" height="44" referrerpolicy="no-referrer"
+                                 @onerror="() => ImageFailed(url)" />
+                        }
+                        <div class="field-stack">
+                            <InputFile @key="fileVersion" id="settings-avatar" accept="@ProfileAvatar.AcceptedTypes"
+                                       aria-describedby="avatar-help" OnChange="SelectAvatarAsync" />
+                            <small id="avatar-help">PNG, JPEG, WebP or GIF, up to 512 KiB.</small>
+                        </div>
                     </div>
                 </div>
-                @if (avatar is not null || invalidFile)
-                {
-                    <button type="button" class="secondary" @onclick="DiscardAvatar">Discard image selection</button>
-                }
-                <button type="submit" disabled="@(!HasProfileChange || invalidFile)">Save profile</button>
+                <div class="form-actions">
+                    <button type="submit" disabled="@(!HasProfileChange || invalidFile)">Save profile</button>
+                    @if (avatar is not null || invalidFile)
+                    {
+                        <button type="button" class="secondary" @onclick="DiscardAvatar">Discard image selection</button>
+                    }
+                </div>
             </fieldset>
             @if (profileResult is { } result)
             {
                 <p role="@(result.Success ? "status" : "alert")">@result.Message</p>
             }
         </form>
-        <form @onsubmit="ChangePasswordAsync" @onsubmit:preventDefault>
-            <fieldset disabled="@busy">
-                <legend>Change password</legend>
-                <label for="settings-password">New password</label>
-                <input id="settings-password" type="password" autocomplete="new-password" required minlength="6"
-                       aria-describedby="password-help" @ref="password" />
-                <small id="password-help">Use at least 6 characters. A longer password or a mix of character types improves strength.</small>
-                <label for="settings-confirmation">Confirm new password</label>
-                <input id="settings-confirmation" type="password" autocomplete="new-password" required @ref="confirmation" />
-                <button type="submit">Update password</button>
+        <form class="settings-card" aria-labelledby="security-heading" @onsubmit="ChangePasswordAsync" @onsubmit:preventDefault>
+            <h2 id="security-heading">Security</h2>
+            <fieldset disabled="@busy" aria-labelledby="security-heading">
+                <div class="field-row">
+                    <label for="settings-password">New password</label>
+                    <div class="field-stack">
+                        <div class="password-row">
+                            <input id="settings-password" type="@(showNew ? "text" : "password")" autocomplete="new-password" required minlength="6"
+                                   aria-describedby="password-help" @ref="password" />
+                            <button type="button" class="secondary" aria-controls="settings-password" @onclick="() => showNew = !showNew">@(showNew ? "Hide" : "Show") new password</button>
+                        </div>
+                        <meter id="settings-strength" aria-label="New password strength" min="0" max="100" low="60" high="80" optimum="100" value="0"></meter>
+                        <small id="password-help">Use at least 6 characters. A longer password or a mix of character types improves strength.</small>
+                    </div>
+                </div>
+                <div class="field-row">
+                    <label for="settings-confirmation">Confirm password</label>
+                    <div class="password-row">
+                        <input id="settings-confirmation" type="@(showConfirmation ? "text" : "password")" autocomplete="new-password" required @ref="confirmation" />
+                        <button type="button" class="secondary" aria-controls="settings-confirmation" @onclick="() => showConfirmation = !showConfirmation">@(showConfirmation ? "Hide" : "Show") confirmation</button>
+                    </div>
+                </div>
+                <div class="form-actions"><button type="submit">Update password</button></div>
             </fieldset>
             @if (passwordResult is { } outcome)
             {
                 <p role="@(outcome.Success ? "status" : "alert")">@outcome.Message</p>
             }
         </form>
+        <section class="settings-card preference-card" aria-labelledby="preferences-heading">
+            <h2 id="preferences-heading">Appearance &amp; Preferences</h2>
+            <cfc-preferences>
+                <div class="field-row">
+                    <label for="theme">Theme</label>
+                    <select id="theme" data-preference="theme"><option value="light">Light</option><option value="dark">Dark</option></select>
+                </div>
+                <div class="field-row">
+                    <label for="text-size">Text size</label>
+                    <select id="text-size" data-preference="text-size">
+                        <option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option>
+                    </select>
+                </div>
+                <div class="field-row">
+                    <label for="starting-page">Starting page</label>
+                    <select id="starting-page" data-preference="starting-page">
+                        <option value="auto">Account default</option>
+                        @foreach (var destination in AppDestination.StartingPages(account))
+                        {
+                            <option value="@(destination.Path[1..])">@destination.Label</option>
+                        }
+                    </select>
+                </div>
+                <small>Changes apply immediately in this browser.</small>
+                <small data-storage-notice hidden role="status">Browser storage is unavailable. Preferences apply for this visit.</small>
+            </cfc-preferences>
+        </section>
     </section>
 }
 
@@ -71,6 +117,7 @@
     private int fileVersion;
     private bool busy;
     private bool invalidFile;
+    private bool showNew, showConfirmation;
     private SettingsResult? profileResult, passwordResult;
     private ElementReference password, confirmation;
 
@@ -150,6 +197,7 @@
         if (busy || Profile is null) return;
         busy = true;
         passwordResult = null;
+        showNew = showConfirmation = false;
         try { passwordResult = await Session.ChangePasswordAsync(Profile.Id, password, confirmation, lifetime.Token); }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         finally { busy = false; }

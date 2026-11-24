@@ -10,6 +10,7 @@ public sealed class ChatLine(string role, string content, string? id = null, str
     public string Role { get; } = role;
     public string Content { get; } = content;
     public string? Id { get; } = id;
+    public string? FollowingAssistantId { get; internal set; }
     public string? CreatedAt { get; } = createdAt;
     public ChatMessageMetadata? Metadata { get; } = metadata;
     public bool IsSavedAssistant => Role == "assistant" && !string.IsNullOrWhiteSpace(Id);
@@ -27,6 +28,7 @@ public sealed class Conversation(ChatSession session)
     public bool HistoryLoaded { get; internal set; }
     public string Draft { get; set; } = "";
     public string? PendingContent { get; internal set; }
+    public IReadOnlyList<LocalImage> PendingImages => Unconfirmed?.Images ?? [];
     public string? Notice { get; internal set; }
     public string? PendingTitle { get; internal set; }
     public string? TitleError { get; internal set; }
@@ -35,10 +37,10 @@ public sealed class Conversation(ChatSession session)
     internal UnconfirmedSend? Unconfirmed { get; set; }
 }
 
-internal sealed record UnconfirmedSend(string Content, string? PreviousId, bool FirstMessage);
+internal sealed record UnconfirmedSend(string Content, string? PreviousId, bool FirstMessage, LocalImage[] Images);
 
 // Owned by one chat page and bound to the verified account that opened it.
-public sealed class ChatWorkspace(FastApiClient api, IChatSessionAccess access, string ownerId) : IDisposable
+public sealed class ChatWorkspace(FastApiClient api, IChatSessionAccess access, string ownerId, LocalChatPreviews? previews = null) : IDisposable
 {
     private readonly CancellationTokenSource lifetime = new();
     private bool disposed;
@@ -94,6 +96,7 @@ public sealed class ChatWorkspace(FastApiClient api, IChatSessionAccess access, 
             if (Active is not null && firstDraft.Length > 0 && Active.Draft.Length == 0)
             {
                 Active.Draft = firstDraft;
+                previews?.MoveFirstDraft(Active.Id);
                 firstDraft = "";
             }
             ListReady = true;
@@ -145,6 +148,7 @@ public sealed class ChatWorkspace(FastApiClient api, IChatSessionAccess access, 
                 Draft = Active is null ? firstDraft : ""
             };
             firstDraft = "";
+            if (Active is null) previews?.MoveFirstDraft(thread.Id);
             Conversations.Insert(0, thread);
             Active = thread;
             return thread;
@@ -172,7 +176,8 @@ public sealed class ChatWorkspace(FastApiClient api, IChatSessionAccess access, 
                     return;
                 }
             }
-            var attempt = new UnconfirmedSend(content, thread.Messages.LastOrDefault()?.Id, thread.Messages.Count == 0);
+            var attempt = new UnconfirmedSend(content, thread.Messages.LastOrDefault()?.Id, thread.Messages.Count == 0,
+                previews?.Draft(thread.Id).ToArray() ?? []);
             thread.Unconfirmed = attempt;
             thread.PendingContent = content;
             thread.Draft = "";
@@ -193,7 +198,8 @@ public sealed class ChatWorkspace(FastApiClient api, IChatSessionAccess access, 
             {
                 thread.Unconfirmed = null;
                 // The send endpoint returns only the assistant row. History supplies the user row ID.
-                thread.Messages.Add(new ChatLine("user", content));
+                thread.Messages.Add(new ChatLine("user", content) { FollowingAssistantId = reply.Id });
+                previews?.Confirm(thread.Id, content, reply.Id, attempt.Images, attempt.PreviousId);
                 thread.Messages.Add(new ChatLine(reply.Role, reply.Content, reply.Id, reply.CreatedAt,
                     new ChatMessageMetadata(reply.Citations, reply.RelevantImages)));
                 if (attempt.FirstMessage) thread.PendingTitle = MakeTitle(content);
@@ -220,6 +226,8 @@ public sealed class ChatWorkspace(FastApiClient api, IChatSessionAccess access, 
         thread.Messages.Clear();
         foreach (var row in rows!)
             thread.Messages.Add(new ChatLine(row.Role, row.Content, row.Id, row.CreatedAt, row.Metadata));
+        if (previews is not null) await previews.BindHistoryAsync(thread.Id, thread.Messages);
+        if (disposed) return false;
         Notify();
         await LoadFeedbackAsync(thread);
 
@@ -244,6 +252,12 @@ public sealed class ChatWorkspace(FastApiClient api, IChatSessionAccess access, 
                 thread.Notice = next < thread.Messages.Count && thread.Messages[next].Role == "assistant"
                     ? "Your message and the assistant reply were recovered from saved history."
                     : "Your message was saved. Reload history to check for a reply.";
+                if (attempt.Images.Length > 0 && previews is not null)
+                {
+                    // Without a write receipt the row could also be an identical send from another tab.
+                    thread.Notice += " Local previews were cleared because their message could not be verified.";
+                    await previews.DiscardUnconfirmedAsync(thread.Id, attempt.Images);
+                }
             }
         }
         return true;
@@ -347,6 +361,7 @@ public sealed class ChatWorkspace(FastApiClient api, IChatSessionAccess access, 
                 return;
             }
             Conversations.Remove(thread);
+            if (previews is not null) await previews.ForgetAsync(thread.Id);
             if (Active != thread) return;
             Active = Conversations.FirstOrDefault();
             if (Active is not null) await SelectAsync(Active);

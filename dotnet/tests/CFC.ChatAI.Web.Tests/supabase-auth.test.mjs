@@ -68,6 +68,25 @@ async function startTab(storage) {
     return tab;
 }
 
+test("Settings strength meter uses the local password field without dispatching a provider call", () => {
+    let inputListener;
+    const document = { baseURI: "https://app.example.test/", addEventListener(name, handle) {
+        if (name === "input") inputListener = handle;
+    } };
+    const tab = createTab(new Map(), undefined, undefined, { globals: { document } });
+    const meter = { value: 0 };
+    const field = { id: "settings-password", form: { querySelector: () => meter }, value: "a" };
+    inputListener({ target: field });
+    assert.ok(meter.value > 0 && meter.value < 60);
+    field.value = randomUUID();
+    inputListener({ target: field });
+    assert.ok(meter.value >= 60 && meter.value <= 100);
+    field.value = "";
+    inputListener({ target: field });
+    assert.equal(meter.value, 0);
+    assert.equal(tab.calls.length, 0);
+});
+
 test("signup validates the two browser fields before calling Supabase", async () => {
     const tab = await startTab();
     let calls = 0;

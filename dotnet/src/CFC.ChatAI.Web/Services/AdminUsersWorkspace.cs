@@ -1,7 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.Net;
 using System.Text.Json;
-using CFC.ChatAI.Web.Components;
 using CFC.ChatAI.Web.Models;
 
 namespace CFC.ChatAI.Web.Services;
@@ -20,8 +19,7 @@ public sealed class AdminUsersWorkspace(FastApiClient api, SupabaseSessionServic
     public bool Busy { get; private set; }
     public bool Loaded { get; private set; }
 
-    private bool Authorized => !lifetime.IsCancellationRequested && session.CanAccessChat &&
-        session.State.Profile?.Id == ownerId && AppDestination.Admin.Allows(session.State.Profile);
+    private bool Authorized => !lifetime.IsCancellationRequested && session.HasAdminAccess(ownerId);
 
     public bool CanManage(AdminUser user) => Authorized && user.Id != ownerId && user.Role != "superuser";
     public Task LoadAsync() => RunAsync(async () =>
@@ -108,18 +106,7 @@ public sealed class AdminUsersWorkspace(FastApiClient api, SupabaseSessionServic
     private Task<T> RequestAsync<T>(Func<string, CancellationToken, Task<T>> request)
     {
         if (lifetime.IsCancellationRequested) throw new OperationCanceledException();
-        return session.WithAccessTokenAsync(ownerId, async (token, ct) =>
-        {
-            RequireAdmin();
-            var result = await request(token, ct);
-            RequireAdmin();
-            return result;
-        }, lifetime.Token);
-    }
-
-    private void RequireAdmin()
-    {
-        if (!Authorized) throw new HttpRequestException("Administrator access is required.", null, HttpStatusCode.Forbidden);
+        return session.WithAdminTokenAsync(ownerId, request, lifetime.Token);
     }
 
     private async Task RunAsync(Func<Task> action)

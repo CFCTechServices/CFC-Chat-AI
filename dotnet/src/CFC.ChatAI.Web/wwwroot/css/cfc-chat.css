@@ -1,4 +1,4 @@
-﻿
+
 /* CFC Chat AI - Modern Gray Theme */
 
 .chat-layout {
@@ -22,13 +22,13 @@
 
     .chat-sidebar h4 {
         color: #252b36;
-        font-size: 17px;
+        font-size: 1.0625rem;
         font-weight: 600;
     }
 
     .chat-sidebar p {
         color: #6b7280;
-        font-size: 14px;
+        font-size: 0.875rem;
     }
 
 /* Main Chat Area */
@@ -159,7 +159,7 @@
     cursor: pointer;
     flex-shrink: 0;
     font-weight: 600;
-    font-size: 14px;
+    font-size: 0.875rem;
 }
 
     .sidebar-new-chat:hover {
@@ -188,7 +188,7 @@
     background: transparent;
     color: #252b36;
     font-family: "Segoe UI", Arial, sans-serif;
-    font-size: 14px;
+    font-size: 0.875rem;
     cursor: pointer;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -255,14 +255,14 @@
 .cfc-header-title h3 {
     margin: 0;
     color: white;
-    font-size: 20px;
+    font-size: 1.25rem;
     font-weight: 600;
 }
 
 .cfc-header-title p {
     margin: 4px 0 0;
     color: #cbd5e1;
-    font-size: 13px;
+    font-size: 0.8125rem;
 }
 
 /* Chat History Row */
@@ -290,7 +290,7 @@
     border-radius: 8px;
     padding: 8px 10px;
     cursor: pointer;
-    font-size: 16px;
+    font-size: 1rem;
 }
 
     .sidebar-delete-chat:hover {
@@ -324,7 +324,7 @@
     align-items: center;
     gap: 10px;
     color: #6b7280;
-    font-size: 14px;
+    font-size: 0.875rem;
 }
 
 .thinking-dots {
@@ -385,7 +385,7 @@
 }
 
     .login-hero h1 {
-        font-size: 32px;
+        font-size: 2rem;
         font-weight: 700;
         margin: 0 0 14px;
         color: #252b36;
@@ -393,7 +393,7 @@
 
     .login-hero p {
         color: #6b7280;
-        font-size: 15px;
+        font-size: 0.9375rem;
         line-height: 1.6;
         margin: 0 0 18px;
     }
@@ -412,7 +412,7 @@
         border: 1px solid #d1d5db;
         border-radius: 20px;
         padding: 6px 12px;
-        font-size: 12px;
+        font-size: 0.75rem;
     }
 
 /* Login Card */
@@ -429,12 +429,12 @@
     .login-card h2 {
         margin: 0 0 10px;
         color: #252b36;
-        font-size: 24px;
+        font-size: 1.5rem;
     }
 
     .login-card > p {
         color: #6b7280;
-        font-size: 14px;
+        font-size: 0.875rem;
         margin-bottom: 24px;
     }
 
@@ -446,7 +446,7 @@
 }
 
     .login-form label {
-        font-size: 14px;
+        font-size: 0.875rem;
         font-weight: 600;
         color: #252b36;
     }
@@ -458,7 +458,7 @@
         border-radius: 10px;
         background: #ffffff;
         color: #252b36;
-        font-size: 14px;
+        font-size: 0.875rem;
     }
 
         .login-form input:focus {
@@ -469,7 +469,7 @@
     /* Forgot Password */
     .login-form a {
         color: #4065ae;
-        font-size: 13px;
+        font-size: 0.8125rem;
         text-align: right;
         text-decoration: none;
     }
@@ -486,7 +486,7 @@
         color: white;
         border: none;
         border-radius: 10px;
-        font-size: 15px;
+        font-size: 0.9375rem;
         font-weight: 600;
         cursor: pointer;
     }
@@ -502,7 +502,7 @@
 
     /* Supporting Text */
     .login-form p {
-        font-size: 13px;
+        font-size: 0.8125rem;
         color: #6b7280;
         text-align: center;
         margin: 6px 0;
@@ -515,7 +515,7 @@
     }
 
     .login-hero h1 {
-        font-size: 26px;
+        font-size: 1.625rem;
     }
 
     .login-card {
@@ -577,7 +577,7 @@ body:has(.login-page) {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    font-size: 13px;
+    font-size: 0.8125rem;
 }
 
 .chat-upload-previews,
@@ -594,7 +594,7 @@ body:has(.login-page) {
     height: 76px;
 }
 
-    .chat-upload-preview img {
+    .chat-upload-preview .chat-answer-image-button img {
         width: 100%;
         height: 100%;
         object-fit: cover;
@@ -602,7 +602,7 @@ body:has(.login-page) {
         border: 1px solid #d1d5db;
     }
 
-    .chat-upload-preview button {
+    .chat-upload-preview .remove-preview {
         position: absolute;
         top: 2px;
         right: 2px;
@@ -640,7 +640,7 @@ body:has(.login-page) {
     color: #252b36;
     border: 1px solid #d1d5db;
     border-radius: 10px;
-    font-size: 14px;
+    font-size: 0.875rem;
     cursor: pointer;
 }
 
@@ -682,7 +682,7 @@ body:has(.login-page) {
     height: 42px;
     padding: 0 12px;
     box-sizing: border-box;
-    font-size: 14px;
+    font-size: 0.875rem;
     font-weight: 500;
     line-height: 1.2;
     white-space: nowrap;
@@ -817,7 +817,7 @@ body:has(.login-page) {
 }
 
     .chat-empty-state h1 {
-        font-size: 26px;
+        font-size: 1.625rem;
         margin-bottom: 10px;
     }
 
@@ -836,7 +836,7 @@ body:has(.login-page) {
     background: #f3f4f6;
     color: #374151;
     cursor: pointer;
-    font-size: 20px;
+    font-size: 1.25rem;
 }
 
 /* Long conversation notice */
@@ -877,5 +877,5 @@ body:has(.login-page) {
     background: transparent;
     color: #374151;
     cursor: pointer;
-    font-size: 18px;
+    font-size: 1.125rem;
 }

@@ -1,0 +1,71 @@
+@using CFC.ChatAI.Web.Services
+@inject SupabaseSessionService Session
+@implements IDisposable
+
+<h2>Upload content</h2>
+@if (!work.Available)
+{
+    <p role="status">Submission is disabled until this deployment has an approved, admin-protected upload backend. You can select files for validation.</p>
+    <button type="button" disabled="@work.Busy" @onclick="work.CheckAvailabilityAsync">Check upload availability</button>
+}
+<p>Per-file transfer limit: @SizeLabel(work.MaxBytes).</p>
+@if (work.Notice is not null) { <p role="status">@work.Notice</p> }
+<ul class="user-list">
+    @foreach (var area in Enum.GetValues<UploadArea>())
+    {
+        var title = Title(area);
+        <li @key="area">
+            <div class="user-details">
+                <h3>@title</h3>
+                <label for="@($"upload-{area}")">Choose @(area == UploadArea.Bulk ? "files" : "a file") (@AdminUploadPolicy.Accept(area))</label>
+                <InputFile id="@($"upload-{area}")" multiple="@(area == UploadArea.Bulk)" accept="@AdminUploadPolicy.Accept(area)"
+                           disabled="@work.Busy" OnChange="args => Select(area, args)" />
+                @foreach (var item in work.Items(area))
+                {
+                    <div @key="item" class="user-details">
+                        <strong>@item.Name · @SizeLabel(item.Size)</strong>
+                        <span role="status">@item.Result.Detail</span>
+                        @if (item.Result.DocumentId is { } id) { <small>Content ID: @id</small> }
+                        @if (item.Result.State == UploadState.Sending)
+                        {
+                            <progress aria-label="@($"File transfer for {item.Name}")" max="100" value="@item.Progress"></progress>
+                            <small>@item.Progress% transferred</small>
+                        }
+                        @if (item.Result.State == UploadState.Retryable)
+                        {
+                            <button type="button" disabled="@(work.Busy || !work.Available)" @onclick="() => work.RetryAsync(area, item)">Retry @item.Name</button>
+                        }
+                    </div>
+                }
+            </div>
+            <button type="button" disabled="@(!work.CanStart(area))" @onclick="() => work.SubmitAsync(area)">
+                @(area == UploadArea.Bulk ? "Start bulk upload" : $"Submit {title.ToLowerInvariant()}")
+            </button>
+        </li>
+    }
+</ul>
+
+@code {
+    [Inject(Key = FastApiClient.UploadClientKey)] private FastApiClient Api { get; set; } = default!;
+    private AdminUploadWorkspace work = default!;
+    protected override Task OnInitializedAsync()
+    {
+        work = new(Api, Session, Session.State.Profile!.Id);
+        work.Changed += OnChange;
+        return work.CheckAvailabilityAsync();
+    }
+    private void OnChange() => _ = InvokeAsync(StateHasChanged);
+    private void Select(UploadArea area, InputFileChangeEventArgs args) => work.Select(area, args.GetMultipleFiles(args.FileCount));
+    private static string SizeLabel(long bytes) => bytes >= 1024 * 1024 ? $"{bytes / 1048576d:0.##} MiB" :
+        bytes >= 1024 ? $"{bytes / 1024d:0.##} KiB" : $"{bytes} B";
+    private static string Title(UploadArea area) => area switch
+    {
+        UploadArea.Single => "Document or video", UploadArea.Bulk => "Bulk upload",
+        UploadArea.Email => "Email message", _ => "Email PDF"
+    };
+    public void Dispose()
+    {
+        work.Changed -= OnChange;
+        work.Dispose();
+    }
+}

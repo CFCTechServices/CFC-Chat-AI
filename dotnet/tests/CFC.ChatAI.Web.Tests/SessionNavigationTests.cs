@@ -17,6 +17,7 @@ public sealed partial class SupabaseSessionTests
 {
     [Theory]
     [InlineData("user")]
+    [InlineData("dev")]
     [InlineData("admin")]
     [InlineData("superuser")]
     public async Task RestoredChatRendersOneLogoAndOnlyImplementedNavigation(string role)
@@ -40,11 +41,13 @@ public sealed partial class SupabaseSessionTests
             Assert.Contains("Sign Out", html);
             var nav = Regex.Match(html, "<nav aria-label=\"Primary navigation\"[^>]*>(.*?)</nav>", RegexOptions.Singleline);
             Assert.True(nav.Success);
-            Assert.Equal(role == "user" ? 3 : 4, Regex.Matches(nav.Value, "<a\\b").Count);
+            var isAdmin = role is "admin" or "superuser";
+            Assert.Equal(isAdmin ? 4 : 3, Regex.Matches(nav.Value, "<a\\b").Count);
+            Assert.DoesNotContain("Docs", nav.Value, StringComparison.OrdinalIgnoreCase);
             Assert.Contains("href=\"/chat\"", nav.Value);
             Assert.Contains("href=\"/history\"", nav.Value);
             Assert.Contains("href=\"/settings\"", nav.Value);
-            Assert.Equal(role != "user", nav.Value.Contains("href=\"/admin\""));
+            Assert.Equal(isAdmin, nav.Value.Contains("href=\"/admin\""));
             Assert.Contains("aria-current=\"page\"", nav.Value);
         });
     }
@@ -146,7 +149,6 @@ public sealed partial class SupabaseSessionTests
     [Theory]
     [InlineData(typeof(History), "/history")]
     [InlineData(typeof(Settings), "/settings")]
-    [InlineData(typeof(DocsRouteProbe), "/docs")]
     public void PlannedMemberRoutesRequireAnActiveProfile(Type pageType, string path)
     {
         var destination = Assert.IsType<AppDestination>(AppDestination.ForPage(pageType));
@@ -184,5 +186,4 @@ public sealed partial class SupabaseSessionTests
     private static ParameterView RouteParameters(Type pageType) => ParameterView.FromDictionary(
         new Dictionary<string, object?> { [nameof(SessionRouteView.RouteData)] = new RouteData(pageType, new Dictionary<string, object?>()) });
 
-    [Route("/docs")] private sealed class DocsRouteProbe : ComponentBase { }
 }

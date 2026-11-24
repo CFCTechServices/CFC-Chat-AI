@@ -1,0 +1,17 @@
+# Blazor Admin Upload
+
+The checked-in Python application exposes `POST /api/files/upload`, `POST /api/files/bulk`, and `POST /api/videos/upload` without an administrator dependency. Neither the route handlers nor their registrations in `main.py` enforce the caller's role. Leave `AdminUploads:VerifiedBackendUrl` unset for this backend. Admins can select and validate files locally in Blazor. No upload request is sent.
+
+## Backend work before enabling submission
+
+1. On the Python backend, apply the existing `app.core.auth.get_current_admin` dependency to all three POST operations, for example through router dependencies in `main.py`. It authenticates the bearer, checks active profile status, and requires the `admin` or `superuser` role. Run it before the handler stores a file, starts transcription, or calls ingestion. Protect the related `POST /api/ingest/document` and `POST /api/ingest/bulk` entry points as well. They are reachable even though Python omits them from OpenAPI.
+2. In an approved development deployment, exercise each upload route directly with an anonymous caller, a regular user, an inactive admin, an active admin and an active superuser. Expect 401/403 for denied requests and verify that no original, transcript, or index entry was created. Use disposable fixtures and isolated development storage and indexes for authorized requests.
+3. After the backend passes those checks, set Blazor's `AdminUploads:VerifiedBackendUrl` to the same approved base URL as `FastApi:BaseUrl` and restart Blazor. Use HTTPS or loopback HTTP. The Upload tab checks the deployment's `/openapi.json` at entry and before each file. All three POST routes must declare mandatory HTTP bearer security. An absent or incompatible schema keeps submission disabled. Direct authorization tests verify that the deployment enforces account status and role.
+
+## Manual acceptance
+
+1. Open **Admin → Upload** with a development admin. Select a small, uniquely named Word document. Verify its name and size, submit it once, then find the returned content ID in **Content** after refreshing. Repeat with a synthetic `.eml` and a text-bearing email PDF in their respective pickers.
+2. Select a Word document and a short video containing speech in **Bulk upload**. Verify sequential per-file progress and results. Word, EML and PDF use `/api/files/upload` with multipart field `file`. Videos use `/api/videos/upload` with `file`, a filename-derived `slug`, and `model=small`. Confirm the transcript and available Content entries. Python's video response omits the indexed chunk count.
+3. Try an empty file, a file above the configured limit, a PDF in Bulk, or a text/Markdown file. They should fail local validation. A malformed Word fixture may be accepted for transfer and fail ingestion inside an HTTP 200. Check the per-file result and the library before resubmitting. Interrupted uploads can still finish on the server. Automatic replay could overwrite or repeat work.
+
+The Blazor transfer limit defaults to 50 MiB per file and can be adjusted with `AdminUploads:MaxFileBytes`. Python applies its 50 MiB threshold when mirroring a document original into Supabase. Legacy Word conversion, PDF extraction and video transcription require their respective Python processing dependencies. Blazor allows up to 30 minutes per upload request, including transcription. A proxy or the backend can time out sooner.

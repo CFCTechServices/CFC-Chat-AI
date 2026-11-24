@@ -29,7 +29,7 @@ public sealed partial class SupabaseSessionTests : IAsyncDisposable
     [Fact]
     public async Task DirectChatPrerenderWithUnknownIdentityHidesTheChatComponent()
     {
-        using var services = new ServiceCollection().AddLogging().AddSingleton(session)
+        using var services = new ServiceCollection().AddLogging().AddSingleton(session).AddSingleton<IJSRuntime>(browser)
             .AddSingleton<NavigationManager, TestNavigation>().BuildServiceProvider();
         await using var renderer = new HtmlRenderer(services, services.GetRequiredService<ILoggerFactory>());
         var html = await renderer.Dispatcher.InvokeAsync(async () =>
@@ -667,11 +667,13 @@ public sealed partial class SupabaseSessionTests : IAsyncDisposable
         public bool HasRecoveryLink, RecoveryVerified;
         public bool ConfirmationRequired;
         public string PasswordOutcome = "updated";
+        public string? StartingPage;
         public List<string> Calls { get; } = [];
         public ValueTask<T> InvokeAsync<T>(string method, object?[]? args) => InvokeAsync<T>(method, default, args);
         public ValueTask<T> InvokeAsync<T>(string method, CancellationToken ct, object?[]? args)
         {
             if (Disconnected) throw new JSDisconnectedException("Circuit unavailable.");
+            if (method == "cfcPreferences.startingPage") return ValueTask.FromResult((T)(object?)StartingPage!);
             if (method is "Blazor._internal.domWrapper.focusBySelector" or "Blazor._internal.InputFile.init")
                 return ValueTask.FromResult(default(T)!);
             var action = method.Replace("cfcAuth.", "", StringComparison.Ordinal);

@@ -23,3 +23,34 @@ public sealed record ReactivateUserResponse(string Message, [property: JsonPrope
     string Email, string Status, [property: JsonPropertyName("restored_at")] string RestoredAt);
 public sealed record DeleteUserResponse(string Message, [property: JsonPropertyName("user_id")] string UserId,
     string Email, [property: JsonPropertyName("permanently_deleted")] bool PermanentlyDeleted);
+
+public sealed record AdminDocument([property: JsonPropertyName("doc_id")] string Id, string Source,
+    [property: JsonPropertyName("source_type")] string SourceType,
+    [property: JsonPropertyName("chunk_count")] int ChunkCount)
+{
+    [JsonIgnore]
+    public string Name => string.IsNullOrWhiteSpace(Source) ? Id : Source.Replace('\\', '/').Split('/')[^1];
+}
+public sealed record AdminDocumentList(IReadOnlyList<AdminDocument> Documents, int Total);
+public sealed record DocumentDownload(string Url, string Filename);
+public sealed record DocumentDeletion(bool Success, string Message);
+public sealed record DocumentReplacement(bool Success, string Message, DocumentIngestion Ingestion);
+public sealed record DocumentIngestion(bool Success, [property: JsonPropertyName("doc_id")] string? Id = null);
+
+public sealed record AdminSystemSettings(
+    [property: JsonPropertyName("auto_approve_uploads")] bool AutoApproveUploads,
+    [property: JsonPropertyName("email_notifications")] bool EmailNotifications,
+    [property: JsonPropertyName("maintenance_mode")] bool MaintenanceMode);
+
+public sealed record AdminSettingsPatch(
+    [property: JsonPropertyName("auto_approve_uploads"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? AutoApproveUploads = null,
+    [property: JsonPropertyName("email_notifications"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? EmailNotifications = null,
+    [property: JsonPropertyName("maintenance_mode"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] bool? MaintenanceMode = null)
+{
+    public bool Matches(AdminSystemSettings settings) =>
+        (AutoApproveUploads is null || AutoApproveUploads == settings.AutoApproveUploads) &&
+        (EmailNotifications is null || EmailNotifications == settings.EmailNotifications) &&
+        (MaintenanceMode is null || MaintenanceMode == settings.MaintenanceMode);
+}
+
+public sealed record ApiHealthResponse(bool Ok, string Message, string? Version = null);

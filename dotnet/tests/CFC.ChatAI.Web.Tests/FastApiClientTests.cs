@@ -96,6 +96,62 @@ public sealed class FastApiClientTests : IDisposable
     }
 
     [Fact]
+    public async Task AdminDocumentsUseExactRoutesBearerAndResponseContracts()
+    {
+        const string resource = "api/admin/documents/guide%20A";
+        Expect(HttpMethod.Get, "api/admin/documents",
+            """{"documents":[{"doc_id":"guide A","source":"/docs/Guide.docx","source_type":"document","chunk_count":3}],"total":1}""", token);
+        var list = await client.GetDocumentsAsync(token, default);
+        var doc = Assert.Single(list.Documents);
+        Assert.Equal(1, list.Total);
+        Assert.Equal("Guide.docx", doc.Name);
+        Assert.Equal(3, doc.ChunkCount);
+        Expect(HttpMethod.Get, resource + "/download", """{"url":"https://fixture.invalid/download","filename":"Guide.docx"}""", token);
+        Assert.Equal("Guide.docx", (await client.GetDocumentDownloadAsync(token, doc.Id, default)).Filename);
+        expected.Enqueue(async (req, ct) =>
+        {
+            Assert.Equal(HttpMethod.Put, req.Method);
+            Assert.Equal("/backend/" + resource + "/replace", req.RequestUri!.PathAndQuery);
+            Assert.Equal(token, req.Headers.Authorization?.Parameter);
+            var multipart = Assert.IsType<MultipartFormDataContent>(req.Content);
+            Assert.Equal("multipart/form-data", multipart.Headers.ContentType!.MediaType);
+            var wire = Encoding.UTF8.GetString(await multipart.ReadAsByteArrayAsync(ct));
+            Assert.Contains("name=\"file\"; filename=\"Guía.docx\"", wire);
+            Assert.Contains("sample contents", wire);
+            return JsonResponse("""{"success":true,"message":"Accepted","ingestion":{"doc_id":"guía","success":true,"chunks_processed":2}}""");
+        });
+        using var file = new MemoryStream("sample contents"u8.ToArray());
+        var replaced = await client.ReplaceDocumentAsync(token, doc.Id, "Guía.docx", file, default);
+        Assert.Equal("guía", replaced.Ingestion.Id);
+        Expect(HttpMethod.Delete, resource, """{"success":true,"message":"Removed"}""", token);
+        Assert.True((await client.DeleteDocumentAsync(token, doc.Id, default)).Success);
+        Assert.Null(http.DefaultRequestHeaders.Authorization);
+    }
+
+    [Fact]
+    public async Task AdminSettingsUseAuthenticatedSparsePatchesAndHealthIsAnonymous()
+    {
+        const string path = "api/admin/settings";
+        const string json = """{"auto_approve_uploads":true,"email_notifications":false,"maintenance_mode":true}""";
+        var settings = new AdminSystemSettings(true, false, true);
+        Expect(HttpMethod.Get, path, json, token);
+        Assert.Equal(settings, await client.GetAdminSettingsAsync(token, default));
+        foreach (var (change, body) in new (AdminSettingsPatch, string)[]
+        {
+            (new(AutoApproveUploads: true), """{"auto_approve_uploads":true}"""),
+            (new(EmailNotifications: false), """{"email_notifications":false}"""),
+            (new(MaintenanceMode: true), """{"maintenance_mode":true}""")
+        })
+        {
+            Expect(HttpMethod.Patch, path, json, token, body);
+            Assert.Equal(settings, await client.UpdateAdminSettingsAsync(token, change, default));
+        }
+        Expect(HttpMethod.Get, "api/health", """{"ok":true,"message":"Running"}""");
+        Assert.Equal(new ApiHealthResponse(true, "Running"), await client.GetHealthAsync(default));
+        Assert.Null(http.DefaultRequestHeaders.Authorization);
+    }
+
+    [Fact]
     public async Task ListsLightweightAndDetailedSessions()
     {
         Expect(HttpMethod.Get, "api/chat/sessions", $"[{SessionJson}]", token);

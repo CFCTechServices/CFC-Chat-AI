@@ -162,7 +162,8 @@ public sealed partial class SupabaseSessionTests
 
     private ServiceProvider HistoryServices(HttpClient http, NavigationManager navigation, IJSRuntime js, SupabaseSessionService? circuit = null) =>
         new ServiceCollection().AddLogging().AddSingleton(circuit ?? session).AddSingleton<TimeProvider>(clock)
-            .AddSingleton(new FastApiClient(http)).AddSingleton(navigation).AddSingleton(js).BuildServiceProvider();
+            .AddSingleton(new FastApiClient(http)).AddKeyedSingleton(FastApiClient.UploadClientKey, new FastApiClient(http))
+            .AddSingleton(navigation).AddSingleton(js).BuildServiceProvider();
 
     private static HttpClient HistoryHttp(Func<HttpRequestMessage, HttpResponseMessage> reply) =>
         new(new HistoryHandler(req => Task.FromResult(reply(req)))) { BaseAddress = new Uri("https://fixture.invalid/") };

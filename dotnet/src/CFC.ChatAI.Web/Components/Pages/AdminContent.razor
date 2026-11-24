@@ -1,0 +1,108 @@
+@using CFC.ChatAI.Web.Services
+@using CFC.ChatAI.Web.Models
+@inject SupabaseSessionService Session
+@inject FastApiClient Api
+@implements IDisposable
+
+<div class="admin-heading">
+    <h2>Content Library</h2>
+    <div class="admin-actions">
+        <label for="content-query">Search documents</label>
+        <input id="content-query" type="search" placeholder="Filename or document ID" disabled="@Locked"
+               @bind:get="work.Query" @bind:set="work.Search" @bind:event="oninput" />
+        <button type="button" disabled="@Locked" @onclick="work.LoadAsync">Refresh</button>
+    </div>
+</div>
+@if (work.Busy) { <p role="status">Waiting for FastAPI…</p> }
+@if (work.Error is { } error) { <p role="alert">@error</p> }
+@if (work.Notice is { } notice) { <p role="status">@notice</p> }
+@if (work.Loaded && work.MatchCount == 0)
+{
+    <p role="status">@(work.Count == 0 ? "No documents in the knowledge base." : "No documents match your search.")</p>
+}
+else if (work.Loaded)
+{
+    <ul class="user-list">
+        @foreach (var doc in work.Visible)
+        {
+            <li @key="doc.Id">
+                <div class="user-details">
+                    <strong>@doc.Name</strong>
+                    <span>@doc.Id</span>
+                    <small>@doc.SourceType · @doc.ChunkCount @(doc.ChunkCount == 1 ? "chunk" : "chunks") indexed</small>
+                </div>
+                <div class="admin-actions">
+                    <button type="button" disabled="@Locked" aria-label="@($"Prepare download for {doc.Name}")"
+                            @onclick="() => work.PrepareDownloadAsync(doc)">Download</button>
+                    <button type="button" disabled="@Locked" aria-label="@($"Replace {doc.Name}")"
+                            @onclick="() => Begin(doc, DocumentAction.Replace)">Replace</button>
+                    <button type="button" class="danger" disabled="@Locked" aria-label="@($"Delete {doc.Name}")"
+                            @onclick="() => Begin(doc, DocumentAction.Delete)">Delete</button>
+                </div>
+                @if (work.DownloadId == doc.Id && work.Download is { } download)
+                {
+                    <div class="confirmation" role="status">
+                        <a href="@download.Url" download="@download.Filename" target="_blank" rel="noopener noreferrer"
+                           referrerpolicy="no-referrer">Download @download.Filename</a>
+                        <small> · Link valid for five minutes. Select Download again for a fresh link.</small>
+                    </div>
+                }
+                @if (work.Pending is { } change && change.Document.Id == doc.Id)
+                {
+                    <div class="confirmation" role="group" aria-label="Confirm document change">
+                        @if (change.Action == DocumentAction.Delete)
+                        {
+                            <p>Permanently delete <strong>@doc.Name</strong> (@doc.Id) from the knowledge base? This cannot be undone.</p>
+                        }
+                        else
+                        {
+                            <p>Replace <strong>@doc.Name</strong> (@doc.Id)? FastAPI removes the current index before ingesting the replacement.</p>
+                            <label>Replacement Word document (.doc or .docx, up to 50 MiB)
+                                <InputFile OnChange="SelectFile" accept=".doc,.docx" disabled="@work.Busy" />
+                            </label>
+                        }
+                        <div class="admin-actions">
+                            <button type="button" disabled="@work.Busy" @onclick="Cancel">Cancel</button>
+                            <button type="button" disabled="@(work.Busy || (change.Action == DocumentAction.Replace && file is null))"
+                                    @onclick="() => ConfirmAsync(change)">@(change.Action == DocumentAction.Delete ? "Confirm deletion" : "Confirm replacement")</button>
+                        </div>
+                    </div>
+                }
+            </li>
+        }
+    </ul>
+    @if (work.PageCount > 1)
+    {
+        <div class="admin-actions" aria-label="Document pages" role="group">
+            <button type="button" disabled="@(Locked || work.Page == 1)" @onclick="() => work.MovePage(-1)">Previous</button>
+            <span>Page @work.Page of @work.PageCount · @work.MatchCount documents</span>
+            <button type="button" disabled="@(Locked || work.Page == work.PageCount)" @onclick="() => work.MovePage(1)">Next</button>
+        </div>
+    }
+}
+
+@code {
+    private AdminContentWorkspace work = default!;
+    private IBrowserFile? file;
+    private bool Locked => work.Busy || work.Pending is not null;
+
+    protected override Task OnInitializedAsync()
+    {
+        work = new(Api, Session, Session.State.Profile!.Id);
+        return work.LoadAsync();
+    }
+
+    private void Begin(AdminDocument doc, DocumentAction action)
+    {
+        file = null;
+        work.Begin(doc, action);
+    }
+    private void SelectFile(InputFileChangeEventArgs selection) => file = selection.FileCount == 1 ? selection.File : null;
+    private void Cancel() { work.Cancel(); file = null; }
+    private async Task ConfirmAsync(DocumentChange change)
+    {
+        await work.ConfirmAsync(change, file);
+        if (work.Pending is null) file = null;
+    }
+    public void Dispose() => work.Dispose();
+}

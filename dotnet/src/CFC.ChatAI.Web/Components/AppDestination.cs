@@ -12,10 +12,9 @@ public sealed class AppDestination
     public string Path { get; }
 
     private static readonly AppDestination Chat = new("Chat", "/chat");
-    private static readonly AppDestination Docs = new("Docs", "/docs");
     public static AppDestination Admin { get; } = new("Admin", "/admin");
     private static readonly AppDestination[] Destinations =
-        [Chat, new("History", "/history"), new("Settings", "/settings"), Docs, Admin];
+        [Chat, new("History", "/history"), new("Settings", "/settings"), Admin];
 
     // Use the same assembly as the Blazor Router. Publish a link only when
     // a routable page implements the destination's exact path.
@@ -28,12 +27,15 @@ public sealed class AppDestination
     public bool Allows(ProfileResponse? verifiedProfile) => verifiedProfile is { Status: "active" } &&
         (this != Admin || verifiedProfile.Role is "admin" or "superuser");
 
-    // React lists Docs in Settings' starting-page choices, outside the toolbar.
     public static IEnumerable<AppDestination> Toolbar(ProfileResponse verifiedProfile) =>
-        Destinations.Where(page => page != Docs && ImplementedPaths.Contains(page.Path) && page.Allows(verifiedProfile));
+        Destinations.Where(page => ImplementedPaths.Contains(page.Path) && page.Allows(verifiedProfile));
 
-    public static string LandingPage(ProfileResponse verifiedProfile) =>
-        ImplementedPaths.Contains(Admin.Path) && Admin.Allows(verifiedProfile) ? Admin.Path : Chat.Path;
+    public static IEnumerable<AppDestination> StartingPages(ProfileResponse profile) =>
+        Toolbar(profile).Where(page => page.Path != "/settings");
+
+    public static string LandingPage(ProfileResponse verifiedProfile, string? preference = null) =>
+        StartingPages(verifiedProfile).FirstOrDefault(page => page.Path[1..] == preference)?.Path ??
+        (ImplementedPaths.Contains(Admin.Path) && Admin.Allows(verifiedProfile) ? Admin.Path : Chat.Path);
 
     public static AppDestination? ForPage(Type pageType)
     {

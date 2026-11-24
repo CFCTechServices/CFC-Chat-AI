@@ -20,11 +20,10 @@
                 <div class="chat-sent-images">
                     @foreach (var image in Images)
                     {
-                        <img src="@image"
-                             alt="Attached image"
-                             class="chat-sent-image" />
+                        <ChatAnswerMedia @key="image.Url" Image="@image.Thumbnail" />
                     }
                 </div>
+                <small>Local previews · Visible only in this tab</small>
             }
         </div>
     }
@@ -125,8 +124,7 @@
     public string Text { get; set; } = "";
 
     [Parameter]
-    public IReadOnlyList<string> Images { get; set; } =
-        Array.Empty<string>();
+    public IReadOnlyList<LocalImage> Images { get; set; } = [];
 
     [Parameter]
     public int? Rating { get; set; }

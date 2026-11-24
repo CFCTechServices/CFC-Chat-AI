@@ -27,6 +27,99 @@ public sealed class ChatWorkspaceTests : IDisposable
 
     private ChatWorkspace NewPage() => new(new FastApiClient(http), access, access.Owner);
 
+    private sealed class PreviewBrowser : IJSRuntime
+    {
+        public List<string> Released { get; } = [];
+        public LocalImage Image { get; set; } = new("blob:https://example.test/first", "sample.png", 100);
+        public ValueTask<T> InvokeAsync<T>(string name, object?[]? args) => InvokeAsync<T>(name, default, args);
+        public ValueTask<T> InvokeAsync<T>(string name, CancellationToken token, object?[]? args)
+        {
+            if (name == "cfcChat.selectImages")
+                return ValueTask.FromResult((T)(object)new ImageSelection([Image], null));
+            Assert.Equal("cfcChat.releaseImages", name);
+            Released.AddRange(Assert.IsType<string[]>(Assert.Single(args!)));
+            return ValueTask.FromResult(default(T)!);
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LocalPreviewsFollowConfirmedMessagesAcrossSessionsAndSkipAmbiguousHistory(bool overlapping)
+    {
+        var js = new PreviewBrowser();
+        await using var previews = new LocalChatPreviews(js);
+        using var page = new ChatWorkspace(new(http), access, access.Owner, previews);
+        handler.Expect("GET", "sessions", Array.Empty<object>());
+        await page.LoadAsync(null);
+        await previews.SelectAsync(null, default);
+        var removed = js.Image;
+        await previews.RemoveAsync(null, removed);
+        js.Image = new("blob:https://example.test/second", "second.jpg", 8);
+        await previews.SelectAsync(null, default);
+        handler.Expect("POST", "sessions", Session("one"));
+        var post = handler.Hold("POST", "message", new { session_id = "one", content = "Repeated" });
+        var send = page.SendAsync("Repeated");
+        await post.Started.Task;
+        var first = page.Active!;
+        Assert.Equal(js.Image, Assert.Single(first.PendingImages));
+        handler.Expect("POST", "sessions", Session("two"));
+        await page.NewAsync();
+        Assert.Empty(previews.Draft("two"));
+        handler.Expect("PATCH", "sessions/one", Session("one", "Repeated"));
+        post.Return(Reply());
+        await send;
+        Assert.Empty(previews.Draft("one"));
+        Assert.Equal(js.Image, Assert.Single(previews.ForMessage("one", first.Messages[0])));
+        Assert.Empty(previews.ForMessage("two", first.Messages[0]));
+        Assert.Empty(previews.ForMessage("one", first.Messages[1]));
+
+        using var reopened = new ChatWorkspace(new(http), access, access.Owner, previews);
+        handler.Expect("GET", "sessions", new[] { Session("one") });
+        handler.Expect("GET", "sessions/one", overlapping ? new[] {
+            Row("one", "concurrent", "user", "Repeated"), Row("one", "saved-user", "user", "Repeated"),
+            Row("one", "m2", "assistant", "Answer from API") } : new[] {
+            Row("one", "saved-user", "user", "Repeated"), Row("one", "m2", "assistant", "Answer from API"),
+            Row("one", "later", "user", "Repeated"), Row("one", "later-reply", "assistant", "Later answer") });
+        ExpectRatings("one");
+        await reopened.LoadAsync("one");
+        var thread = reopened.Active!;
+        if (overlapping) Assert.Empty(previews.ForMessage(thread.Id, thread.Messages[0]));
+        else Assert.Equal(js.Image, Assert.Single(previews.ForMessage(thread.Id, thread.Messages[0])));
+        Assert.Empty(previews.ForMessage(thread.Id, thread.Messages[1]));
+        Assert.Empty(previews.ForMessage(thread.Id, thread.Messages[2]));
+        await using var otherTab = new LocalChatPreviews(js);
+        Assert.Empty(otherTab.ForMessage(thread.Id, thread.Messages[0]));
+        handler.Expect("DELETE", "sessions/one", new { success = true });
+        await reopened.DeleteAsync(thread);
+        Assert.Equal(new[] { removed.Url, js.Image.Url }, js.Released);
+        Assert.Empty(previews.ForMessage(thread.Id, thread.Messages[0]));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FailedSendKeepsUnsentDraftAndNeverGuessesTheOwnerOfARecoveredRow(bool stored)
+    {
+        var js = new PreviewBrowser();
+        var previews = new LocalChatPreviews(js);
+        using var page = new ChatWorkspace(new(http), access, access.Owner, previews);
+        handler.Expect("GET", "sessions", new[] { Session("a") });
+        var first = Row("a", "earlier", "user", "Earlier");
+        handler.Expect("GET", "sessions/a", new[] { first });
+        await page.LoadAsync("a");
+        await previews.SelectAsync("a", default);
+        handler.Fail("POST", "message", HttpStatusCode.ServiceUnavailable);
+        handler.Expect("GET", "sessions/a", stored ? new[] { first, Row("a", "confirmed", "user", "Question") } : new[] { first });
+        await page.SendAsync("Question");
+        Assert.Equal(stored ? 0 : 1, previews.Draft("a").Count);
+        Assert.Empty(previews.ForMessage("a", page.Active!.Messages.Last()));
+        if (stored) Assert.Contains("Local previews were cleared", page.Active.Notice);
+        await previews.DisposeAsync();
+        Assert.Equal(js.Image.Url, Assert.Single(js.Released));
+        Assert.Empty(previews.Draft("a"));
+    }
+
     [Fact]
     public async Task DetailedListReflectsChatCreatesAndDeletesAndUsesTheCurrentOwnerToken()
     {

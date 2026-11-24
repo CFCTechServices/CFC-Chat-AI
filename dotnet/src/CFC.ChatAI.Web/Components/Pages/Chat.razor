@@ -6,7 +6,7 @@
 @inject NavigationManager Navigation
 @using CFC.ChatAI.Web.Services
 @inject FastApiClient Api
-@implements IDisposable
+@implements IAsyncDisposable
 
 <div class="chat-layout">
     <div class="chat-sidebar">
@@ -40,6 +40,7 @@
                 </div>
             }
         </div>
+        @if (chat.ListReady) { <small>@chat.Conversations.Count @(chat.Conversations.Count == 1 ? "chat" : "chats")</small> }
     </div>
 
     <div class="chat-main">
@@ -58,6 +59,7 @@
                 {
                     <ChatMessage @key="message" Sender="@(message.Role == "user" ? "You" : "CFC AI")"
                                  Text="@message.Content" Rating="@message.Rating"
+                                 Images="@(Previews?.ForMessage(active.Id, message) ?? [])"
                                  Metadata="@(message.Role == "assistant" ? message.Metadata : null)" BackendAddress="@Api.BaseAddress"
                                  FeedbackDisabled="@(!message.IsSavedAssistant || !chat.CanRate(active))"
                                  OnVote="thumb => chat.ToggleFeedbackAsync(active, message, thumb)" />
@@ -68,7 +70,7 @@
                 }
                 @if (active.PendingContent is { } pending)
                 {
-                    <ChatMessage Sender="You" Text="@pending" />
+                    <ChatMessage Sender="You" Text="@pending" Images="active.PendingImages" />
                     <div class="chat-message bot"
                          role="status"
                          aria-live="polite">
@@ -103,7 +105,7 @@
                 <button type="button" @onclick="() => chat.RetryTitleAsync(thread)">Retry saving title</button>
             }
         }
-        <ChatComposer @key="chat.Active?.Id" @bind-Value="chat.Draft" OnSend="chat.SendAsync"
+        <ChatComposer @key="chat.Active?.Id" ThreadId="@chat.Active?.Id" @bind-Value="chat.Draft" OnSend="chat.SendAsync"
                       Disabled="@(!chat.CanSend)" ShowLongConvoWarning="@(chat.Active?.Messages.Count > 12)"
                       OnLongConvoInfo="() => showLongConvoInfo = true" />
     </div>
@@ -147,6 +149,7 @@
 }
 
 @code {
+    [CascadingParameter] public LocalChatPreviews? Previews { get; set; }
     [Parameter] public string? SessionId { get; set; }
     public static string PathForSession(string? id) => id is null ? "/chat" : "/chat/" + Uri.EscapeDataString(id);
 
@@ -166,7 +169,7 @@
     protected override void OnInitialized()
     {
         var ownerId = Session.State.Profile!.Id;
-        chat = new ChatWorkspace(Api, Session, ownerId);
+        chat = new ChatWorkspace(Api, Session, ownerId, Previews);
         selectionKey = "cfc-chat-session:" + ownerId;
         chat.Changed += StateHasChanged;
     }
@@ -251,11 +254,12 @@
         catch (JSDisconnectedException) { }
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         disposed = true;
         chat.Changed -= StateHasChanged;
         chat.Dispose();
+        if (Previews is not null) await Previews.ClearDraftsAsync();
     }
 
     private static readonly string[] WelcomePhrases =
