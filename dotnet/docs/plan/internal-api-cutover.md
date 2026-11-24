@@ -1,0 +1,8 @@
+# Internal API: remaining cutover steps
+
+The [implementation and delivery records](../complete/internal-api/) are archived under `complete`. That move does not approve a traffic cutover.
+
+1. **Test both profile write routes with `Api:EnableProfileWrites=true`.** Cover caller ID/token forwarding, both allowed fields, empty and protected-only payloads, unauthenticated/inactive/deleted users, and provider failure or no updated row. Retain coverage for the default-off configuration.
+2. **Verify the target Supabase profile security boundary.** Follow the [profile security plan](supabase-profile-self-service-security.md). Confirm effective grants, RLS, and signup triggers; remediate any overly broad permissions. On disposable test accounts, verify that own-profile edits work, other rows and protected fields cannot be changed, and signup and service-role administration still work. No live permission verification was performed during endpoint implementation.
+3. **Verify provider and UI behavior before routing traffic.** Reconcile the archived delivery records with the routes currently mapped, run the outstanding [Supabase checks](../complete/internal-api/supabase-completion-remaining-plan.md), and complete applicable [frontend smoke tests](../frontend-changes.md). Execute the [routing and hosting plan](routing-and-hosting.md), including its deployment, isolation and rollback checks. Resolve or explicitly defer any remaining compatibility and operational gaps.
+4. **Enable and cut over deliberately.** Leave `Api:EnableProfileWrites` off until profile checks pass. Keep Python routing for any unverified routes and document how to restore it before switching traffic.

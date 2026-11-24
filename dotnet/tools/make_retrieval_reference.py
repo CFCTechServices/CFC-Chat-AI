@@ -4,7 +4,7 @@ as the answer key for the C# PineconeVectorStore parity check.
 
 For each question: embeds it with the Python model, queries Pinecone through the app's own
 VectorStore (read-only), and saves the query vector plus the returned chunk IDs and scores to:
-    tests/CFC.ChatAI.Rag.Tests/TestData/retrieval_reference.json
+    tests/CFC.ChatAI.Pinecone.Tests/TestData/retrieval_reference.json
 
 C# then replays the same query vectors, so only the vector store is being compared.
 Note: results reflect the index at the time this runs. Re-run after documents are ingested.
@@ -65,6 +65,6 @@ for q in QUESTIONS:
     })
     print(f"{len(matches)} matches {q}")
 
-out_path = Path(__file__).resolve().parents[1] / "tests" / "CFC.ChatAI.Rag.Tests" / "TestData" / "retrieval_reference.json"
+out_path = Path(__file__).resolve().parents[1] / "tests" / "CFC.ChatAI.Pinecone.Tests" / "TestData" / "retrieval_reference.json"
 out_path.write_text(json.dumps(records), encoding="utf-8")
 print(f"Wrote {len(records)} questions to {out_path}")

@@ -7,6 +7,7 @@
   function DocsPage() {
     const { isDark } = useTheme();
     const iframeRef = React.useRef(null);
+    const hasSwagger = window.CFC.ApiFeatures?.isDotnet === false;
 
     React.useEffect(() => {
       const iframe = iframeRef.current;
@@ -116,7 +117,7 @@
       return () => {
         iframe.removeEventListener('load', applyDarkMode);
       };
-    }, [isDark]);
+    }, [isDark, hasSwagger]);
 
     return (
       <Layout>
@@ -132,7 +133,7 @@
           </div>
 
           <div className="docs-grid">
-            <Card className="docs-card">
+            {hasSwagger && <Card className="docs-card">
               <h2>Interactive API Docs</h2>
               <p className="muted">
                 This is the same OpenAPI/Swagger documentation exposed at <code>/docs</code>, wrapped in a scrollable surface.
@@ -140,19 +141,18 @@
               <div className="docs-iframe-wrapper">
                 <iframe ref={iframeRef} src="/docs" title="API docs" className="docs-iframe" />
               </div>
-            </Card>
+            </Card>}
 
             <Card className="docs-card notes-card">
               <h2>Implementation notes</h2>
               <ul className="notes-list">
                 <br />
-                <li>Search and chat endpoints backed by your RAG pipeline.</li>
-                <br />
-                <li>Video ingestion with Whisper and Pinecone indexing.</li>
+                <li>Chat is backed by the RAG pipeline.</li>
+                {hasSwagger && <li>Video ingestion with Whisper and Pinecone indexing.</li>}
                 <br />
                 <li>Admin uploads immediately trigger ingestion workflows.</li>
                 <br />
-                <li>Some elements of the interactive API docs may not display correctly in dark mode because of Swagger. Toggling dark mode on and off can sometimes fix this.</li>
+                {hasSwagger && <li>Some elements of the interactive API docs may not display correctly in dark mode because of Swagger. Toggling dark mode on and off can sometimes fix this.</li>}
               </ul>
             </Card>
           </div>

@@ -1,0 +1,7 @@
+{
+  "name": "cfc-chat-deployment",
+  "private": true,
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

@@ -1,0 +1,4 @@
+# Preserve fixture bytes and their reported hashes across platforms.
+*.eml -text
+*.txt -text
+*.docx binary

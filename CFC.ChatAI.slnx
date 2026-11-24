@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="dotnet/tests/CFC.ChatAI.Pinecone.Tests/CFC.ChatAI.Pinecone.Tests.csproj" />
+  <Project Path="dotnet/tests/CFC.ChatAI.Supabase.Tests/CFC.ChatAI.Supabase.Tests.csproj" />
+</Solution>

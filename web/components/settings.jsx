@@ -7,6 +7,7 @@
   function SettingsPage() {
     const { user, session, profile, setProfile, setUser, supabase } = useUser();
 
+    const canEditProfile = window.CFC.ApiFeatures?.profileWrites;
     const [activeTab, setActiveTab] = React.useState('profile'); // 'profile' | 'preferences'
     const [saving, setSaving] = React.useState(false);
     const [saveMsg, setSaveMsg] = React.useState('');
@@ -129,10 +130,10 @@
                 </div>
 
                 <div style={{ display: 'grid', gap: '12px' }}>
-                  <TextInput label="Full Name" value={fullName} onChange={(e) => setFullName(e.target.value)} />
+                  <TextInput label="Full Name" value={fullName} readOnly={!canEditProfile} onChange={(e) => setFullName(e.target.value)} />
                   <TextInput label="Email Address" value={email} readOnly />
                   <TextInput label="Role" value={role} readOnly />
-                  <label className="field">
+                  {canEditProfile && <label className="field">
                     <span className="field-label">Avatar</span>
                     <input type="file" accept="image/*" onChange={(e) => {
                       const file = e.target.files?.[0];
@@ -141,7 +142,7 @@
                       reader.onload = () => setAvatar(reader.result);
                       reader.readAsDataURL(file);
                     }} />
-                  </label>
+                  </label>}
                 </div>
 
                 {saveMsg && (
@@ -151,7 +152,7 @@
                     {saveMsg}
                   </div>
                 )}
-                <div style={{ marginTop: '14px' }}>
+                {canEditProfile && <div style={{ marginTop: '14px' }}>
                   <PrimaryButton onClick={saveProfile} disabled={saving}>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M19 21H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h11l5 5v9a2 2 0 0 1-2 2z" />
@@ -160,7 +161,7 @@
                     </svg>
                     {saving ? 'Saving...' : 'Save Profile'}
                   </PrimaryButton>
-                </div>
+                </div>}
               </Card>
 
               <Card className="settings-card" style={{ marginTop: '18px' }}>

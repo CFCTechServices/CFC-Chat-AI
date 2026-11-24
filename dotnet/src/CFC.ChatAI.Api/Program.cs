@@ -1,0 +1,154 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
+using CFC.ChatAI.Api.Configuration;
+using CFC.ChatAI.Api.Endpoints;
+using CFC.ChatAI.Api.Features.Health;
+using CFC.ChatAI.Api.Security;
+using CFC.ChatAI.Pinecone;
+using CFC.ChatAI.Feedback;
+using CFC.ChatAI.ChatService;
+using CFC.ChatAI.DocumentHandler;
+using CFC.ChatAI.DocumentProcessor;
+using Microsoft.AspNetCore.Http.Features;
+using CFC.ChatAI.Supabase;
+using CFC.ChatAI.Supabase.Common;
+using CFC.ChatAI.Supabase.Conversations;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.RateLimiting;
+
+// Load from the configured working directory (repository root locally; private directory in NSSM).
+// Preserve explicitly set environment variables.
+DotNetEnv.Env.NoClobber().Load(".env");
+
+var builder = WebApplication.CreateBuilder(args);
+var apiPort = builder.Configuration["DOTNET_API_PORT"] ?? "5000";
+builder.WebHost.UseUrls(builder.Configuration["Api:Urls"] ?? $"http://127.0.0.1:{apiPort}");
+
+builder.Services.Configure<ApiOptions>(builder.Configuration.GetSection(ApiOptions.SectionName));
+builder.Services.AddHttpClient();
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
+    options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.Never;
+});
+
+// Keep health available without credentials. Provider-backed routes are never mapped without
+// their complete configuration: no mock successes and no half-configured adapters.
+var config = builder.Configuration;
+var maxDocumentBytes = config.GetValue<long?>("Document:MaxUploadBytes") ?? 50L * 1024 * 1024;
+if (maxDocumentBytes <= 0 || maxDocumentBytes > long.MaxValue - 1024 * 1024)
+    throw new InvalidOperationException("Document:MaxUploadBytes must be positive and leave room for multipart overhead.");
+builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = maxDocumentBytes + 1024 * 1024);
+var hasSupabase = new[] { "SUPABASE_URL", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY" }
+    .All(key => !string.IsNullOrWhiteSpace(config[key]));
+var hasPinecone = new[] { "PINECONE_API_KEY", "PINECONE_INDEX_NAME", "Embedding:ModelPath", "Embedding:VocabularyPath" }
+    .All(key => !string.IsNullOrWhiteSpace(config[key]));
+if (hasSupabase)
+{
+    builder.Services.AddSupabaseInfrastructure(o =>
+    {
+        o.Url = config["SUPABASE_URL"]!;
+        o.AnonKey = config["SUPABASE_ANON_KEY"]!;
+        o.ServiceRoleKey = config["SUPABASE_SERVICE_ROLE_KEY"]!;
+        o.DocumentsBucket = config["SUPABASE_DOCUMENTS_BUCKET"] ?? o.DocumentsBucket;
+        o.VideosBucket = config["SUPABASE_VIDEOS_BUCKET"] ?? o.VideosBucket;
+    });
+    builder.Services.AddSingleton(TimeProvider.System);
+    builder.Services.AddSingleton<AdminSettingsStore>();
+    builder.Services.AddSingleton(new AccountLifecycleJournal(config["Api:AccountLifecycleJournalDirectory"],
+        config.GetValue<bool>("Api:EnableAccountLifecycle"), config.GetValue<bool>("Api:EnablePermanentAccountDeletion")));
+    builder.Services.AddSingleton<AccountLifecycleWorkflow>();
+    builder.Services.AddAuthentication("Bearer").AddScheme<AuthenticationSchemeOptions, ApiAuthenticationHandler>("Bearer", null);
+    builder.Services.AddAuthorizationBuilder()
+        .AddPolicy("current-user", policy => policy.RequireAuthenticatedUser().RequireClaim("active", "true"))
+        .AddPolicy("admin", policy => policy.RequireAuthenticatedUser().RequireClaim("active", "true")
+            .RequireRole("admin", "superuser"));
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = 429;
+        options.AddPolicy("public-auth", context => RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions { PermitLimit = 10, Window = TimeSpan.FromMinutes(5), QueueLimit = 0 }));
+    });
+    if (hasPinecone)
+    {
+        builder.Services.AddPineconeInfrastructure(o =>
+        {
+            o.ApiKey = config["PINECONE_API_KEY"]!;
+            o.IndexName = config["PINECONE_INDEX_NAME"]!;
+            o.Namespace = config["PINECONE_NAMESPACE"];
+            o.ModelPath = config["Embedding:ModelPath"]!;
+            o.VocabularyPath = config["Embedding:VocabularyPath"]!;
+        });
+        builder.Services.AddDocumentProcessing(o =>
+        {
+            o.MaxDocumentBytes = maxDocumentBytes;
+            o.LibreOfficePath = config["Document:LibreOfficePath"] ?? o.LibreOfficePath;
+        });
+        builder.Services.AddDocumentHandling(o => o.MaxUploadBytes = maxDocumentBytes);
+        builder.Services.AddSingleton<DocumentMutations>();
+        builder.Services.AddFeedback();
+        builder.Services.AddChatService(o =>
+        {
+            o.AzureOpenAIEndpoint = config["AZURE_OPENAI_ENDPOINT"] ?? "";
+            o.AzureOpenAIApiKey = config["AZURE_OPENAI_API_KEY"] ?? "";
+            o.AzureOpenAIDeploymentName = config["AZURE_OPENAI_DEPLOYMENT"] ?? "";
+        });
+    }
+}
+
+var app = builder.Build();
+// Do not leak dependency exceptions (which can contain provider data) to HTTP clients.
+app.Use(async (context, next) =>
+{
+    try { await next(context); }
+    catch (OperationCanceledException) when (context.RequestAborted.IsCancellationRequested) { }
+    catch (BadHttpRequestException ex)
+    {
+        if (!context.Response.HasStarted)
+            await Results.Json(new { detail = ex.StatusCode == 413 ? "Upload exceeds the size limit" : "Invalid request body" },
+                statusCode: ex.StatusCode == 413 ? 413 : 400).ExecuteAsync(context);
+    }
+    catch (SessionDeletionPartialFailureException)
+    {
+        app.Logger.LogError("Session deletion partially failed; reconciliation required (trace {TraceId})", context.TraceIdentifier);
+        if (!context.Response.HasStarted)
+            await Results.Problem("Messages were deleted but session deletion failed; retry or contact an operator.", statusCode: 500).ExecuteAsync(context);
+    }
+    catch (DependencyFailureException)
+    {
+        if (!context.Response.HasStarted)
+            await Results.Problem("A dependency is unavailable.", statusCode: 503).ExecuteAsync(context);
+    }
+    catch (Exception ex)
+    {
+        // Exception messages can contain request data or upstream response bodies.
+        app.Logger.LogError("Internal API request failed (trace {TraceId}): {ExceptionType}\n{StackTrace}",
+            context.TraceIdentifier, ex.GetType().FullName, ex.StackTrace);
+        if (!context.Response.HasStarted)
+            await Results.Problem("Request could not be completed.", statusCode: 500).ExecuteAsync(context);
+    }
+});
+app.MapHealth();
+if (hasSupabase)
+{
+    app.UseRateLimiter();
+    app.UseAuthentication();
+    app.UseAuthorization();
+    app.MapInternalApi(hasPinecone);
+    app.MapDocumentImages();
+    app.MapAdminReads();
+    app.MapAccountLifecycle();
+    app.MapStagingStats(config["Document:StagingRoot"], config["Document:ProcessedRoot"]);
+    if (hasPinecone)
+    {
+        app.MapDocumentUploads(maxDocumentBytes, app.Environment.IsDevelopment() && config.GetValue<bool>("Api:EnableDevIngest"));
+        app.MapDocumentDeletions(app.Environment.IsDevelopment() && config.GetValue<bool>("Api:EnableDevDelete"));
+        app.MapDocumentReplacement(maxDocumentBytes);
+        app.MapStagedIngest(config["Document:StagingRoot"], maxDocumentBytes);
+    }
+}
+app.Run();
+
+public partial class Program;

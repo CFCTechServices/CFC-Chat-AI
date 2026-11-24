@@ -1,514 +1,170 @@
-# CFC Chat-Talk - AI-Powered Documentation Chatbot
+# CFC Chat AI
 
-A Retrieval-Augmented Generation (RAG) chatbot system for CFC Technologies' animal feed software documentation. This FastAPI-based backend enables intelligent document search, Q&A capabilities, and video transcript processing through semantic search powered by Pinecone vector database.
+CFC Chat AI is a documentation assistant for CFC Technologies' animal-feed software. It ingests documents and video transcripts, searches relevant content using embeddings and Pinecone, and answers questions using retrieved context and Azure OpenAI. The browser UI uses React, Supabase authentication and the application API.
 
-## 📋 Table of Contents
+This repository contains the existing **Python/FastAPI application** and an **in-progress .NET migration**. They are not interchangeable yet. The Windows deployment script deploys Python; the checked-in IIS configuration routes only `GET /api/health` and `GET /api/health/detailed` to .NET and sends other `/api/*` requests to Python. It does not install or start the .NET API. Confirm the actual VM configuration before operating it.
 
-- [Project Overview](#project-overview)
-- [Key Components & Focus Areas](#key-components--focus-areas)
-- [Important Files to Review](#important-files-to-review)
-- [Credentials & Environment Setup](#credentials--environment-setup)
-- [Quick Start Guide](#quick-start-guide)
-- [Architecture Overview](#architecture-overview)
-- [API Endpoints](#api-endpoints)
-- [Next Steps & Improvements](#next-steps--improvements)
-- [Support & Contact](#support--contact)
-- [Project Status](#project-status)
----
+> **Migration release gate:** Do not cut all traffic over to .NET yet. The in-scope internal API routes are implemented, but hosting/routing, live provider security and integration checks, and browser validation remain. Profile self-service writes are implemented behind a default-off flag; video upload is deferred. See the [cutover checklist](dotnet/docs/plan/internal-api-cutover.md), [routing and hosting plan](dotnet/docs/plan/routing-and-hosting.md), and [remaining security and integration results](dotnet/docs/complete/internal-api/supabase-completion-remaining-results.md).
 
-<a id="quick-start-guide"></a>
-## 🚀 Quick Start Guide
+## Repository map
 
-For a comprehensive guide on local development, CI/CD, and deployment overview, please see [**DEVELOPMENT_SETUP.md**](./DEVELOPMENT_SETUP.md).
+| Path | Purpose |
+| --- | --- |
+| `main.py`, `app/` | Python API, authentication, ingestion, RAG and services |
+| `web/` | Static React UI; `web/index.html` loads components from `web/components/`, `web/js/` and `web/state/` using CDN dependencies |
+| `dotnet/src/` | .NET API and ChatService, DocumentHandler, DocumentProcessor, VideoProcessor, Feedback, Pinecone and Supabase components |
+| `tests/`, `dotnet/tests/` | Python and .NET tests |
+| `data/` | Local documents, videos and processed data |
+| `deployment/iis-web.config`, `deploy-windows.ps1` | Windows IIS routing and Python service deployment |
+| `scripts/`, `dotnet/tools/` | Diagnostics, architecture checks and RAG test tools |
 
-### Prerequisites
+## Local development: Python application
 
-- Python 3.10+
-- Pinecone API Key (Required)
-- OpenAI or Gemini API Key (Required for AI answers)
+Use Python 3.10 or 3.11; CI uses 3.10 and the Windows deployment script expects 3.11. Video transcription requires FFmpeg. Scanned PDFs may require Tesseract and Poppler; legacy `.doc` conversion requires Microsoft Word on Windows or LibreOffice. Install the relevant tools on PATH, or configure the binary paths described below.
 
-### 3-Step Local Setup
-
-1. **Install Dependencies**:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # macOS/Linux
-   # .venv\Scripts\activate   # Windows
-   pip install -r requirements.txt
-   ```
-
-2. **Configure Environment**:
-   ```bash
-   cp .env.example .env
-   # Edit .env and add your PINECONE_API_KEY and OPENAI_API_KEY/GEMINI_API_KEY
-   ```
-
-3. **Run the App**:
-   ```bash
-   uvicorn main:app --reload
-   ```
-   Access the UI at [http://localhost:8000](http://localhost:8000).
-
----
-
-<a id="project-overview"></a>
-## 🎯 Project Overview
-
-**CFC Chat-Talk** is a production-ready MVP that transforms company documentation (DOC/DOCX/TXT) and video transcripts into a searchable knowledge base. Users can ask natural language questions and receive AI-powered answers with source citations.
-
-### Current Capabilities
-
-✅ **Document Processing**: Upload and ingest DOC/DOCX/TXT files with automatic chunking and image extraction  
-✅ **Semantic Search**: Vector-based search using Pinecone for finding relevant content  
-✅ **AI Q&A**: Generate answers using OpenAI/Gemini with context from retrieved documents  
-✅ **Video Processing**: Upload videos with Whisper transcription and searchable transcripts  
-✅ **Web UI**: React-based frontend for document uploads and chat interactions  
-✅ **Content Storage**: Local file storage with optional Supabase cloud integration  
-
-### Technology Stack
-
-- **Backend**: FastAPI (Python)
-- **Vector Database**: Pinecone
-- **Embeddings**: sentence-transformers (`all-MiniLM-L6-v2`)
-- **LLM**: OpenAI GPT / Google Gemini (for answer generation)
-- **Frontend**: React 18 (served as static files)
-- **Storage**: Local filesystem + optional Supabase
-- **Video Transcription**: OpenAI Whisper
-
-
-### API Endpoints
-
-Please refer to https://mnscu-my.sharepoint.com/:w:/r/personal/lm1263ei_go_minnstate_edu/Documents/CFC/Design%20Docs/Test%20Plan.docx?d=w660fa584e60b4c429a24b61283d471cc&csf=1&web=1&e=8Nj2SB for more details.  
-
-### Core Services
-
-| File | Purpose | Key Functionality |
-|------|---------|-------------------|
-| `app/services/chat_service.py` | Main chat business logic | `search_documents()`, `ask_question()` |
-| `app/services/document_processor.py` | Document parsing and chunking | `process_document()` |
-| `app/core/rag.py` | RAG pipeline implementation | `retrieve_context()`, `format_context()` |
-| `app/core/vector_store.py` | Pinecone integration | `query()`, `upsert_vectors()` |
-| `app/core/embeddings.py` | Embedding model wrapper | `encode_query()`, `encode_documents()` |
-
-### Content Storage
-
-| File | Purpose | Notes |
-|------|---------|-------|
-| `app/services/content_repository.py` | Local file storage | Default implementation |
-| `app/services/supabase_content_repository.py` | Supabase cloud storage | Optional, enabled via config |
-
-### Frontend
-
-| File | Purpose | Key Components |
-|------|---------|----------------|
-| `web/app.jsx` | Main React application | Login, Chat, Admin, Upload flows |
-| `web/styles.css` | Styling | All UI styles |
-| `web/index.html` | HTML entry point | React app container |
-
-### Configuration & Models
-
-| File | Purpose |
-|------|---------|
-| `app/api/models/requests.py` | Request models (SearchRequest, AskRequest, etc.) |
-| `app/api/models/responses.py` | Response models (SearchResponse, AskResponse, etc.) |
-
-### Documentation
-
-| File | Purpose |
-|------|---------|
-| `HANDOVER_DOCUMENT.md` | Comprehensive technical handover document |
-| `SETUP_GUIDE.md` | Quick setup instructions |
-
----
-
-<a id="credentials--environment-setup"></a>
-## 🔑 Credentials & Environment Setup
-
-### Required Environment Variables
-
-Create a `.env` file in the project root with the following variables:
-
-#### **Required Credentials** (Get from Dan Bates)
+From the repository root:
 
 ```bash
-# Pinecone (REQUIRED for vector search)
-# Contact Dan Bates from CFC Tech to obtain these credentials
-PINECONE_API_KEY=your_pinecone_api_key_here
-PINECONE_INDEX_NAME=cfc-animal-feed-chatbot
-PINECONE_CLOUD=aws
-PINECONE_REGION=us-east-1
-
-# Optional: Separate index for videos
-PINECONE_VIDEO_INDEX_NAME=cfc-animal-feed-chatbot-videos
-PINECONE_NAMESPACE=your_namespace  # Optional
+python -m venv .venv
+# macOS/Linux:
+source .venv/bin/activate
+# Windows PowerShell instead: .\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+# Copy .env.example to .env and fill in the settings needed for your features
+uvicorn main:app --reload
 ```
 
-#### **Optional Credentials**
+For the copy step use `cp .env.example .env` on macOS/Linux or `Copy-Item .env.example .env` in PowerShell. Do not overwrite an existing `.env` unintentionally.
+
+- UI: <http://localhost:8000/> or <http://localhost:8000/ui/>
+- FastAPI OpenAPI/Swagger: <http://localhost:8000/docs>
+- Health: <http://localhost:8000/api/health>; dependency details: `/api/health/detailed`
+
+The UI needs the configured Supabase project for its sign-in flows. Full search/chat requires the corresponding provider configuration and ingested content. Without Azure OpenAI configuration, the Python chat service can fall back to retrieved content rather than generating a synthesized answer; a running server alone does not prove the providers work. Python uses `sentence-transformers/all-MiniLM-L6-v2` (384 dimensions) for embeddings. Its vector store uses Pinecone; verify the intended index, namespace and data before testing search.
+
+## Configuration and secrets
+
+Start with [`.env.example`](.env.example); placeholders are not working credentials. Obtain project-specific access and values from the CFC project owner or IT team. Never commit `.env`, expose service-role keys to the browser, or place credentials in documentation or logs. The Supabase anon key is client-facing; the service-role key is privileged and bypasses RLS.
+
+| Setting | Purpose |
+| --- | --- |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` | Supabase Auth, database and backend operations; use the correct key for each role |
+| `SUPABASE_BUCKET`, `SUPABASE_BUCKET_VIDEOS` | Python document and video storage buckets |
+| `PINECONE_API_KEY`, `PINECONE_INDEX_NAME` | Python and .NET vector search; the index must match the embedding dimensions |
+| `PINECONE_VIDEO_INDEX_NAME`, `PINECONE_NAMESPACE` | Python video index and namespace; inspect the .NET host configuration separately before assuming parity |
+| `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_DEPLOYMENT` | Azure OpenAI answer generation; configure all three together. `AZURE_OPENAI_API_VERSION` is used by Python |
+| `FRONTEND_BASE_URL`, `CORS_ORIGINS` | Python email links and allowed browser origins; configure actual deployment URLs and Supabase redirect allowlist |
+| `RESEND_API_KEY`, `ENABLE_EMAIL_INVITES` | Optional Python invitation email delivery |
+| `SOFFICE_PATH`, `TESSERACT_CMD` | Python executable overrides when LibreOffice or Tesseract is not on PATH |
+
+For Python, an unset `CORS_ORIGINS` falls back to `*`; explicitly restrict origins for deployment. The `.env.example` also lists `API_HOST` and `API_PORT`, but `app/config.py` currently hard-codes `0.0.0.0` and `8000`; choose Uvicorn's `--host` and `--port` explicitly rather than relying on those variables.
+
+## Local development: .NET migration
+
+Install the **.NET 10 SDK**. From the repository root, use the full solution explicitly (the root `CFC.ChatAI.slnx` contains only two test projects):
 
 ```bash
-# Supabase (for cloud storage - optional)
-# Contact Dan Bates from CFC Tech to obtain these credentials
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_BUCKET=your_bucket_name
-SUPABASE_BUCKET_VIDEOS=your_videos_bucket_name
-
-# OpenAI (for AI-generated answers)
-# You can create your own account or ask Dan Bates
-OPENAI_API_KEY=your_openai_api_key_here
-
-# Google Gemini (alternative to OpenAI)
-# You can create your own account
-GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-2.0-flash
+dotnet restore dotnet/CFC.ChatAI.slnx
+dotnet build dotnet/CFC.ChatAI.slnx
+dotnet test dotnet/CFC.ChatAI.slnx
+dotnet run --project dotnet/src/CFC.ChatAI.Api/CFC.ChatAI.Api.csproj
 ```
 
-### How to Get Credentials
+`dotnet run` starts the API in the repository root so it loads the root `.env` without overwriting existing environment variables. It listens on `http://127.0.0.1:5000` by default; `DOTNET_API_PORT` changes the port, and `Api:Urls` overrides the URL. It does not serve static UI files. With the API on its default port, use Node.js 22+ and run `npm --prefix ./deployment ci --include=dev` (PowerShell: `npm.cmd`), then `node deployment/dotnet-edge.mjs` in a second terminal. Open `http://127.0.0.1:8080/ui/`. The local proxy builds the UI at startup, serves it and forwards only the allowed API methods and paths; no CORS changes or Python service are needed. Development ingest/delete routes are never proxied.
 
-1. **Pinecone API Key** (REQUIRED): 
-   - **Contact Dan Bates from CFC Tech** to get access to the Pinecone API key and index details
-   - The existing Pinecone index is already configured with dimension `384` (matches `all-MiniLM-L6-v2` embedding model)
-   - You'll receive: `PINECONE_API_KEY`, `PINECONE_INDEX_NAME`, and other Pinecone configuration values
+- Health routes are mapped without provider credentials. `/api/health` checks the host, not end-to-end readiness. `/api/health/detailed` checks dependencies, but its Azure OpenAI check only checks configuration, not a live completion.
+- Supabase-backed routes are mapped only when `SUPABASE_URL`, `SUPABASE_ANON_KEY` and `SUPABASE_SERVICE_ROLE_KEY` are all nonempty. Chat, feedback submission and vector stats additionally require `PINECONE_API_KEY`, `PINECONE_INDEX_NAME`, `Embedding:ModelPath` and `Embedding:VocabularyPath`. Missing configuration means routes are absent (404), not mock successes. Nonempty placeholder values do not prove connectivity.
+- Set the two embedding paths to the local ONNX model and vocabulary. For environment variables use `Embedding__ModelPath` and `Embedding__VocabularyPath`; absolute paths avoid content-root ambiguity. The files are not committed. Download and test the matching `all-MiniLM-L6-v2` assets as described in [embedding setup](dotnet/docs/rag/embeddings.md); pin and verify model assets before deployment.
+- The .NET host reads `SUPABASE_DOCUMENTS_BUCKET` and `SUPABASE_VIDEOS_BUCKET`, not the Python bucket variable names. Defaults are `cfc-docs` and `cfc-videos`. `PINECONE_NAMESPACE` selects the index namespace. Verify the development Supabase project, buckets, index, namespace and matching embedding model/vocabulary before writing data.
+- Document upload is available when both providers are configured: `POST /api/files/upload` requires an active admin/superuser bearer token and one multipart `file` (.pdf, .docx, .doc, .txt, .md, .eml). `Document__MaxUploadBytes` defaults to 50 MiB; HTTP allows an additional 1 MiB multipart overhead. `.doc` requires LibreOffice (`Document__LibreOfficePath`, default `soffice`); PDF extraction uses embedded text, not OCR. Writes are not transactional; a failure can require reconciliation. Duplicate checks are not atomic and cannot prevent concurrent collisions.
+- For local-only development, set `ASPNETCORE_ENVIRONMENT=Development` and `Api__EnableDevIngest=true`, bind only to loopback, then run `curl -F "file=@./unique-document.txt" http://127.0.0.1:5000/api/ingest/dev` (PowerShell: `curl.exe`). This unauthenticated endpoint requires a direct loopback connection, skips duplicate checks and must never be exposed or proxied. Reusing a normalized filename can mix chunks and overwrite originals; use a unique filename, not this route for replacement. Leave the flag off on shared, containerized, remote and production deployments.
+- Document deletion: `DELETE /api/admin/documents/{docId}` requires an active admin/superuser. The separate unauthenticated `DELETE /api/ingest/dev/{docId}` requires Development, `Api__EnableDevDelete=true`, configured providers and a direct loopback connection; never proxy it. Verify the actual Supabase project, buckets and Pinecone index/namespace before deleting. These routes operate on configured providers, not just local files. Only known document metadata is supported; video/unknown types return 409, and missing metadata returns 404 without proving all stores are clean. No durable recovery or cross-instance lock exists: serialize writes manually and reconcile all stores after a failure, cancellation or lost response before retrying or reusing an ID. See [deletion PR notes](dotnet/docs/complete/document-deletion/document-deletion-changes.md).
+- Profile writes (`PATCH /api/profile/me`, `POST /api/profile/complete`) map only with `Api__EnableProfileWrites=true`; leave it off until enabled-route tests and the [database security gate](dotnet/docs/plan/supabase-profile-self-service-security.md) pass. Account lifecycle actions also default off and need a private persistent journal; permanent deletion has a separate flag. See the [delivery notes](dotnet/docs/complete/internal-api/internal-api-remaining-endpoints-delivery.md) for their configuration and reconciliation.
+- Azure OpenAI's endpoint, key and deployment must be configured together or all left empty for extractive fallback. The .NET API implements the in-scope internal API, not every Python endpoint; authentication and behavior differ in places.
 
-2. **Supabase Credentials** (Optional):
-   - **Contact Dan Bates from CFC Tech** to get access to Supabase credentials
-   - You'll receive: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and bucket names
-   - These are optional - the system works with local file storage if Supabase is not configured
+## API and data flow
 
-3. **Gemini API Key** (Optional - Alternative to OpenAI):
-   - Get from [Google AI Studio](https://makersuite.google.com/app/apikey)
-   - Can be used instead of OpenAI for answer generation
+The Python service processes uploaded documents into chunks and embeddings; video uploads use Whisper and FFmpeg for transcription. Pinecone provides vector search, while content and metadata can be stored locally or in Supabase. Chat retrieves context, applies feedback-based ranking where configured, and returns answers with source information. Supabase also supports authentication, profiles, sessions, feedback and storage. The actual features available depend on configuration and the running backend.
 
-### Environment File Setup
+Common Python endpoints (see `/docs` for request schemas and the complete exposed API):
+
+| Area | Endpoints |
+| --- | --- |
+| Health | `GET /api/health`, `GET /api/health/detailed` |
+| Auth/profile | `GET /api/auth/config`, `POST /api/auth/check-email`, `POST /api/auth/forgot-password`, `GET/PATCH /api/profile/me` |
+| Chat | `POST /api/chat/message`, `POST /api/chat/search`, `POST /api/chat/ask`, `POST /api/chat/ask/video`, `POST /api/chat/recommendations` |
+| History/feedback | `GET/POST /api/chat/sessions`, `GET/PATCH/DELETE /api/chat/sessions/{session_id}`, `GET/POST /api/chat/feedback` |
+| Ingestion | `POST /api/files/upload`, `POST /api/videos/upload`; operator ingestion routes under `/api/ingest/` |
+| Admin | `/api/admin/users`, `/api/admin/invite`, `/api/admin/documents`, `/api/admin/settings`, `/api/admin/ingestion/stats` |
+| Vector stats | `GET /api/visibility/vector-store` |
+
+The .NET host implements health, auth, profile read, sessions, feedback, chat message, vector stats, document and admin workflows, conditional on provider configuration. Upload, deletion, replacement and staged ingest require both providers; profile writes require an explicit default-off flag, and account lifecycle operations have separate enablement requirements. Video upload and some Python routes are out of scope. See the [delivery notes](dotnet/docs/complete/internal-api/internal-api-remaining-endpoints-delivery.md), [cutover checklist](dotnet/docs/plan/internal-api-cutover.md) and [frontend status](dotnet/docs/frontend-changes.md). Authentication and persistent sessions/feedback exist in the code; older handover statements describing them as entirely unimplemented are obsolete.
+
+## Testing and CI
 
 ```bash
-# Windows (PowerShell)
-Copy-Item -LiteralPath '.env.example' -Destination '.env'
+# Python, from the repository root; some integration tests require a live server and credentials
+pytest tests/ -q
 
-# Windows (CMD)
-copy .env.example .env
+# Full .NET solution; some parity tests skip if model assets or reference documents are missing
+dotnet test dotnet/CFC.ChatAI.slnx
 
-# macOS/Linux
-cp .env.example .env
+# Supabase component dependency boundary
+python dotnet/tools/check_supabase_boundary.py
 ```
 
-Then edit `.env` and add your credentials.
+Use a disposable non-production project for provider-backed tests and inspect test requirements before running them: some tests operate on users or other remote state. Local/unit tests do not validate the live database's grants, RLS, RPCs, storage policies or deployed services.
 
----
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on push, pull request and manual dispatch (with a path exclusion), installs Python 3.10 dependencies, checks the .NET Supabase architecture boundary and runs `pytest`. It does **not** build or test the .NET solution. The repository contains a deployment plan, but no checked-in automated production deployment workflow; do not assume the VM polls GitHub.
 
-<a id="quick-start-guide"></a>
-## 🚀 Quick Start Guide
+## Windows deployment and operations
 
-For a comprehensive guide on local development, CI/CD, and deployment overview, please see [**DEVELOPMENT_SETUP.md**](./DEVELOPMENT_SETUP.md).
+For a Python-free development deployment, follow the [.NET/IIS deployment checklist](deployment/DOTNET-IIS.md). It uses IIS/ARR and a self-contained Windows x64 .NET service managed by NSSM. Validate IIS routing and browser flows on the target host before relying on it. The instructions below describe the legacy Python deployment and are not steps for the .NET target.
 
-### Prerequisites
+### One-time preparation
 
-- Python 3.10+
-- Pinecone API Key (Required)
-- OpenAI or Gemini API Key (Required for AI answers)
+1. Install Python 3.11, Git, FFmpeg, and NSSM. Install Tesseract/Poppler for scanned PDFs and LibreOffice for `.doc` ingestion where needed. Put binaries on the service's PATH or set the supported paths in `.env`.
+2. Enable IIS, install URL Rewrite and Application Request Routing, and enable ARR proxy. Provision the application and IIS web-root directories and appropriate service/file permissions. Arrange DNS, firewall/NSG rules and HTTPS according to the approved network design; do not expose RDP or HTTP to the internet by default.
+3. Clone the repository, copy `.env.example` to `.env` and supply the actual secrets and URLs securely. Configure the Supabase Site URL and allowed redirect URLs to match the frontend; verify invitation and password-reset links.
+4. Configure an IIS site at `C:\inetpub\cfcchat` with the necessary bindings and certificate. The script copies `web/` to its `ui/` directory and `deployment/iis-web.config` to its root.
+5. **Resolve the split-health dependency before deployment:** the checked-in IIS config sends health GETs to port 5000. Ensure a separately managed .NET API is running there, or make an explicitly reviewed routing change. The Python deploy script alone cannot satisfy those routes. Verify both direct backends and IIS after any change.
 
-### 3-Step Local Setup
+### Deploy/update Python
 
-1. **Install Dependencies**:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # macOS/Linux
-   # .venv\Scripts\activate   # Windows
-   pip install -r requirements.txt
-   ```
+In an appropriately privileged PowerShell session on the VM, after reviewing the intended revision and preserving `.env`:
 
-2. **Configure Environment**:
-   ```bash
-   cp .env.example .env
-   # Edit .env and add your PINECONE_API_KEY and OPENAI_API_KEY/GEMINI_API_KEY
-   ```
-
-3. **Run the App**:
-   ```bash
-   uvicorn main:app --reload
-   ```
-   Access the UI at [http://localhost:8000](http://localhost:8000).
-
----
-
-<a id="architecture-overview"></a>
-## 🏗️ Architecture Overview
-
-### System Flow: The RAG Loop
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant API as FastAPI (Backend)
-    participant Pinecone as Pinecone (Vector DB)
-    participant Supabase as Supabase (PostgreSQL)
-    participant LLM as Azure OpenAI / Gemini
-
-    User->>API: Asks Question
-    API->>API: Generate Query Embedding
-    API->>Pinecone: Semantic Search (Top-K)
-    Pinecone-->>API: Match IDs + Scores
-    API->>Supabase: Fetch Full Content & Metadata by IDs
-    Supabase-->>API: Document Chunks + Image Paths
-    API->>API: Optional: Feedback-based Re-ranking
-    API->>LLM: Send Prompt (Question + Grounded Context)
-    LLM-->>API: Generated Answer with Citations
-    API-->>User: Final Response (Text + Images/Videos)
+```powershell
+cd C:\cfcchat
+git pull
+.\deploy-windows.ps1
 ```
 
-<a id="important-files-to-review"></a>
-## 📁 Important Files to Review
+The script creates/updates `.venv`, installs dependencies, copies frontend files, installs or restarts the `CFC-ChatAI` NSSM service and probes Python at `127.0.0.1:8000`. It configures Uvicorn with two workers on that fixed address/port. On an existing service it attempts to stop it and kill listeners on port 8000; check ownership before running it on a shared host. A failed health probe is a warning, so independently verify the result. Changes to `.env` require restarting the Python process.
 
-### Core Application Files
-
-| File | Purpose | Key Logic |
-|------|---------|-----------|
-| `main.py` | Application entry point and router registration | App lifecycle & CORS |
-| `app/config.py` | Centralized configuration (API keys, paths, settings) | Env var management |
-| `app/core/rag.py` | Core RAG logic: retrieval and context formatting | **Metadata fetch from Supabase** |
-| `app/services/chat_service.py` | Main orchestration for chat and search | Image ranking & LLM prompts |
-
-### Component Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      Frontend (React)                        │
-│  web/app.jsx - Login, Chat, Admin, Upload interfaces        │
-└───────────────────────┬─────────────────────────────────────┘
-                        │ HTTP/REST
-┌───────────────────────▼─────────────────────────────────────┐
-│                   FastAPI Backend                           │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │ API Endpoints│  │   Services   │  │    Core      │     │
-│  │ - chat.py    │→ │ - chat_svc   │→ │ - rag.py     │     │
-│  │ - upload.py  │  │ - doc_proc   │  │ - embeddings│     │
-│  │ - ingest.py  │  │ - content_repo│ │ - vector_db  │     │
-│  └──────────────┘  └──────────────┘  └──────────────┘     │
-└───────────────────────┬───────────────────────┬─────────────┘
-                        │                       │
-        ┌───────────────▼──────────────┐  ┌─────▼──────────────┐
-        │       Vector Search          │  │  Relational/Auth   │
-        │  Pinecone (Vector DB)        │  │  Supabase (Postgres)│
-        └──────────────────────────────┘  └────────────────────┘
+```powershell
+nssm status CFC-ChatAI
+Invoke-RestMethod http://127.0.0.1:8000/api/health  # Python directly
+Invoke-RestMethod http://127.0.0.1:5000/api/health  # .NET directly, if running
+# Also check /api/health and /ui/ through the actual IIS hostname and bindings.
+nssm restart CFC-ChatAI
+netstat -ano | findstr ":8000"
 ```
 
-### Data Flow: Document Ingestion
+Consult the service's configured stdout/stderr destinations and Windows Application event log for failures. The checked-in script does **not** configure `C:\cfcchat\logs\stdout.log` or `stderr.log`; those paths only apply if an operator has configured them. Investigate process ownership before terminating any stale listener.
 
-```
-Document Upload → DocumentProcessor → Text Cleaning → Chunking
-                                                         ↓
-                                              Generate Embeddings
-                                                         ↓
-    ┌────────────────────────────────────────────────────┴────────────────────────────────────┐
-    │                                                    │                                    │
-    ▼                                                    ▼                                    ▼
-Pinecone Index                              Supabase (PostgreSQL)                    Local FS / Storage
-(Vectors + IDs)                             (Content + Full Metadata)                (Originals + Images)
-```
+### Troubleshooting and maintenance
 
-### Data Flow: Query Processing
+- **No results:** check the selected Pinecone index, dimensions, namespace, credentials and ingestion state; verify the matching backend configuration.
+- **Document/video processing fails:** check service account permissions, disk space, supported file type and FFmpeg, Tesseract, Poppler or LibreOffice availability as appropriate. On Windows set `SOFFICE_PATH` or `TESSERACT_CMD` if needed, then restart the service.
+- **Fallback answers or model errors:** inspect application logs and Azure OpenAI endpoint, key and deployment. If a model is retired, create an approved replacement deployment, update configuration and restart. Health configuration checks do not prove the model is usable.
+- **Login, invitation or reset links fail:** verify Supabase project configuration, email delivery, `FRONTEND_BASE_URL` and the Supabase redirect allowlist. Confirm browser origin and CORS settings for the actual deployment.
+- **IIS health fails while Python is healthy:** check whether .NET is listening on port 5000 and inspect the deployed IIS rewrite rules. Do not interpret the Python script's direct probe as a check of the IIS route.
+- **Domain/HTTPS change:** configure DNS, firewall and an IIS certificate, update frontend origin and Supabase URL settings, restart affected services, and test from the intended network. In a private deployment, obtain the current VPN and site address from client IT.
 
-1. **User Query**: Received via `POST /api/chat/ask`.
-2. **Retrieval**: 
-   - Query is embedded using `all-MiniLM-L6-v2`.
-   - **Pinecone** returns IDs of the top 5-10 most similar chunks.
-   - **Supabase** is queried to fetch the actual text content and image paths for those specific IDs.
-3. **Synthesis**:
-   - `RAGPipeline` formats the context with `[CHUNK_ID]` markers for citation.
-   - **Azure OpenAI** (primary) or Gemini generates a grounded response.
-4. **Response**: Answer is returned with clickable citations and relevant document images.
+## Security and release considerations
 
----
+The migration's checked-in Supabase privilege exports indicate potentially unsafe profile column grants; they do not establish the live project's state. The database owner must verify the target project, grants, role inheritance, RLS, signup triggers and direct negative tests before enabling .NET self-profile writes. See [profile self-service security](dotnet/docs/plan/supabase-profile-self-service-security.md). Complete provider integration tests, frontend compatibility, deployment/monitoring, and the remaining cutover gates before production traffic is moved. Verify the superuser safeguards and database triggers in the actual target environment rather than assuming they exist.
 
-<a id="api-endpoints"></a>
-## 📡 API Endpoints
+## Documentation status
 
-### Document Management
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/files/upload` | POST | Upload single file with auto-ingestion |
-| `/api/ingest/document` | POST | Process document by filename |
-| `/api/ingest/bulk` | POST | Bulk process directory contents |
-
-### Search & Chat
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/chat/search` | POST | Semantic document search (returns chunks) |
-| `/api/chat/ask` | POST | Q&A with AI-generated answers |
-| `/api/chat/ask/video` | POST | Video transcript-specific Q&A |
-| `/api/chat/recommendations` | POST | Content recommendations based on query |
-| `/api/chat/sessions` | GET/POST | Chat session management |
-
-### Auth & Profile
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/auth/config` | GET | Supabase config for client |
-| `/api/auth/forgot-password` | POST | Password reset |
-| `/api/profile/me` | GET/PATCH | User profile |
-
-### Admin
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/admin/users` | GET | List all users |
-| `/api/admin/invite` | POST | Generate invitation code |
-| `/api/admin/settings` | GET/PATCH | Admin settings |
-| `/api/admin/ingestion/stats` | GET | Ingestion statistics |
-
-### System
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/health` | GET | Health check |
-| `/api/visibility/vector-store` | GET | Pinecone index statistics |
-
-### Video Processing
-
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/videos/upload` | POST | Video upload with Whisper transcription |
-
-### Interactive API Documentation
-
-Visit [http://localhost:8000/docs](http://localhost:8000/docs) for interactive Swagger UI documentation with request/response schemas.
-
----
-
-<a id="next-steps--improvements"></a>
-## 🎯 Next Steps & Improvements
-
-### Immediate Priorities
-
-1. **Implement Authentication** 🔐
-   - JWT-based auth system
-   - Role-based access control
-   - Secure API endpoints
-
-2. **Add Chat History** 💬
-   - Database schema for sessions/messages
-   - Backend persistence
-   - Frontend integration
-
-3. **Enhance Security** 🛡️
-   - Fix CORS configuration
-   - Add rate limiting
-   - Input validation and sanitization
-
-### Medium-Term Enhancements
-
-4. **Feedback System** ⭐
-   - Rating collection
-   - Analytics dashboard
-   - ML training data export
-
-5. **RAG Quality** 🧠
-   - Hybrid search (vector + keyword)
-   - Re-ranking models
-   - Better chunking strategies
-
-6. **Testing & Monitoring** 📊
-   - Comprehensive test suite
-   - Structured logging
-   - Performance metrics
-
-### Long-Term Goals
-
-7. **CFC Integration** 🔗
-   - Analytics platform integration
-   - Usage metrics dashboard
-   - Batch data exports
-
-8. **Performance** ⚡
-   - Redis caching
-   - Async processing
-   - Connection pooling
-
-9. **Documentation** 📚
-   - Architecture diagrams
-   - API reference
-   - Developer guides
-
----
-
-<a id="support--contact"></a>
-## 🆘 Support & Contact
-
-### Questions or Issues?
-
-**Contact**: **Dan Bates from CFC Tech**
-
-**Important**: Dan Bates is your primary contact for:
-- **Pinecone API credentials** (required)
-- **Supabase credentials** (optional)
-- Project architecture and design decisions
-- Integration requirements
-- Business logic and requirements
-- Technical clarifications
-
-For other credentials (OpenAI, Gemini), you can create your own accounts or ask Dan Bates if CFC has shared accounts.
-
-### Additional Resources
-
-- **Technical Handover**: See `HANDOVER_DOCUMENT.md` for comprehensive technical details
-- **Setup Guide**: See `SETUP_GUIDE.md` for quick setup instructions
-- **API Docs**: Visit `/docs` endpoint when server is running
-- **Code Comments**: Most files have inline documentation
-
-### Common Issues
-
-**Pinecone Connection Errors**:
-- **Contact Dan Bates** if you don't have the Pinecone API key
-- Verify `PINECONE_API_KEY` is set correctly in `.env`
-- Check index name matches the one provided by Dan Bates
-- Ensure index dimension is `384`
-
-**Document Processing Fails**:
-- Ensure Office/LibreOffice is installed for `.doc` files
-- Check file permissions in `data/documents/` directory
-- Review logs for specific error messages
-
-**No Search Results**:
-- Verify documents have been ingested (`/api/visibility/vector-store`)
-- Check Pinecone index has vectors
-- Try different query keywords
-
-**Frontend Not Loading**:
-- Ensure server is running: `http://localhost:8000`
-- Check browser console for errors
-- Verify `CORS_ORIGINS` in `.env` includes your domain in production
-
----
-
-<a id="project-status"></a>
-## 📝 Project Status
-
-**Current Version**: 1.0.0  
-**Status**: Functional MVP - Ready for production enhancements  
-**Last Updated**: See git commit history
-
-### What's Working ✅
-
-- Document ingestion and processing
-- Vector search with Pinecone
-- AI-powered Q&A
-- Video transcription
-- Web UI for uploads and chat
-- Local and cloud storage options
-
-### What Needs Work 🚧
-
-- Authentication and authorization
-- Chat history persistence
-- Feedback collection system
-- Enhanced RAG quality
-- Comprehensive testing
-- Production monitoring
-
-
-
----
-
-**Built for CFC Technologies** 🚀
+This README consolidates the root setup, deployment, runbook, access and handover guides plus `docs/OPERATIONS_CENTRAL.md` against the checked-in code and configuration. Those older files are retained for history and may contain stale or contradictory instructions; prefer this README and the current source. Migration-specific implementation plans and verification records under `dotnet/docs/` provide further detail, but are not proof of the current live deployment. Confirm production credentials, access and operational ownership with the CFC project owner or IT team.

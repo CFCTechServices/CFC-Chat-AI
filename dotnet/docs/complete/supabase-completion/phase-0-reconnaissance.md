@@ -1,0 +1,129 @@
+# Supabase completion — Phase 0 reconnaissance
+
+**Status:** Repository reconnaissance is complete. Sanitized profile schema, RLS policy, and effective privilege exports have now been added under this directory. They identify a profile privilege-escalation risk; target-project identity, reviewed remediation, and post-change verification remain outstanding. Other database verification remains blocked. No schema changes were made.
+
+**Sources examined:** `main.py`; `local/csharp-endpoint-migration-chunks.md`; active `app/api/endpoints/` routers and `app/core/{auth,supabase_service,feedback_service}.py`; `app/services/supabase_content_repository.py`; and the existing `dotnet/src/CFC.ChatAI.Supabase/` contracts/adapters.
+
+## 1. Active route inventory and migration cross-check
+
+`main.py` mounts the following API routers (prefixes shown after composition). This agrees with the 42-route inventory in `local/csharp-endpoint-migration-chunks.md`; the router module also defines SPA/static routes, which are not API operations. The `transcripts.py` router is **not mounted** and is correctly described as optional in the migration chunks. The legacy `/content/images/{path:path}` alias is separately mounted and delegates to the chat image-serving handler.
+
+| Route group | Active routes | Supabase role in this plan |
+|---|---|---|
+| Health/config/visibility (4) | `GET /api/health`; `GET /api/health/detailed`; `GET /api/auth/config`; `GET /api/visibility/vector-store` | Detailed health performs a service-role `profiles` connectivity query. Other routes are host/config/vector-store concerns; auth config publishes only URL + anon key. |
+| Auth/profile (5) | `POST /api/auth/forgot-password`; `POST /api/auth/check-email`; `GET /api/profile/me`; `PATCH /api/profile/me`; `POST /api/profile/complete` | Auth recovery and invite eligibility use service-role/privileged calls; profile routes use a user-scoped anon-key client for the table query after service-role-backed token/profile checks. |
+| Admin identity/invites (7) | `POST /api/admin/invite`; `GET /api/admin/invitations/status/{email}`; `GET /api/admin/users`; `POST /api/admin/change-role`; `POST /api/admin/users/{user_id}/deactivate`; `POST /api/admin/users/{user_id}/reactivate`; `DELETE /api/admin/users/{user_id}` | Service-role table/Auth-admin operations after application-level admin authorization. |
+| Admin settings/ingestion status (3) | `GET /api/admin/settings`; `PATCH /api/admin/settings`; `GET /api/admin/ingestion/stats` | Local settings/filesystem operations; no Supabase persistence required by the inspected implementations. |
+| Stateless chat (4) | `POST /api/chat/search`; `POST /api/chat/ask`; `POST /api/chat/ask/video`; `POST /api/chat/recommendations` | These combine application/provider workflows; document-chunk hydration and feedback score reads are service-role Supabase persistence. Search/LLM/embeddings/vector store are outside this module. |
+| Chat sessions/messages/feedback (8) | `GET /api/chat/sessions` (including `detail=true`); `POST /api/chat/sessions`; `GET /api/chat/sessions/{session_id}`; `DELETE /api/chat/sessions/{session_id}`; `PATCH /api/chat/sessions/{session_id}`; `POST /api/chat/message`; `POST /api/chat/feedback`; `GET /api/chat/feedback` | Sessions routes use user-scoped access. `message` and feedback routes currently use service-role access with explicit ownership checks in application code. |
+| Intake/ingestion (4) | `POST /api/files/upload`; `POST /api/files/bulk`; hidden-from-OpenAPI `POST /api/ingest/document`; hidden-from-OpenAPI `POST /api/ingest/bulk` | Storage mirror and document chunk writes use service-role credentials; parser, embeddings, Pinecone, and orchestration remain outside Supabase. |
+| Admin document lifecycle (4) | `GET /api/admin/documents`; `GET /api/admin/documents/{doc_id}/download`; `DELETE /api/admin/documents/{doc_id}`; `PUT /api/admin/documents/{doc_id}/replace` | Service-role chunk queries, Storage, and chunk-row deletes; Pinecone coordination and replacement lifecycle must stay above Supabase adapters. |
+| Video upload/indexing (1) | `POST /api/videos/upload` | Service-role Storage and `document_chunks` writes; transcription/embedding/Pinecone are not Supabase responsibilities. |
+| Content image delivery (2) | `GET /api/chat/content/images/{path:path}`; `GET /content/images/{path:path}` | Reads from configured Storage or local content repository. The latter is an alias of the former. |
+
+## 2. Observed operation and authorization matrix
+
+“Service role” below describes the Python implementation observed in this repository, not a recommendation to preserve implicit privilege. It is an important migration compatibility baseline. The .NET implementation must make privileged capabilities explicit and must not turn these operations into user-scoped calls or vice versa without an intentional decision and RLS verification.
+
+| Operation | Python credential / scope observed | Current behavior and unresolved security decision |
+|---|---|---|
+| Validate bearer token (`get_current_user`) | Service-role Supabase Auth `get_user(token)` | Auth token validation is followed by service-role `profiles(id,status,deleted_at)` lookup; missing profile => 403, inactive/deleted/non-active => 403. Keep token validation distinct from profile/authorization lookup. Existing .NET `IIdentityGateway` validates via anon key + supplied bearer token, which is a deliberate implementation difference to retain or resolve with API owners. |
+| Admin role check (`get_current_admin`) | Service role | Reads `profiles.role` for validated user; allows `admin` and `superuser`. This is application authorization logic, not a repository policy. |
+| Self profile GET/PATCH/complete | Anon key + caller JWT set on a per-request-created Supabase client | Reads profile by `id`; self-update allows only provided `full_name` and `avatar_url`; empty update is HTTP 400. Relies on RLS. `complete` delegates to the same update. Preserve caller token per request, never shared mutable auth state. |
+| Forgot password | Service role as both `apikey` and bearer on direct `/auth/v1/recover` | Always masks account existence; 429 returns `success=false`, other provider failures are logged and response remains generic success. Existing .NET recovery uses anon key, so this credential behavior is a documented difference requiring decision; do not silently change. |
+| Check-email eligibility | Service-role table access | Looks up latest unregistered invitation ordered by `created_at DESC`; application compares `expires_at` against UTC now. Provider/query failure fails closed (`eligible=false` with temporary error message). |
+| Admin invitation create/status | Service role | Create first checks profile email, then unregistered invitation; active invite => 409; expired invite is deleted by ID before insert; insert sends `email,created_by` and expects DB-generated `expires_at`. Status uses latest invitation and statuses `active|expired|registered|none`. Insert catches unique violations/index-name string to map conflict to 409. |
+| Admin user/profile operations | Service role | List profiles, role/status reads and updates. Role options `user|dev|admin`; superuser role/self-action protections and lifecycle decisions are endpoint policy. Deactivate writes inactive + deletion metadata; reactivation clears metadata. Auth ban/sign-out calls are best-effort in current flow. Hard delete deletes invitations by email, then deletes Auth user; claimed DB cascades need verification. |
+| Sessions list/create/read/update/delete | Anon key + caller JWT | RLS is expected to enforce ownership. Create explicitly writes `user_id`; list order is created descending; detail mode joins counts and reads last user message preview. History reads ordered messages. Delete separately deletes messages then session after ownership read; this is not transactional. |
+| Chat message ownership, messages, history | Service role | Checks session by both `id` and `user_id`; inserts user message, queries 10 most recent role/content rows, runs chat outside persistence, inserts assistant message with JSON metadata `{citations,relevant_images}`. Explicit filters are the only observed ownership barrier for these service-role calls. Preserve explicitly if migrated; do not claim RLS protection. |
+| Feedback submit/read | Service role | Submit checks message -> session ownership, validates rating `-1|1|null`, calls `submit_message_feedback(p_message_id,p_user_id,p_new_rating)` once; endpoint claims RPC atomically upserts vote and adjusts aggregates. Read checks owned session, gathers message IDs, selects current user's `feedback(message_id,score)`, omitting null score. |
+| Feedback query-event background sync | Service role | Deletes `chunk_feedback_events` by message ID; for non-null votes reads assistant `session_id,created_at,metadata`, extracts citation chunk IDs, fetches preceding user content, then inserts events with supplied embedding. Delete + read + insert are separate requests and best effort, not atomic. |
+| Feedback score reads / query-aware RPC | Service role | Reads `chunk_feedback_scores(chunk_id,net_score)`; invokes `get_query_aware_chunk_scores(p_query_emb,p_chunk_ids,p_sim_threshold)`. Embeddings are created outside Supabase. |
+| Document chunk hydration/upsert/list/delete | Service role in Python | Uses `document_chunks`, including `chunk_id`, `doc_id`, `content`, section/source/image/video metadata. Chunk IDs and doc IDs are distinct concepts. Admin document listing pages chunk rows and aggregates by doc ID. Chunk deletion by IDs is separate from document-wide lifecycle orchestration. |
+| Storage upload/download/list/delete/signed/public URL | Service role | Configured docs/videos buckets. Calls use overwrite/upsert; signed download lifetime is 300 seconds in admin download. Storage cleanup performs folder listings then removes returned names. Recursive/nested traversal, pagination, and deployed key layouts are not established by code alone. |
+| Health Supabase check | Service role | Reads one `profiles.id`; operational diagnostic, no repository contract required. |
+
+## 3. Schema and deployed-database reconnaissance
+
+### Evidence available locally
+
+- Python table and RPC names/column use are visible in the route/service code and summarized above.
+- Python source uses `profiles`, `invitations`, `chat_sessions`, `chat_messages`, `feedback`, `document_chunks`, `chunk_feedback_scores`, and `chunk_feedback_events`.
+- Python RPC invocation names and argument names visible in source: `submit_message_feedback(p_message_id,p_user_id,p_new_rating)`, `get_query_aware_chunk_scores(p_query_emb,p_chunk_ids,p_sim_threshold)`, and legacy `update_chunk_feedback_score(p_chunk_id,p_old_rating,p_new_rating)` (the latter appears in a helper but is explicitly described as unused by the normal submit path).
+- The query-aware event data serializes query embeddings as vectors; source comments describe 384 dimensions, but this is not database verification.
+- Storage settings default to `cfc-docs` and `cfc-videos` (with legacy `SUPABASE_BUCKET` fallback). At least two path layouts are evidenced in code: documents under `docs/{doc_id}/original|sections|images/...`; videos under `videos/{slug}/original|transcripts|summary/...`. A second video repository contains legacy layouts (`videos/original/{slug}/...`, `videos/transcript/{slug}.*`, `videos/summaries/{slug}.*`). The active video upload route uses the former layout.
+- Existing .NET module contracts include chunk, feedback, identity, and object-storage capabilities, but do not establish remote schema, RLS, grants, or foreign-key behavior.
+- Supplied project exports: `schema.sql`, `user-rls-policies.csv`, and `privileges.csv`. The schema defines `public.profiles` with `id` referencing `auth.users(id)`, nullable profile/deletion fields, role/status checks, and `created_at`. The RLS export shows self INSERT, UPDATE, and SELECT policies. The SELECT policy excludes deleted profiles; INSERT and UPDATE check only `auth.uid() = id`.
+- The privileges export reports effective `INSERT` and `UPDATE` privileges on every profile column for both `authenticated` and `anon`; it also reports profile read/update privileges for `service_role`. The export does not establish whether these are table-level or column-level ACL entries. Combined with the policies, authenticated users can change privileged fields on their own profile and can supply privileged fields when inserting a profile. This is a confirmed security design defect in the supplied evidence, pending confirmation that exports are from the intended live project.
+
+### Not present / not verifiable in this checkout
+
+A repository search found no checked-in Supabase migration/schema SQL defining these objects. The supplied exports cover profile schema, policies, and effective privileges, but do not establish the source project/environment or the ACL grant origin. Other target-project facts remain unverified: primary/unique/partial indexes beyond the included schema excerpt; invitation partial unique index name and predicate; database default for `expires_at`; Auth/profile trigger behavior; foreign-key actions/cascade/set-null semantics; RPC implementation, transaction guarantees, parameter SQL types, vector dimension/index/grants; other tables' grants/RLS; and Storage bucket visibility, policies, object paths, or limits.
+
+A live or exported non-production project inspection remains required. Confirm the project/environment for these profile exports, inspect the underlying ACLs and any profile triggers, review a database-side least-privilege remediation, and collect the remaining DDL/catalog evidence (indexes, other policies/grants, FK actions, functions, vector dimensions, bucket metadata and Storage policies), plus representative object path examples. Do not paste keys, JWTs, signed URLs, user PII, or unrestricted project dumps into this document. No credentials were needed or used for this repository-only review.
+
+### Schema assumptions that must be verified before adapter implementation/migration
+
+1. `profiles`: supplied schema confirms the primary key/FK, role/status checks, and deletion metadata columns. Supplied policies permit own-row INSERT/UPDATE and hide deleted rows from SELECT. Effective privileges include all-column INSERT/UPDATE for `authenticated` (and `anon`); policy expressions do not restrict columns. Verify intended project and profile-creation trigger, inspect ACL source, and implement/review database-side restrictions so users cannot set role/status/deletion metadata.
+2. `invitations`: exact columns and types (`id,email,created_by,is_registered,created_at,expires_at` inferred from use); unique index predicate for unregistered invites; generated expiry default; FK action for `created_by`; whether deletion of expired/replaced records is permitted to the selected role.
+3. `chat_sessions` / `chat_messages`: IDs/timestamp defaults; owner field/FK; message metadata JSON type; session-message FK action; user-scoped insert/update/delete policies; whether user can delete messages directly. Python explicitly deletes messages before session, so cascade must not be inferred.
+4. `feedback`: `message_id,user_id,score` types, uniqueness for `(message_id,user_id)`, nullable score and FK delete behavior. Verify `submit_message_feedback` and the aggregate update share one Postgres transaction, and validate its grants/security-definer/search-path behavior.
+5. `document_chunks`: complete column types and constraints, conflict target for `chunk_id`, nullable video-specific fields, image-path type, and grants/RLS for service-role upsert/select/delete. Source comments are not schema evidence.
+6. `chunk_feedback_scores` and `chunk_feedback_events`: columns, FK delete actions, event uniqueness/duplicates policy, `net_score` meaning/type, embedding vector dimension and index, exact RPC overload signatures/parameter SQL types/return columns/grants. Confirm whether security definer is used and its execution context.
+7. Storage: real bucket names, private/public status, object policies/grants for the chosen service role, maximum object size, overwrite semantics, nested-folder listing pagination/response shape, and actual keys in each bucket. Confirm whether both legacy and current video key layouts remain live.
+
+## 4. Contract DTOs and operation semantics to implement
+
+These are application-owned contract shapes/behaviors, not copied Supabase wire DTOs. Nullable fields are intentional. Persisted timestamps should be represented in UTC (`DateTimeOffset`/ISO-8601 at API boundaries). Repositories return typed absence rather than conflating absence with provider failure. Provider failures must remain sanitized.
+
+### Profiles and invitations
+
+| Contract/operation | Proposed contract shape | Absence, conflict, and failure semantics |
+|---|---|---|
+| `UserProfile` | `Id, Email, FullName?, AvatarUrl?, Role, Status, CreatedAt` | Self-profile lookup returns `null` if no visible row; not token validation. A dependency failure is a sanitized dependency exception. |
+| `UpdateOwnProfile` | `FullName?, AvatarUrl?` only; include explicit field-presence representation if PATCH must distinguish omitted from explicit null | Reject empty update at application/API boundary. Must not accept role/status/deletion metadata. Writes use anon key + per-request access token and RLS; zero affected rows => not found/forbidden outcome (API mapping decided above adapter). |
+| `AdminProfile` | `Id, Email, FullName?, AvatarUrl?, Role, Status, CreatedAt, DeletedAt?, DeletedBy?` plus `LastActive?` only as API placeholder, not persisted data | `GetById/GetByEmail` absent => `null`; list is bounded/paged and stable order; admin list’s existing sort is status active/inactive/deleted then `created_at DESC` (stable for ties in current Python behavior). |
+| Admin profile writes | narrowly scoped `SetRole(userId,role)` and `SetStatus(userId,status,deletedAt,deletedBy)` | No policy validation in repository; missing row => not found. Auth ban/sign-out/delete remain `IAdminIdentityGateway` capabilities. |
+| `Invitation` | `Id, Email, CreatedBy?, IsRegistered, CreatedAt, ExpiresAt` | `FindLatestByEmail`, `FindUnregisteredByEmail`, `FindProfileByEmail` return nullable results. Latest ordering is `created_at DESC`; unregistered lookup is email + `is_registered=false`. |
+| Invitation insert/delete | Insert `{Email,CreatedBy}` and return persisted `Invitation`; delete expired/replaced by ID; delete by email | Database-generated `id/created_at/expires_at` must be returned; unique conflict maps to a typed `PersistenceConflictException` with no SQL/body leakage. Application computes `active|expired|registered|none` using UTC and resolves eligibility/policy. Separate lookup/delete/insert is not atomic; the unique index must arbitrate races. |
+
+### Conversations and feedback
+
+| Contract/operation | Proposed contract shape | Absence, conflict, and failure semantics |
+|---|---|---|
+| `ChatSession` | `Id, UserId, Title?, CreatedAt`; detail projection adds `MessageCount, LastUserMessagePreview?` | List is owner-scoped, created descending, paged/bounded. Session lookup for a user returns null if absent/not visible. Create returns persisted row including generated ID/time. |
+| `ChatMessage` | `Id, SessionId, Role, Content, CreatedAt, Metadata?` (`Metadata` is JSON with citations and relevant images) | History ordered oldest-first. Context query returns last N role/content rows newest-first at DB then reverses in application (N=10 current chat behavior). Explicit owner filter or verified user RLS required on every access. |
+| Session writes | Create session, update title, delete session; insert user/assistant message; metadata/timestamp read for feedback | Empty/no affected row is absence, not successful mutation. Session deletion is not claimed transactional if it uses message deletion then session deletion; report partial failure and leave retries/compensation to application workflow. Inserts return persisted IDs/timestamps. |
+| Session detail | count messages + most recent user-role message content truncated to 100 characters by existing API | Prefer the current response contract; do not assume the count is included in a single PostgREST join unless the deployed relationship/policy is verified. |
+| Feedback read | `GetUserScoresForMessages(userId, boundedMessageIds) -> IReadOnlyDictionary<MessageId,int>` | Include only non-null scores; absent rows and null scores both omitted as in current API. Ownership/session validation is application/conversation workflow. Bound and batch supplied IDs. |
+| Feedback submit | `FeedbackSubmission(MessageId,UserId,Rating?)`, only `-1,1,null` | One RPC call, preserve deployed atomic vote + aggregate behavior only after verifying the function. No rows/return value is not automatically an error if RPC is void. |
+| Query-event persistence | Event set of `(ChunkId,MessageId,Rating)` + supplied embedding; delete events by message ID | Database serialization only; embedding/model creation stays outside this project. Delete followed by insert is multiple requests and non-atomic. Event generation may be best-effort at the application boundary. |
+
+### Documents and Storage
+
+| Contract/operation | Proposed contract shape | Absence, conflict, and failure semantics |
+|---|---|---|
+| `DocumentMetadata` | `DocumentId, Source, SourceType` | One-row lookup by doc ID; absent => null. If multiple chunk rows differ, flag data inconsistency rather than silently selecting arbitrary metadata (current Python uses an arbitrary first row). |
+| `DocumentSummary` | `DocumentId, Source, SourceType, ChunkCount` | Initial adapter may retain bounded/paged chunk scan and aggregate; deterministic source ordering. Page exhaustion must be detectable and cancellation honored. |
+| Existing `Chunk` | Existing fields include ID/doc ID/content, section/source/image/video metadata | No vector IDs or Pinecone concerns beyond chunk identifiers; Supabase operations only. Chunk delete remains keyed to Supabase chunk IDs/doc IDs and does not coordinate vector deletion. |
+| Existing Storage keys | `StorageArea.Documents|Videos`, relative validated `ObjectKey` and `ObjectPrefix` | Keep bucket mapping explicit. Upload supports overwrite choice; download owns/disposes response stream as currently modeled; list is paged. The contract does not imply recursive traversal: application workflow traverses folders/pages. Signed URL lifetime is explicit and short-lived. Public URL generation does not prove bucket is public. |
+
+## 5. Decisions before Phase 1
+
+1. **User-vs-service scope:** preserve user-token + anon-key for self-profile and session endpoints. Make an explicit application-approved choice for existing service-role session/message/feedback paths. If preserved, require user/session filters in persistence operations and authorization in application code; if changed to RLS/user-scoped access, first verify policies and test the behavior against the deployed schema.
+2. **Identity and recovery credential differences:** Python validates bearer tokens via service-role-backed SDK and sends recovery using service role; existing .NET identity validation uses anon key + supplied user token and password recovery uses anon key. Decide whether these are intended hardening/compatibility changes. Token validation remains separate from profile status/role.
+3. **Operation contracts:** implement the DTO/semantics in Section 4 before REST adapters. Keep focused contracts (`IUserProfileRepository`, `IAdminProfileRepository`, `IInvitationRepository`, `IConversationRepository`, feedback extension, chunk extension); avoid a broad Supabase service locator and any cross-provider workflow method.
+4. **Database gate:** obtain a sanitized non-production schema/policy/RPC/Storage inventory listed in Section 3. Resolve the assumptions before production migration; no client-side behavior can establish DB atomicity, RLS, constraints, or cascades.
+5. **Partial operations:** document that invite replacement (delete then insert), session deletion (message then session), Auth lifecycle + profile update, document deletion across storage/database/vector store, and feedback event sync span multiple calls and are not transactions unless separately verified and implemented as such.
+
+## Phase 0 exit assessment
+
+- [x] Active router inventory performed and cross-checked against the 42-route migration-chunk document; unmounted transcript routes excluded.
+- [x] Observed table/RPC/Storage use and current Python credential mode recorded.
+- [x] Candidate contract DTOs and missing/nullable/conflict/failure semantics specified.
+- [x] Supplied profile schema, RLS expressions, and effective privileges reviewed; self-service profile write escalation risk recorded.
+- [ ] Confirm profile exports are from the intended target project; inspect ACL origin/triggers; apply and verify reviewed least-privilege remediation, including direct API negative tests.
+- [ ] Remaining target-project indexes/constraints, other-table RLS/grants, foreign keys/cascades, RPC definitions/transaction behavior, and Storage policies/path samples verified.
+- [ ] Owner decision recorded for preserving or changing service-role use in chat/message/feedback paths and for Python-vs-.NET auth/recovery credential differences.
+
+**Phase 0 is not fully closed.** The supplied profile evidence reveals that the current RLS policies are not sufficient to constrain self-service writes: all-column INSERT/UPDATE privileges allow authenticated users to set privileged profile fields on their own row. Resolve this security issue before production use of self-service profile writes. Other database facts and security-scope decisions above also remain unverified.

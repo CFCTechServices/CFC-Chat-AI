@@ -1,0 +1,1 @@
+This synthetic text fixture is supported by the C# processor but not the Python document processor.

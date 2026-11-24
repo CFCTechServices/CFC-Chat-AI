@@ -1,5 +1,51 @@
 // Chat message bubble, typing indicator, video bubble, and feedback actions
 (() => {
+  function ChatImage({ segment, token, onImageClick }) {
+    const needsResolution = segment.url.startsWith('/api/chat/content/images/');
+    const [resolvedUrl, setResolvedUrl] = React.useState(null);
+    const [failed, setFailed] = React.useState(false);
+    const [retry, setRetry] = React.useState(0);
+    React.useEffect(() => {
+      if (!needsResolution || !token) return;
+      const controller = new AbortController();
+      let objectUrl;
+      setResolvedUrl(null);
+      setFailed(false);
+      (async () => {
+        const response = await fetch(segment.url, {
+          headers: { Authorization: `Bearer ${token}` }, signal: controller.signal, redirect: 'error',
+        });
+        if (!response.ok) throw new Error('Image unavailable');
+        const contentType = response.headers.get('content-type') || '';
+        let url;
+        if (contentType.startsWith('application/json')) {
+          const result = await response.json();
+          url = result.url;
+          if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) throw new Error('Invalid image link');
+        } else if (contentType.startsWith('image/')) {
+          // The Python backend returns image bytes rather than a signed URL.
+          const blob = await response.blob();
+          if (controller.signal.aborted) return;
+          url = objectUrl = URL.createObjectURL(blob);
+        } else {
+          throw new Error('Unexpected image response');
+        }
+        if (!controller.signal.aborted) setResolvedUrl(url);
+      })().catch(() => { if (!controller.signal.aborted) setFailed(true); });
+      return () => {
+        controller.abort();
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+      };
+    }, [needsResolution, segment.url, token, retry]);
+
+    const url = needsResolution ? resolvedUrl : segment.url;
+    const alt = segment.alt || 'Document image';
+    if (failed) return <span>{alt} (unavailable)</span>;
+    if (!url) return null;
+    return <img src={url} alt={alt} className="chat-image" onClick={() => onImageClick?.(url)}
+      onError={() => needsResolution && retry === 0 ? setRetry(1) : setFailed(true)} />;
+  }
+
   function ChatMessage({ message, onImageClick, onVideoClick, token, sessionId, onFeedback }) {
     const isUser = message.role === 'user';
 
@@ -57,7 +103,7 @@
       if (segments && segments.length) {
         return segments.map((seg, idx) => {
           if (seg.type === 'text') return <MarkdownText key={idx} text={seg.text} />;
-          if (seg.type === 'image') return <img key={idx} src={seg.url} alt={seg.alt || 'Image'} className="chat-image" onClick={() => onImageClick && onImageClick(seg.url)} />;
+          if (seg.type === 'image') return <ChatImage key={`${idx}:${seg.url}`} segment={seg} token={token} onImageClick={onImageClick} />;
           if (seg.type === 'video') return <VideoBubble key={idx} segment={seg} onVideoClick={onVideoClick} />;
           return null;
         });

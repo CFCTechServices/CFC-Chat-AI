@@ -72,6 +72,8 @@ data/videos/meta/*.whisper.json
 *.vtt
 *.txt
 *.json
+!/deployment/package.json
+!/deployment/package-lock.json
 
 ########################################
 #       Media (large files)

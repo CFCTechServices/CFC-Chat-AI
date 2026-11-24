@@ -18,8 +18,7 @@
     const [error, setError] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [actionState, setActionState] = useState({});
-    const fileInputRef = useRef(null);
-    const replaceTargetRef = useRef(null);
+    const mutatingRef = useRef(new Set());
 
     const authHeaders = useCallback(() => ({
       Authorization: `Bearer ${session?.access_token}`,
@@ -55,21 +54,61 @@
 
     // --- Delete ---
     const handleDelete = async (docId) => {
+      if (mutatingRef.current.has(docId)) return;
       setDeleteTarget(null);
+      if (!session?.access_token || (session.expires_at && session.expires_at * 1000 <= Date.now())) {
+        setDocAction(docId, { error: 'Session missing or expired. Sign in again.' });
+        return;
+      }
+      mutatingRef.current.add(docId);
       setDocAction(docId, { busy: true, error: null, message: null });
       try {
         const res = await fetch(`/api/admin/documents/${encodeURIComponent(docId)}`, {
           method: 'DELETE',
           headers: authHeaders(),
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error(data.detail || `Delete failed (${res.status})`);
-        }
+        }).catch(() => { throw new Error('Deletion response was lost. Reconciliation may be required.'); });
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 401 || res.status === 403) throw new Error('Session expired or access denied. Sign in as an active admin.');
+        if (res.status === 404) throw new Error('Document not found. If a prior deletion failed, ask an operator to reconcile it.');
+        if (!res.ok) throw new Error(data.detail || `Delete failed (${res.status}). Reconciliation may be required.`);
+        if (data.success !== true || data.message !== 'Document deleted.')
+          throw new Error('Deletion response was ambiguous. Reconciliation may be required.');
         setDocuments(prev => prev.filter(d => d.doc_id !== docId));
         setDocAction(docId, { busy: false });
       } catch (err) {
+        setDocAction(docId, { busy: false, error: err.message || 'Response lost. Reconciliation may be required.' });
+      } finally {
+        mutatingRef.current.delete(docId);
+      }
+    };
+
+    const handleReplace = async (doc, file) => {
+      const docId = doc.doc_id;
+      if (!file || mutatingRef.current.has(docId)) return;
+      if (!session?.access_token) {
+        setDocAction(docId, { error: 'Sign in again before replacing this document.' });
+        return;
+      }
+      if (!window.confirm(`Replace ${basename(doc.source)} with ${file.name}? The filename must match the existing document ID and format.`)) return;
+      mutatingRef.current.add(docId);
+      setDocAction(docId, { busy: true, error: null, message: null });
+      try {
+        const body = new FormData();
+        body.append('file', file);
+        const res = await fetch(`/api/admin/documents/${encodeURIComponent(docId)}/replace`, {
+          method: 'PUT', headers: authHeaders(), body,
+        }).catch(() => { throw new Error('Replacement response was lost. Ask an operator to reconcile before retrying.'); });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error((data.detail || `Replacement failed (${res.status})`) +
+          (data.reference ? ` Reference: ${data.reference}` : ''));
+        if (data.success !== true || data.ingestion?.doc_id !== docId)
+          throw new Error('Replacement response was ambiguous. Ask an operator to reconcile before retrying.');
+        setDocAction(docId, { busy: false, message: data.message });
+        fetchDocuments();
+      } catch (err) {
         setDocAction(docId, { busy: false, error: err.message });
+      } finally {
+        mutatingRef.current.delete(docId);
       }
     };
 
@@ -91,48 +130,8 @@
       }
     };
 
-    // --- Replace ---
-    const triggerReplace = (docId) => {
-      replaceTargetRef.current = docId;
-      fileInputRef.current.value = '';
-      fileInputRef.current.click();
-    };
-
-    const handleReplaceFileChosen = async (e) => {
-      const file = e.target.files?.[0];
-      const docId = replaceTargetRef.current;
-      if (!file || !docId) return;
-
-      setDocAction(docId, { busy: true, error: null, message: null });
-      const form = new FormData();
-      form.append('file', file);
-
-      try {
-        const res = await fetch(`/api/admin/documents/${encodeURIComponent(docId)}/replace`, {
-          method: 'PUT',
-          headers: authHeaders(),
-          body: form,
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.detail || `Replace failed (${res.status})`);
-        setDocAction(docId, { busy: false, message: 'Replaced successfully.' });
-        fetchDocuments();
-      } catch (err) {
-        setDocAction(docId, { busy: false, error: err.message });
-      }
-    };
-
     return (
       <div className="tab-content">
-        {/* Hidden file input for replace */}
-        <input
-          type="file"
-          ref={fileInputRef}
-          style={{ display: 'none' }}
-          accept=".doc,.docx"
-          onChange={handleReplaceFileChosen}
-        />
-
         {/* Delete Confirmation Modal — same pattern as user.jsx */}
         {deleteTarget && (
           <>
@@ -279,18 +278,17 @@
                             <line x1="12" y1="15" x2="12" y2="3"/>
                           </svg>
                         </button>
-                        {/* Replace button — pencil icon, same style as btn-delete */}
-                        <button
-                          className="btn-delete"
-                          title="Replace document"
-                          onClick={() => triggerReplace(doc.doc_id)}
-                          aria-label={`Replace ${basename(doc.source)}`}
-                        >
-                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-                            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                          </svg>
-                        </button>
+                        {doc.source_type === 'document' && (
+                          <label className="btn-secondary">
+                            Replace file
+                            <input type="file" accept=".pdf,.doc,.docx,.txt,.md,.eml" aria-label={`Replace ${basename(doc.source)}`}
+                              onChange={e => {
+                                const file = e.target.files?.[0];
+                                e.target.value = '';
+                                handleReplace(doc, file);
+                              }} />
+                          </label>
+                        )}
                         {/* Delete button — exact same as user.jsx */}
                         <button
                           className="btn-delete"

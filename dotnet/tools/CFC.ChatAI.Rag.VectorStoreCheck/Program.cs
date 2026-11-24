@@ -1,10 +1,12 @@
 ﻿using System.Text.Json;
-using CFC.ChatAI.Rag;
+using CFC.ChatAI.Pinecone.Internal;
 
 // Read-only parity check for PineconeVectorStore
 // Replays the exact query vectors Python used (retrieval_reference.json) and compares
 // chunk IDs and scores. Credentials are read from the repo's .env (never printed)
 // Run from the dotnet/ folder : dotnet run --project tools/CFC.ChatAI.Rag.VectorStoreCheck
+// Add -- --text to go through TextVectorStore instead: C# embeds each question's text with the
+// ONNX model (models/model.onnx), so the embedder and vector store are checked together.
 
 var env = LoadDotEnv(Path.Combine("..",".env"));
 string Setting(string key) => 
@@ -13,14 +15,25 @@ string Setting(string key) =>
 var store = new PineconeVectorStore(
     Setting("PINECONE_API_KEY"), Setting("PINECONE_INDEX_NAME"), Setting("PINECONE_NAMESPACE"));
 
+bool textMode = args.Contains("--text");
+using var embedder = textMode
+    ? new OnnxEmbeddingModel(Path.Combine("models", "model.onnx"), Path.Combine("models", "vocab.txt"))
+    : null;
+var textStore = embedder is null ? null : new TextVectorStore(embedder, store);
+Console.WriteLine(textMode
+    ? "Mode: text (C# embeds each question, then queries)\n"
+    : "Mode: vector (replaying Python's query vectors)\n");
+
 var references = JsonSerializer.Deserialize<List<RetrievalReference>>(
-    File.ReadAllText("tests/CFC.ChatAI.Rag.Tests/TestData/retrieval_reference.json"),
+    File.ReadAllText("tests/CFC.ChatAI.Pinecone.Tests/TestData/retrieval_reference.json"),
     new JsonSerializerOptions { PropertyNameCaseInsensitive = true, PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower })!;
 
 int passCount = 0, tieCount = 0, failCount = 0;
 foreach (var reference in references)
 {
-    var actual = await store.QueryAsync(reference.QueryVector, topK: reference.Matches.Count, includeMetadata: false);
+    var actual = textStore is null
+        ? await store.QueryAsync(reference.QueryVector, topK: reference.Matches.Count, includeMetadata: false)
+        : (await textStore.SearchAsync(reference.Question, topK: reference.Matches.Count, includeMetadata: false)).Matches;
     var verdict = Compare(reference.Matches, actual);
 
     if (verdict.StartsWith("PASS")) passCount++;

@@ -6,6 +6,13 @@
 
   const ROLES = ['user', 'dev', 'admin'];
 
+  async function requireAccountSuccess(res) {
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((data.detail || `Account operation failed (${res.status})`) +
+      (data.reference ? ` Reference: ${data.reference}` : ''));
+    return data;
+  }
+
   function UsersTab() {
     const { session, user: currentUser } = useUser();
     const [users, setUsers] = useState([]);
@@ -85,9 +92,10 @@
           method: 'POST',
           headers: authHeaders(),
           body: JSON.stringify({}),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'Action failed');
+        }).catch(() => { throw new Error('Account operation response was lost. Contact an operator or retry the same action.'); });
+        const data = await requireAccountSuccess(res);
+        if (data.user_id !== user.id || data.status !== (isActive ? 'inactive' : 'active'))
+          throw new Error('Account operation was not confirmed. Contact an operator.');
         fetchUsers();
       } catch (e) {
         setActionError(e.message);
@@ -112,14 +120,15 @@
 
     const handleDelete = async (userId) => {
       setActionError(null);
+      setDeleteTarget(null);
       try {
         const res = await fetch(`/api/admin/users/${userId}`, {
           method: 'DELETE',
           headers: authHeaders(),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'Failed to delete user');
-        setDeleteTarget(null);
+        }).catch(() => { throw new Error('Deletion response was lost. Contact an operator or retry deletion of the same account.'); });
+        const data = await requireAccountSuccess(res);
+        if (data.user_id !== userId || data.permanently_deleted !== true)
+          throw new Error('Account deletion was not confirmed. Contact an operator.');
         fetchUsers();
       } catch (e) {
         setActionError(e.message);
@@ -301,19 +310,20 @@
                 <div className="user-actions">
                   {u.role !== 'superuser' && (() => {
                     const isSelf = u.id === currentUser?.id;
+                    if (!isSelf && u.status !== 'active' && u.status !== 'inactive') return null;
                     return !isSelf ? (
                       <>
-                        <span title={u.status === 'active' ? 'Deactivate user' : 'Activate user'}>
+                        {window.CFC.ApiFeatures?.accountLifecycle && <span title={u.status === 'active' ? 'Deactivate user' : 'Activate user'}>
                           <Toggle
                             checked={u.status === 'active'}
                             onChange={() => handleToggleSuspend(u)}
                           />
-                        </span>
-                        <button className="btn-delete" title="Delete user" onClick={() => setDeleteTarget(u)} aria-label={`Delete ${u.email}`}>
+                        </span>}
+                        {window.CFC.ApiFeatures?.permanentAccountDeletion && <button className="btn-delete" title="Delete user" onClick={() => setDeleteTarget(u)} aria-label={`Delete ${u.email}`}>
                           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
-                        </button>
+                        </button>}
                       </>
                     ) : (
                       <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', fontStyle: 'italic', paddingRight: '8px' }}>You</span>
